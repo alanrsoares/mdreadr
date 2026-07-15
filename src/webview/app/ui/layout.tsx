@@ -7,7 +7,7 @@ export const ReaderPanel = tw.aside(
 );
 
 export const ReaderMain = tw.main(
-  "overflow-auto border-[var(--color-border)] border-r bg-[var(--reader-well-bg)]",
+  "relative overflow-auto border-[var(--color-border)] border-r bg-[var(--reader-well-bg)]",
 );
 
 export const ReaderNotesAside = tw.aside(
@@ -39,7 +39,7 @@ export const PanelStack = tw.div`grid gap-3 p-4`;
 export const ButtonRow = tw.div`flex flex-wrap gap-2`;
 
 export const NoteCard = tw.div(
-  "mb-3 rounded-[var(--radius-container)] border border-[var(--color-border)] p-3",
+  "mb-3 rounded-[var(--radius-container)] border border-[var(--color-border)] p-3 transition-[opacity,border-color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)]",
   {
     variants: {
       $status: {
@@ -69,7 +69,7 @@ export const ReplyBubble = tw.div`rounded-[var(--radius-inner)] bg-[var(--color-
 export const ReplyBody = tw.div`whitespace-pre-wrap break-words text-[var(--color-text-primary)]`;
 
 export const NoteAnchorButton = tw.button(
-  "m-0 max-w-[14rem] cursor-pointer truncate border-none bg-transparent p-0 text-left font-semibold text-[var(--color-text-primary)] underline-offset-2 hover:underline",
+  "m-0 max-w-[14rem] cursor-pointer truncate border-none bg-transparent p-0 text-left font-semibold text-[var(--color-text-primary)] underline-offset-2 transition-[color,transform] duration-[var(--duration-fast-min)] ease-[var(--ease-standard)] hover:translate-x-px hover:underline",
 );
 
 export const ReplyAuthor = tw.div`mb-1 text-[var(--color-text-secondary)] text-xs`;

@@ -77,9 +77,7 @@ export function buildRecentPathDisplays(paths: readonly string[]): Map<string, R
   return displays;
 }
 
-export function formatRecentMenuLabels(
-  paths: readonly string[],
-): Map<string, RecentPathMenuLabel> {
+export function formatRecentMenuLabels(paths: readonly string[]): Map<string, RecentPathMenuLabel> {
   const displays = buildRecentPathDisplays(paths);
   const labels = new Map<string, RecentPathMenuLabel>();
 

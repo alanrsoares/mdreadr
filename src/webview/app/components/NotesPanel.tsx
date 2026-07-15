@@ -91,7 +91,7 @@ export function NotesPanel({
       </ButtonRow>
 
       {pendingAnchor ? (
-        <NoteCard $status="open">
+        <NoteCard $status="open" className="reader-enter">
           <MutedText>
             New note on <strong>{anchorDisplayLabel(pendingAnchor)}</strong>
           </MutedText>
@@ -125,10 +125,11 @@ export function NotesPanel({
         </MutedText>
       )}
 
-      {sortedNotes.map((note) => (
+      {sortedNotes.map((note, index) => (
         <NoteCardItem
           key={note.id}
           note={note}
+          enterDelayMs={Math.min(index, 6) * 40}
           replyDraft={replyDrafts[note.id] ?? ""}
           isReplyOpen={expandedReplies[note.id] ?? false}
           onToggleReply={() =>
@@ -148,6 +149,7 @@ export function NotesPanel({
 
 function NoteCardItem({
   note,
+  enterDelayMs,
   replyDraft,
   isReplyOpen,
   onToggleReply,
@@ -157,6 +159,7 @@ function NoteCardItem({
   onScrollToAnchor,
 }: {
   note: Note;
+  enterDelayMs: number;
   replyDraft: string;
   isReplyOpen: boolean;
   onToggleReply: () => void;
@@ -166,7 +169,11 @@ function NoteCardItem({
   onScrollToAnchor: () => void;
 }) {
   return (
-    <NoteCard $status={note.status}>
+    <NoteCard
+      $status={note.status}
+      className="reader-note-enter"
+      style={{ animationDelay: `${enterDelayMs}ms` }}
+    >
       <NoteCardHeader>
         <NoteAnchorLink anchor={note.anchor} onClick={onScrollToAnchor} />
         <Selector
@@ -196,7 +203,7 @@ function NoteCardItem({
       </ReplyList>
 
       {isReplyOpen ? (
-        <ReplyStack>
+        <ReplyStack className="reader-reveal">
           <TextArea
             label="Reply"
             isLabelHidden
@@ -223,13 +230,7 @@ function NoteCardItem({
   );
 }
 
-function NoteAnchorLink({
-  anchor,
-  onClick,
-}: {
-  anchor: BlockAnchor;
-  onClick: () => void;
-}) {
+function NoteAnchorLink({ anchor, onClick }: { anchor: BlockAnchor; onClick: () => void }) {
   const label = anchorDisplayLabel(anchor);
 
   return (

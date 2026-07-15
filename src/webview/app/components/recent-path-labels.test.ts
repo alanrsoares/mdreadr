@@ -35,10 +35,7 @@ describe("buildRecentPathDisplays", () => {
   });
 
   test("uses deeper hints when parent folder names also collide", () => {
-    const paths = [
-      "/repo/a/pkg/README.md",
-      "/repo/b/pkg/README.md",
-    ];
+    const paths = ["/repo/a/pkg/README.md", "/repo/b/pkg/README.md"];
 
     const displays = buildRecentPathDisplays(paths);
 
@@ -50,10 +47,7 @@ describe("buildRecentPathDisplays", () => {
 describe("formatRecentMenuLabels", () => {
   test("uses full path for aria labels", () => {
     const path = "/home/alan/dev/mdreadr/packages/domain/README.md";
-    const labels = formatRecentMenuLabels([
-      path,
-      "/home/alan/dev/mdreadr/packages/api/README.md",
-    ]);
+    const labels = formatRecentMenuLabels([path, "/home/alan/dev/mdreadr/packages/api/README.md"]);
 
     expect(labels.get(path)).toEqual({
       menuLabel: "README.md · domain",
@@ -68,10 +62,7 @@ describe("abbreviatePathHint", () => {
   });
 
   test("abbreviates long hints from the tail", () => {
-    const hint = abbreviatePathHint(
-      "home/alan/dev/mdreadr/packages/domain/submodule",
-      20,
-    );
+    const hint = abbreviatePathHint("home/alan/dev/mdreadr/packages/domain/submodule", 20);
     expect(hint.startsWith("…/")).toBe(true);
     expect(hint.endsWith("submodule") || hint.includes("domain")).toBe(true);
   });

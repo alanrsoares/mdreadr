@@ -5,7 +5,7 @@ import {
   ReaderDocumentChrome,
   ReaderSheet,
 } from "../ui/layout.tsx";
-import { DocumentViewModeSwitch, type DocumentViewMode } from "./DocumentViewModeSwitch.tsx";
+import { type DocumentViewMode, DocumentViewModeSwitch } from "./DocumentViewModeSwitch.tsx";
 import { MarkdownView } from "./MarkdownView.tsx";
 import { RawMarkdownView } from "./RawMarkdownView.tsx";
 
@@ -27,7 +27,7 @@ export function DocumentView({
   onPinBlock,
 }: DocumentViewProps) {
   return (
-    <ReaderSheet>
+    <ReaderSheet className="reader-sheet-enter">
       <ReaderDocumentChrome>
         <ReaderChromeControls>
           <DocumentViewModeSwitch value={viewMode} onChange={onViewModeChange} />

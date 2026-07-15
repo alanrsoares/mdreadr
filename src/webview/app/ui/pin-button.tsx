@@ -1,5 +1,7 @@
+import { Icon } from "@astryxdesign/core/Icon";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import type { BlockAnchor } from "@mdreadr/domain";
+import { MapPinIcon } from "../icons.ts";
 import { anchorDisplayLabel } from "../markdown/block-ids.ts";
 
 type PinButtonProps = {
@@ -22,7 +24,7 @@ export function PinButton({ onPin, anchor }: PinButtonProps) {
           onPin(anchor);
         }}
       >
-        Pin
+        <Icon icon={MapPinIcon} size="sm" />
       </button>
     </Tooltip>
   );

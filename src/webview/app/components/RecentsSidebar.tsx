@@ -8,37 +8,12 @@ import {
   useSideNavCollapse,
 } from "@astryxdesign/core/SideNav";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
-import type { SVGProps } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DocumentTextIcon } from "../icons.ts";
 import { formatDisplayPath } from "./display-path.ts";
 import { formatRecentMenuLabels } from "./recent-path-labels.ts";
 
 const RECENTS_SIDEBAR_COLLAPSED_KEY = "mdreadr-recents-sidebar-collapsed";
-
-function DocumentTextIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    // biome-ignore lint/a11y/noSvgWithoutTitle: decorative; item label names the file
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      aria-hidden
-      {...props}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125V5.25a2.25 2.25 0 0 0-2.25-2.25H6.75A2.25 2.25 0 0 0 4.5 4.5v15.75a2.25 2.25 0 0 0 2.25 2.25h10.5A2.25 2.25 0 0 0 19.5 19.5V14.25Z"
-      />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M14.25 5.25v5.25a2.25 2.25 0 0 0 2.25 2.25h5.25"
-      />
-    </svg>
-  );
-}
 
 function fileName(path: string): string {
   const parts = path.split(/[/\\]/);
@@ -95,12 +70,7 @@ type RecentSideNavItemProps = {
   onOpen: () => void;
 };
 
-function RecentSideNavItem({
-  menuLabel,
-  displayPath,
-  isSelected,
-  onOpen,
-}: RecentSideNavItemProps) {
+function RecentSideNavItem({ menuLabel, displayPath, isSelected, onOpen }: RecentSideNavItemProps) {
   const { isCollapsed } = useSideNavCollapse();
   const anchorRef = useRef<HTMLDivElement>(null);
   const itemLabel = isCollapsed ? displayPath : menuLabel;
@@ -115,12 +85,7 @@ function RecentSideNavItem({
         onClick={onOpen}
       />
       {!isCollapsed && displayPath !== menuLabel ? (
-        <Tooltip
-          content={displayPath}
-          placement="end"
-          alignment="start"
-          anchorRef={anchorRef}
-        />
+        <Tooltip content={displayPath} placement="end" alignment="start" anchorRef={anchorRef} />
       ) : null}
     </div>
   );
@@ -176,11 +141,7 @@ export function RecentsSidebar({
     >
       <SideNavSection title="Recents">
         {paths.length === 0 ? (
-          <SideNavItem
-            label="No recent files"
-            icon={DocumentTextIcon}
-            isDisabled
-          />
+          <SideNavItem label="No recent files" icon={DocumentTextIcon} isDisabled />
         ) : (
           paths.map((path) => {
             const { menuLabel } = menuLabels.get(path) ?? {

@@ -13,7 +13,7 @@
  *   import './mdreadr.css';
  */
 export const mdreadrTheme = {
-  name: 'mdreadr',
+  name: "mdreadr",
   __built: true,
   tokens: {
     "--font-size-4xs": "0.375rem",
@@ -79,9 +79,12 @@ export const mdreadrTheme = {
     "--duration-slow-min": "525ms",
     "--duration-slow": "700ms",
     "--duration-slow-max": "935ms",
-    "--font-family-body": "Figtree, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif",
-    "--font-family-heading": "Figtree, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif",
-    "--font-family-code": "ui-monospace, \"SF Mono\", Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace",
+    "--font-family-body":
+      'Figtree, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    "--font-family-heading":
+      'Figtree, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    "--font-family-code":
+      'ui-monospace, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
     "--color-syntax-keyword": "light-dark(#700084, #efa8ff)",
     "--color-syntax-string": "light-dark(#005600, #a6d2a2)",
     "--color-syntax-comment": "light-dark(#737373, #a3a3a3)",
@@ -178,9 +181,12 @@ export const mdreadrTheme = {
     "--radius-container": "0.75rem",
     "--radius-page": "1.75rem",
     "--radius-full": "9999px",
-    "--shadow-low": "0 2px 4px light-dark(oklch(0 0 0 / 5%), oklch(0 0 0 / 25%)), 0 4px 8px light-dark(oklch(0 0 0 / 10%), oklch(0 0 0 / 40%)), inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 8%))",
-    "--shadow-med": "0 2px 4px light-dark(oklch(0 0 0 / 5%), oklch(0 0 0 / 35%)), 0 4px 12px light-dark(oklch(0 0 0 / 10%), oklch(0 0 0 / 50%)), inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 12%))",
-    "--shadow-high": "0 4px 6px light-dark(oklch(0 0 0 / 10%), oklch(0 0 0 / 50%)), 0 12px 24px light-dark(oklch(0 0 0 / 15%), oklch(0 0 0 / 70%)), inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 15%))",
+    "--shadow-low":
+      "0 2px 4px light-dark(oklch(0 0 0 / 5%), oklch(0 0 0 / 25%)), 0 4px 8px light-dark(oklch(0 0 0 / 10%), oklch(0 0 0 / 40%)), inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 8%))",
+    "--shadow-med":
+      "0 2px 4px light-dark(oklch(0 0 0 / 5%), oklch(0 0 0 / 35%)), 0 4px 12px light-dark(oklch(0 0 0 / 10%), oklch(0 0 0 / 50%)), inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 12%))",
+    "--shadow-high":
+      "0 4px 6px light-dark(oklch(0 0 0 / 10%), oklch(0 0 0 / 50%)), 0 12px 24px light-dark(oklch(0 0 0 / 15%), oklch(0 0 0 / 70%)), inset 0 0 0 1px light-dark(transparent, oklch(1 0 0 / 15%))",
     "--shadow-inset-hover": "inset 0px 0px 0px 2px #0074e24D",
     "--shadow-inset-selected": "inset 0px 0px 0px 2px #0074e280",
     "--shadow-inset-success": "inset 0px 0px 0px 2px #1981004D",
@@ -189,7 +195,7 @@ export const mdreadrTheme = {
     "--reader-well-bg": "light-dark(#e8e4de, #11100f)",
     "--reader-paper-bg": "light-dark(#faf8f5, #1c1a18)",
     "--reader-chrome-bg": "light-dark(rgb(250 248 245 / 0.92), rgb(28 26 24 / 0.92))",
-    "--reader-prose-family": "\"Source Serif 4\", \"Iowan Old Style\", \"Palatino Linotype\", Palatino, Georgia, serif"
+    "--reader-prose-family":
+      '"Source Serif 4", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
   },
-
 };

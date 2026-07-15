@@ -1,17 +1,23 @@
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { Button } from "@astryxdesign/core/Button";
-import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Stack } from "@astryxdesign/core/Stack";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
+import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import type { BlockAnchor, NoteStatus } from "@mdreadr/domain";
 import { extractHeadings } from "@mdreadr/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readOptionalPath, readPaths } from "../api-guards.ts";
 import { DocumentView, type DocumentViewMode } from "../components/DocumentView.tsx";
+import { AppLogo } from "../components/AppLogo.tsx";
+import { formatDisplayPath } from "../components/display-path.ts";
 import { NotesPanel } from "../components/NotesPanel.tsx";
+import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
 import { pathFileName, RecentsSidebar } from "../components/RecentsSidebar.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
+import { ArrowDownTrayIcon } from "../icons.ts";
 import { scrollToBlock } from "../markdown/block-ids.ts";
 import { api } from "../treaty.ts";
 import {
@@ -23,24 +29,34 @@ import {
   ReaderPanel,
 } from "../ui/layout.tsx";
 
-function ReaderDocumentTopNavHeading({ documentPath }: { documentPath?: string }) {
+function ReaderDocumentTopNavHeading({
+  documentPath,
+  homeDirectory,
+}: {
+  documentPath?: string;
+  homeDirectory?: string;
+}) {
   const anchorRef = useRef<HTMLDivElement>(null);
 
   if (!documentPath) {
-    return <TopNavHeading heading="mdreadr" />;
+    return <TopNavHeading logo={<AppLogo />} heading="mdreadr" />;
   }
+
+  const displayPath = formatDisplayPath(documentPath, homeDirectory);
 
   return (
     <>
       <div ref={anchorRef}>
-        <TopNavHeading heading={pathFileName(documentPath)} subheading={documentPath} />
+        <TopNavHeading
+          logo={<AppLogo />}
+          superheading="mdreadr"
+          heading={pathFileName(documentPath)}
+          subheading={displayPath}
+        />
       </div>
-      <Tooltip
-        content={documentPath}
-        placement="below"
-        alignment="start"
-        anchorRef={anchorRef}
-      />
+      {displayPath !== documentPath ? (
+        <Tooltip content={documentPath} placement="below" alignment="start" anchorRef={anchorRef} />
+      ) : null}
     </>
   );
 }
@@ -51,6 +67,9 @@ export function ReaderPage() {
   const [pendingAnchor, setPendingAnchor] = useState<BlockAnchor | null>(null);
   const [documentViewMode, setDocumentViewMode] = useState<DocumentViewMode>("preview");
   const [liveMessage, setLiveMessage] = useState("");
+  const [isDragOver, setIsDragOver] = useState(false);
+  const readerMainRef = useRef<HTMLElement>(null);
+  const dragDepthRef = useRef(0);
 
   const sessionQuery = useQuery({
     queryKey: ["session"],
@@ -97,10 +116,15 @@ export function ReaderPage() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, path) => {
       void queryClient.invalidateQueries({ queryKey: ["session"] });
       void queryClient.invalidateQueries({ queryKey: ["recents"] });
       setPendingAnchor(null);
+      const homeDirectory = queryClient.getQueryData<{ homeDirectory?: string }>([
+        "session",
+      ])?.homeDirectory;
+      showSuccess(`Opened ${formatDisplayPath(path, homeDirectory)}`);
+      setLiveMessage(`Opened ${pathFileName(path)}`);
     },
     onError: (error) => {
       showError("Open document", error);
@@ -249,6 +273,9 @@ export function ReaderPage() {
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
+      dragDepthRef.current = 0;
+      setIsDragOver(false);
+
       const file = event.dataTransfer.files.item(0);
       if (!file) return;
 
@@ -267,6 +294,51 @@ export function ReaderPage() {
     },
     [openDocument, showError],
   );
+
+  const onDragEnter = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    if (!event.dataTransfer.types.includes("Files")) return;
+    dragDepthRef.current += 1;
+    setIsDragOver(true);
+  }, []);
+
+  const onDragLeave = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    if (!event.dataTransfer.types.includes("Files")) return;
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    if (event.dataTransfer.types.includes("Files")) {
+      event.dataTransfer.dropEffect = "copy";
+    }
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      if (event.key.toLowerCase() !== "o" || event.shiftKey) return;
+
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.closest("input, textarea, select, [contenteditable='true']"))
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      pickDocument.mutate();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [pickDocument]);
 
   const content = sessionQuery.data?.documentContent ?? "";
   const documentPath = sessionQuery.data?.document?.path;
@@ -301,7 +373,12 @@ export function ReaderPage() {
       topNav={
         <TopNav
           label="Reader"
-          heading={<ReaderDocumentTopNavHeading documentPath={documentPath} />}
+          heading={
+            <ReaderDocumentTopNavHeading
+              documentPath={documentPath}
+              homeDirectory={sessionQuery.data?.homeDirectory}
+            />
+          }
           endContent={
             <Button
               label="Open…"
@@ -326,22 +403,39 @@ export function ReaderPage() {
       <div aria-live="polite" className="sr-only">
         {liveMessage}
       </div>
-      <ReaderLayout
-        aria-label="Document reader"
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={onDrop}
-      >
+      <ReaderLayout aria-label="Document reader">
         <ReaderPanel>
           {documentViewMode === "preview" ? (
-            <TocSidebar entries={toc} />
+            <TocSidebar entries={toc} scrollRootRef={readerMainRef} documentKey={documentPath} />
           ) : (
-            <EmptyState>
+            <EmptyState className="reader-empty-enter">
               <p>Table of contents is available in preview.</p>
             </EmptyState>
           )}
         </ReaderPanel>
 
-        <ReaderMain>
+        <ReaderMain
+          ref={readerMainRef}
+          onDragEnter={onDragEnter}
+          onDragLeave={onDragLeave}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+        >
+          <div
+            aria-hidden
+            className="reader-main-drop-overlay"
+            data-active={isDragOver ? "true" : "false"}
+          >
+            <Stack
+              gap={2}
+              vAlign="center"
+              hAlign="center"
+              className="reader-drop-overlay-content"
+            >
+              <Icon icon={ArrowDownTrayIcon} size="lg" />
+              Drop to open
+            </Stack>
+          </div>
           {content ? (
             <ReaderContent>
               <DocumentView
@@ -354,8 +448,8 @@ export function ReaderPage() {
               />
             </ReaderContent>
           ) : (
-            <EmptyState>
-              <p>Drop a markdown file here, or open one to begin reading.</p>
+            <EmptyState className="reader-empty-enter">
+              <ReaderDropHint />
               <Button
                 label="Open markdown…"
                 variant="primary"
