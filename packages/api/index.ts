@@ -25,6 +25,7 @@ import {
   openDocument,
   pickNativePath,
   readJsonFile,
+  resolveAssetPath,
   toDocumentHttpError,
   writeTextFile,
 } from "./documents.ts";
@@ -85,6 +86,34 @@ export const app = new Elysia()
       body: OpenDocumentBodySchema,
     },
   )
+  // Serves images referenced relative to the currently open Document. Scoped
+  // to that Document so the endpoint cannot be used to probe arbitrary paths.
+  .get("/documents/asset", async ({ query, set }) => {
+    const { doc, src } = query;
+    if (
+      typeof doc !== "string" ||
+      doc.length === 0 ||
+      typeof src !== "string" ||
+      src.length === 0
+    ) {
+      set.status = 400;
+      return { error: "doc and src query params are required", code: "ValidationError" };
+    }
+
+    const current = sessionStore.snapshot().document?.path;
+    if (!current || current !== doc) {
+      set.status = 403;
+      return { error: "Asset requests must reference the open Document", code: "AssetForbidden" };
+    }
+
+    const file = Bun.file(resolveAssetPath(doc, src));
+    if (!(await file.exists())) {
+      set.status = 404;
+      return { error: `Asset not found: ${src}`, code: "AssetNotFound" };
+    }
+
+    return file;
+  })
   .get("/notes", () => ({ notes: sessionStore.getNotes() }))
   .post(
     "/notes",

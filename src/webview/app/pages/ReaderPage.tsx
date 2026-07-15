@@ -9,8 +9,8 @@ import { extractHeadings } from "@mdreadr/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readOptionalPath, readPaths } from "../api-guards.ts";
-import { DocumentView, type DocumentViewMode } from "../components/DocumentView.tsx";
 import { AppLogo } from "../components/AppLogo.tsx";
+import { DocumentView, type DocumentViewMode } from "../components/DocumentView.tsx";
 import { formatDisplayPath } from "../components/display-path.ts";
 import { NotesPanel } from "../components/NotesPanel.tsx";
 import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
@@ -18,7 +18,7 @@ import { pathFileName, RecentsSidebar } from "../components/RecentsSidebar.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
 import { ArrowDownTrayIcon } from "../icons.ts";
-import { scrollToBlock, flashBlock } from "../markdown/block-ids.ts";
+import { flashBlock, scrollToBlock } from "../markdown/block-ids.ts";
 import { api } from "../treaty.ts";
 import {
   EmptyState,
@@ -426,12 +426,7 @@ export function ReaderPage() {
             className="reader-main-drop-overlay"
             data-active={isDragOver ? "true" : "false"}
           >
-            <Stack
-              gap={2}
-              vAlign="center"
-              hAlign="center"
-              className="reader-drop-overlay-content"
-            >
+            <Stack gap={2} vAlign="center" hAlign="center" className="reader-drop-overlay-content">
               <Icon icon={ArrowDownTrayIcon} size="lg" />
               Drop to open
             </Stack>
@@ -441,6 +436,7 @@ export function ReaderPage() {
               <DocumentView
                 key={documentPath}
                 content={content}
+                documentPath={documentPath}
                 notes={notes}
                 viewMode={documentViewMode}
                 onViewModeChange={setDocumentViewMode}

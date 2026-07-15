@@ -1,3 +1,4 @@
+import { dirname, resolve } from "node:path";
 import { ResultAsync } from "@onrails/result";
 import type { DocumentRef } from "../domain/index.ts";
 import { touchRecent } from "./recents.ts";
@@ -52,6 +53,10 @@ export const openDocument = (path: string): ResultAsync<OpenDocumentResult, Docu
   );
 
 export const toDocumentRef = (path: string): DocumentRef => ({ path });
+
+/** Resolve a Document-relative asset reference (e.g. `docs/hero.png`). */
+export const resolveAssetPath = (documentPath: string, src: string): string =>
+  resolve(dirname(documentPath), src);
 
 export const toDocumentHttpError = (
   error: DocumentError,

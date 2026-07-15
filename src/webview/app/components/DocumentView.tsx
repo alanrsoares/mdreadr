@@ -14,6 +14,7 @@ export type { DocumentViewMode };
 type DocumentViewProps = {
   content: string;
   notes: Note[];
+  documentPath?: string;
   viewMode: DocumentViewMode;
   onViewModeChange: (mode: DocumentViewMode) => void;
   onPinBlock?: (anchor: BlockAnchor) => void;
@@ -22,6 +23,7 @@ type DocumentViewProps = {
 export function DocumentView({
   content,
   notes,
+  documentPath,
   viewMode,
   onViewModeChange,
   onPinBlock,
@@ -36,7 +38,12 @@ export function DocumentView({
 
       <ReaderDocumentBody className="reader-document-body" key={viewMode}>
         {viewMode === "preview" ? (
-          <MarkdownView content={content} notes={notes} onPinBlock={onPinBlock} />
+          <MarkdownView
+            content={content}
+            documentPath={documentPath}
+            notes={notes}
+            onPinBlock={onPinBlock}
+          />
         ) : (
           <RawMarkdownView content={content} />
         )}

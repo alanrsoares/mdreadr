@@ -2,16 +2,20 @@ import { Markdown } from "@astryxdesign/core/Markdown";
 import type { BlockAnchor, Note } from "@mdreadr/domain";
 import { blockIdForHeading, extractHeadings } from "@mdreadr/domain";
 import { useMemo, useRef } from "react";
+import { createAssetResolver } from "../markdown/assets.ts";
 import { linkedBadgePlugin } from "../markdown/badges.tsx";
 import { createBlockIdAllocator } from "../markdown/block-ids.ts";
+import { createInlineHtmlPlugins } from "../markdown/inline-html.tsx";
 import { inlineMathPlugin } from "../markdown/math.tsx";
 import { createPinComponents } from "../markdown/pin-components.tsx";
 import { preprocessReaderMarkdown } from "../markdown/preprocess.ts";
+import { getApiBase } from "../treaty.ts";
 import { ReaderArticle } from "../ui/reader.tsx";
 
 type MarkdownViewProps = {
   content: string;
   notes: Note[];
+  documentPath?: string;
   onPinBlock?: (anchor: BlockAnchor) => void;
 };
 
@@ -27,13 +31,21 @@ function headingPathForLevel(
   return stack.map((item) => item.text);
 }
 
-export function MarkdownView({ content, notes, onPinBlock }: MarkdownViewProps) {
+export function MarkdownView({ content, notes, documentPath, onPinBlock }: MarkdownViewProps) {
   const headingStackRef = useRef<{ level: number; text: string }[]>([]);
   const headingIndexRef = useRef(0);
   const headings = useMemo(() => extractHeadings(content), [content]);
   const prepared = useMemo(() => preprocessReaderMarkdown(content), [content]);
   const blockIds = useMemo(() => createBlockIdAllocator(prepared), [prepared]);
   const notedBlockIds = useMemo(() => new Set(notes.map((note) => note.anchor.blockId)), [notes]);
+  const resolveImageSrc = useMemo(
+    () => createAssetResolver(getApiBase(), documentPath),
+    [documentPath],
+  );
+  const inlinePlugins = useMemo(
+    () => [linkedBadgePlugin, inlineMathPlugin, ...createInlineHtmlPlugins(resolveImageSrc)],
+    [resolveImageSrc],
+  );
 
   const contentKeyRef = useRef(content);
   if (contentKeyRef.current !== content) {
@@ -56,8 +68,9 @@ export function MarkdownView({ content, notes, onPinBlock }: MarkdownViewProps) 
         headingPathForLevel(headingStackRef.current, level, text),
       blockIds,
       notedBlockIds,
+      resolveImageSrc,
     });
-  }, [blockIds, headings, notedBlockIds, onPinBlock]);
+  }, [blockIds, headings, notedBlockIds, onPinBlock, resolveImageSrc]);
 
   return (
     <ReaderArticle>
@@ -67,7 +80,7 @@ export function MarkdownView({ content, notes, onPinBlock }: MarkdownViewProps) 
         contentWidth={680}
         autolink="gfm"
         components={components}
-        inlinePlugins={[linkedBadgePlugin, inlineMathPlugin]}
+        inlinePlugins={inlinePlugins}
       >
         {prepared}
       </Markdown>

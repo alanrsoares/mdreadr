@@ -250,6 +250,37 @@ body,
   border-radius: var(--radius-inner);
 }
 
+.reader-align-block[data-align="center"] {
+  text-align: center;
+}
+
+.reader-align-block[data-align="right"] {
+  text-align: right;
+}
+
+.reader-align-block[data-align="center"] img {
+  margin-inline: auto;
+}
+
+.reader-prose .reader-inline-img {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.reader-prose .reader-kbd {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  font-family: var(--font-family-code);
+  font-size: 0.85em;
+  line-height: 1.2;
+  color: var(--color-text-primary);
+  background: var(--color-background-muted);
+  border: 1px solid var(--color-border);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-inner);
+}
+
 .reader-document-body {
   animation: reader-document-in var(--duration-fast) var(--ease-standard) both;
 }

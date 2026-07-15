@@ -11,6 +11,8 @@ import {
   ReaderParagraph,
   readerHeadingByLevel,
 } from "../ui/reader.tsx";
+import { AlignBlock } from "./align-block.tsx";
+import { DANGEROUS_URL_PATTERN, type ImageSrcResolver } from "./assets.ts";
 import { BadgeRow, parseBadgeBlock } from "./badges.tsx";
 import type { BlockIdAllocator } from "./block-ids.ts";
 import { MathBlock } from "./math.tsx";
@@ -22,6 +24,7 @@ export type PinContext = {
   headingPathForLevel: (level: number, text: string) => string[];
   blockIds: BlockIdAllocator;
   notedBlockIds: ReadonlySet<string>;
+  resolveImageSrc?: ImageSrcResolver;
 };
 
 function textFromChildren(children: ReactNode): string {
@@ -77,13 +80,19 @@ function PinCodeBlock({
   onPinBlock,
   blockIds,
   notedBlockIds,
+  resolveImageSrc,
 }: {
   code: string;
   language?: string;
   onPinBlock?: (anchor: BlockAnchor) => void;
   blockIds: BlockIdAllocator;
   notedBlockIds: ReadonlySet<string>;
+  resolveImageSrc?: ImageSrcResolver;
 }) {
+  if (language === "align") {
+    return <AlignBlock code={code} resolveImageSrc={resolveImageSrc} />;
+  }
+
   if (language === "mermaid") {
     return <MermaidChart chart={code} />;
   }
@@ -159,6 +168,20 @@ export function createPinComponents(ctx: PinContext): Partial<MarkdownComponents
           onPinBlock={ctx.onPinBlock}
           blockIds={ctx.blockIds}
           notedBlockIds={ctx.notedBlockIds}
+          resolveImageSrc={ctx.resolveImageSrc}
+        />
+      );
+    },
+    image({ src, alt }) {
+      if (DANGEROUS_URL_PATTERN.test(src.trim())) {
+        return <span>{alt}</span>;
+      }
+      return (
+        <img
+          alt={alt}
+          className="reader-inline-img"
+          loading="lazy"
+          src={ctx.resolveImageSrc ? ctx.resolveImageSrc(src) : src}
         />
       );
     },
