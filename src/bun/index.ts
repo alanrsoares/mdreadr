@@ -2,19 +2,19 @@ import { ApplicationMenu, BrowserWindow } from "electrobun/bun";
 import { startServer } from "../../packages/api/index.ts";
 import { APP_NAME } from "../../shared/constants.ts";
 
-async function getMainViewUrl(apiBase: string): Promise<string> {
-  const apiQuery = `api=${encodeURIComponent(apiBase)}`;
-
+// The api base is injected via preload instead of a query string: the macOS
+// views:// handler treats the query as part of the ASAR file path and 404s.
+async function getMainViewUrl(): Promise<string> {
   try {
     const response = await fetch("http://localhost:5173");
     if (response.ok) {
-      return `http://localhost:5173/?${apiQuery}`;
+      return "http://localhost:5173/";
     }
   } catch {
     // Vite dev server not running, use bundled views
   }
 
-  return `views://mainview/index.html?${apiQuery}`;
+  return "views://mainview/index.html";
 }
 
 function buildApplicationMenu(): void {
@@ -63,7 +63,8 @@ buildApplicationMenu();
 
 const mainWindow = new BrowserWindow({
   title: APP_NAME,
-  url: await getMainViewUrl(apiBase),
+  url: await getMainViewUrl(),
+  preload: `window.__MDREADR_API__ = ${JSON.stringify(apiBase)};`,
   frame: {
     width: 1280,
     height: 840,

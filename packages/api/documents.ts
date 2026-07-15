@@ -125,6 +125,54 @@ export function toZenityFileFilters(patterns: string[] | undefined): string[] {
   return filters;
 }
 
+export function toAppleScriptTypeList(patterns: string[] | undefined): string | null {
+  const extensions = (patterns ?? [])
+    .map((pattern) => pattern.replace(/^\*\./, ""))
+    .filter((extension) => extension.length > 0 && extension !== "*");
+
+  if (extensions.length === 0) {
+    return null;
+  }
+
+  return `{${extensions.map((extension) => `"${escapeAppleScriptString(extension)}"`).join(", ")}}`;
+}
+
+export function escapeAppleScriptString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+export function buildMacOpenScript(title: string, patterns: string[] | undefined): string {
+  const typeList = toAppleScriptTypeList(patterns);
+  const typeClause = typeList ? ` of type ${typeList}` : "";
+  return `POSIX path of (choose file with prompt "${escapeAppleScriptString(title)}"${typeClause})`;
+}
+
+export function buildMacSaveScript(title: string, filename: string): string {
+  const separator = filename.lastIndexOf("/");
+  const name = separator === -1 ? filename : filename.slice(separator + 1);
+  const directory = separator === -1 ? "" : filename.slice(0, separator);
+  const locationClause = directory
+    ? ` default location (POSIX file "${escapeAppleScriptString(directory)}" as alias)`
+    : "";
+  return `POSIX path of (choose file name with prompt "${escapeAppleScriptString(title)}" default name "${escapeAppleScriptString(name)}"${locationClause})`;
+}
+
+async function macFileSelection(script: string): Promise<string | null> {
+  // "activate" brings the chooser dialog frontmost; osascript alone can open it behind the app
+  const proc = Bun.spawn(
+    ["osascript", "-e", `tell application "System Events" to activate`, "-e", script],
+    { stdout: "pipe", stderr: "ignore" },
+  );
+  const path = (await new Response(proc.stdout).text()).trim();
+  const exitCode = await proc.exited;
+
+  if (exitCode !== 0 || path.length === 0) {
+    return null;
+  }
+
+  return path;
+}
+
 async function zenityFileSelection(
   title: string,
   filters: string[],
@@ -158,11 +206,20 @@ export const pickNativePath = (input: {
 }): ResultAsync<string | null, { _tag: "DialogFailed"; message: string }> =>
   ResultAsync.fromPromise(
     (async () => {
+      const isMac = process.platform === "darwin";
+
       if (input.mode === "open") {
-        return zenityFileSelection("Open file", toZenityFileFilters(input.filters));
+        return isMac
+          ? macFileSelection(buildMacOpenScript("Open file", input.filters))
+          : zenityFileSelection("Open file", toZenityFileFilters(input.filters));
       }
 
       const filename = input.defaultPath ?? "notes.json";
+
+      if (isMac) {
+        return macFileSelection(buildMacSaveScript("Save file", filename));
+      }
+
       return zenityFileSelection("Save file", toZenityFileFilters(input.filters ?? ["*.json"]), {
         save: true,
         filename,

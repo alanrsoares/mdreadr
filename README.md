@@ -43,10 +43,10 @@ bun run lint
 bun run lint:fix
 ```
 
-## Build (Linux)
+## Build (Linux + macOS)
 
 ```bash
 bun run build
 ```
 
-Requires `zenity` on Linux for native open/save dialogs.
+Native open/save dialogs use `zenity` on Linux (install it via your package manager) and `osascript` on macOS (built in).
