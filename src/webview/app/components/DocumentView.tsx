@@ -1,50 +1,46 @@
-import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
-import type { BlockAnchor } from "@mdreadr/domain";
-import { useEffect, useState } from "react";
-import { ReaderToolbar } from "../ui/layout.tsx";
+import type { BlockAnchor, Note } from "@mdreadr/domain";
+import {
+  ReaderChromeControls,
+  ReaderDocumentBody,
+  ReaderDocumentChrome,
+  ReaderSheet,
+} from "../ui/layout.tsx";
+import { DocumentViewModeSwitch, type DocumentViewMode } from "./DocumentViewModeSwitch.tsx";
 import { MarkdownView } from "./MarkdownView.tsx";
 import { RawMarkdownView } from "./RawMarkdownView.tsx";
 
-export type DocumentViewMode = "preview" | "source";
+export type { DocumentViewMode };
 
 type DocumentViewProps = {
   content: string;
+  notes: Note[];
+  viewMode: DocumentViewMode;
+  onViewModeChange: (mode: DocumentViewMode) => void;
   onPinBlock?: (anchor: BlockAnchor) => void;
-  onViewModeChange?: (mode: DocumentViewMode) => void;
 };
 
-export function DocumentView({ content, onPinBlock, onViewModeChange }: DocumentViewProps) {
-  const [viewMode, setViewMode] = useState<DocumentViewMode>("preview");
-
-  useEffect(() => {
-    onViewModeChange?.(viewMode);
-  }, [viewMode, onViewModeChange]);
-
-  const selectMode = (next: string) => {
-    if (next === "preview" || next === "source") {
-      setViewMode(next);
-    }
-  };
-
+export function DocumentView({
+  content,
+  notes,
+  viewMode,
+  onViewModeChange,
+  onPinBlock,
+}: DocumentViewProps) {
   return (
-    <>
-      <ReaderToolbar>
-        <SegmentedControl
-          label="Preview or source"
-          layout="fill"
-          value={viewMode}
-          onChange={selectMode}
-        >
-          <SegmentedControlItem label="Preview" value="preview" />
-          <SegmentedControlItem label="Source" value="source" />
-        </SegmentedControl>
-      </ReaderToolbar>
+    <ReaderSheet>
+      <ReaderDocumentChrome>
+        <ReaderChromeControls>
+          <DocumentViewModeSwitch value={viewMode} onChange={onViewModeChange} />
+        </ReaderChromeControls>
+      </ReaderDocumentChrome>
 
-      {viewMode === "preview" ? (
-        <MarkdownView content={content} onPinBlock={onPinBlock} />
-      ) : (
-        <RawMarkdownView content={content} />
-      )}
-    </>
+      <ReaderDocumentBody className="reader-document-body" key={viewMode}>
+        {viewMode === "preview" ? (
+          <MarkdownView content={content} notes={notes} onPinBlock={onPinBlock} />
+        ) : (
+          <RawMarkdownView content={content} />
+        )}
+      </ReaderDocumentBody>
+    </ReaderSheet>
   );
 }

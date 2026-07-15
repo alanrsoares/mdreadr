@@ -1,7 +1,10 @@
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import type { MarkdownComponents } from "@astryxdesign/core/Markdown";
 import type { BlockAnchor } from "@mdreadr/domain";
-import { type ReactNode, useState } from "react";
+import { truncateAnchorLabel } from "@mdreadr/domain";
+import type { ReactNode } from "react";
+import { PinButton } from "../ui/pin-button.tsx";
+import { PinnableBlock } from "../ui/pinnable-block.tsx";
 import {
   ReaderBlockquote,
   ReaderCodeWrap,
@@ -9,6 +12,7 @@ import {
   readerHeadingByLevel,
 } from "../ui/reader.tsx";
 import { BadgeRow, parseBadgeBlock } from "./badges.tsx";
+import type { BlockIdAllocator } from "./block-ids.ts";
 import { MathBlock } from "./math.tsx";
 import { MermaidChart } from "./mermaid.tsx";
 
@@ -16,6 +20,8 @@ export type PinContext = {
   onPinBlock?: (anchor: BlockAnchor) => void;
   nextHeadingId: () => string;
   headingPathForLevel: (level: number, text: string) => string[];
+  blockIds: BlockIdAllocator;
+  notedBlockIds: ReadonlySet<string>;
 };
 
 function textFromChildren(children: ReactNode): string {
@@ -32,26 +38,36 @@ function textFromChildren(children: ReactNode): string {
   return "";
 }
 
+function blockClasses(notedBlockIds: ReadonlySet<string>, blockId: string): string {
+  return notedBlockIds.has(blockId) ? "reader-block-has-note" : "";
+}
+
 function PinParagraph({
   children,
   onPinBlock,
+  blockIds,
+  notedBlockIds,
 }: {
   children: ReactNode;
   onPinBlock?: (anchor: BlockAnchor) => void;
+  blockIds: BlockIdAllocator;
+  notedBlockIds: ReadonlySet<string>;
 }) {
-  const [blockId] = useState(() => `paragraph-${crypto.randomUUID()}`);
+  const text = textFromChildren(children);
+  const blockId = blockIds.nextParagraphId(text);
+  const anchor: BlockAnchor = {
+    kind: "paragraph",
+    blockId,
+    label: truncateAnchorLabel(text),
+  };
 
   return (
-    <ReaderParagraph
-      data-block-id={blockId}
-      onContextMenu={(event) => {
-        if (!onPinBlock) return;
-        event.preventDefault();
-        onPinBlock({ kind: "paragraph", blockId });
-      }}
-    >
-      {children}
-    </ReaderParagraph>
+    <PinnableBlock>
+      {onPinBlock ? <PinButton anchor={anchor} onPin={onPinBlock} /> : null}
+      <ReaderParagraph data-block-id={blockId} className={blockClasses(notedBlockIds, blockId)}>
+        {children}
+      </ReaderParagraph>
+    </PinnableBlock>
   );
 }
 
@@ -59,13 +75,15 @@ function PinCodeBlock({
   code,
   language,
   onPinBlock,
+  blockIds,
+  notedBlockIds,
 }: {
   code: string;
   language?: string;
   onPinBlock?: (anchor: BlockAnchor) => void;
+  blockIds: BlockIdAllocator;
+  notedBlockIds: ReadonlySet<string>;
 }) {
-  const [blockId] = useState(() => `code-${crypto.randomUUID()}`);
-
   if (language === "mermaid") {
     return <MermaidChart chart={code} />;
   }
@@ -81,17 +99,20 @@ function PinCodeBlock({
     }
   }
 
+  const blockId = blockIds.nextCodeId(code, language);
+  const anchor: BlockAnchor = {
+    kind: "code",
+    blockId,
+    label: truncateAnchorLabel(code.split("\n")[0] ?? code),
+  };
+
   return (
-    <ReaderCodeWrap
-      data-block-id={blockId}
-      onContextMenu={(event) => {
-        if (!onPinBlock) return;
-        event.preventDefault();
-        onPinBlock({ kind: "code", blockId });
-      }}
-    >
-      <CodeBlock code={code} language={language} isCollapsible />
-    </ReaderCodeWrap>
+    <PinnableBlock>
+      {onPinBlock ? <PinButton anchor={anchor} onPin={onPinBlock} /> : null}
+      <ReaderCodeWrap data-block-id={blockId} className={blockClasses(notedBlockIds, blockId)}>
+        <CodeBlock code={code} language={language} isCollapsible />
+      </ReaderCodeWrap>
+    </PinnableBlock>
   );
 }
 
@@ -101,32 +122,45 @@ export function createPinComponents(ctx: PinContext): Partial<MarkdownComponents
       const text = textFromChildren(children);
       const id = ctx.nextHeadingId();
       const headingPath = ctx.headingPathForLevel(level, text);
+      const anchor: BlockAnchor = {
+        kind: "heading",
+        blockId: id,
+        headingPath,
+        label: truncateAnchorLabel(text),
+      };
 
       const Heading = readerHeadingByLevel[level];
 
       return (
-        <Heading
-          id={id}
-          data-block-id={id}
-          onContextMenu={(event) => {
-            if (!ctx.onPinBlock) return;
-            event.preventDefault();
-            ctx.onPinBlock({
-              kind: "heading",
-              blockId: id,
-              headingPath,
-            });
-          }}
-        >
-          {children}
-        </Heading>
+        <PinnableBlock>
+          {ctx.onPinBlock ? <PinButton anchor={anchor} onPin={ctx.onPinBlock} /> : null}
+          <Heading id={id} data-block-id={id} className={blockClasses(ctx.notedBlockIds, id)}>
+            {children}
+          </Heading>
+        </PinnableBlock>
       );
     },
     paragraph({ children }) {
-      return <PinParagraph onPinBlock={ctx.onPinBlock}>{children}</PinParagraph>;
+      return (
+        <PinParagraph
+          onPinBlock={ctx.onPinBlock}
+          blockIds={ctx.blockIds}
+          notedBlockIds={ctx.notedBlockIds}
+        >
+          {children}
+        </PinParagraph>
+      );
     },
     code({ code, language }) {
-      return <PinCodeBlock code={code} language={language} onPinBlock={ctx.onPinBlock} />;
+      return (
+        <PinCodeBlock
+          code={code}
+          language={language}
+          onPinBlock={ctx.onPinBlock}
+          blockIds={ctx.blockIds}
+          notedBlockIds={ctx.notedBlockIds}
+        />
+      );
     },
     blockquote({ children }) {
       return <ReaderBlockquote>{children}</ReaderBlockquote>;

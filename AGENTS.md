@@ -66,8 +66,12 @@ Use `bun` for everything.
 | `bun run dev:hmr` | Vite HMR + Electrobun |
 | `bun run start` | Build webview + Electrobun dev |
 | `bun run build` | Vite build + Electrobun Linux package |
+| `bun run theme:build` | Compile `mdreadrTheme.ts` → static CSS/JS |
+| `bun run astryx -- …` | Astryx CLI (`nvm use` first — see `.nvmrc`) |
 
 Open a Document on launch: `bun run start -- /path/to/file.md`
+
+**Astryx + AI**: Agent docs live in the `<!-- ASTRYX:START -->` block below. CLI via `bun run astryx` ([Working with AI](https://astryx.atmeta.com/docs/working-with-ai)). MCP: [`.cursor/mcp.json`](.cursor/mcp.json). After `@astryxdesign/*` bumps: `bun run astryx init --features agents --agent codex` and `bun run astryx upgrade --apply`.
 
 **Linux**: `libayatana-appindicator-gtk3`, `zenity`; WebKit Wayland workarounds in `start` scripts. See [mdreadr-linux](.agents/skills/mdreadr-linux/SKILL.md).
 
@@ -114,3 +118,40 @@ Run `bun run check` after every milestone before claiming done.
 - Do not commit unless explicitly asked.
 
 **Scopes**: `api`, `domain`, `ui`, `shell`, `repo`
+
+<!-- ASTRYX:START -->
+Astryx v0.1.5 · 149 components
+CLI: run every command as `bun run astryx -- <cmd>` (shown below as `astryx ...`). Requires Node ≥22 — `nvm use` (`.nvmrc`).
+
+SETUP (mdreadr — see main.tsx) — without these, components render unstyled:
+  import "@astryxdesign/core/reset.css";
+  import "@astryxdesign/core/astryx.css";
+  import "./app/theme/mdreadr.css";
+  Theme + mdreadrTheme from ./app/theme/mdreadr.js (run `bun run theme:build` after editing mdreadrTheme.ts)
+
+WORKFLOW — discover, don't guess. Before writing UI:
+1. `astryx build "<idea>"` — START HERE: returns a kit (closest [page] + [block]s + [component]s). No args = full playbook.
+2. `astryx template <name> [--skeleton]` — scaffold the [page]/[block]s it named, or study their layout. Templates are reference code.
+3. `astryx component <Name>` — props + examples for every component you use.
+
+RULES:
+- No <div> — components do all layout/spacing. Full page → AppShell; sidebar nav → SideNav.
+- Frame first: pick the shell (AppShell / Layout+LayoutPanel) and budget regions in px BEFORE writing content (`astryx docs layout`).
+- Dense data = rows (Table, List/Item) edge-to-edge — never Card-wrapped list items. Card = dashboard widgets, galleries, settings groups only.
+- Status → StatusDot/Token; Badge only for counts and enumerated states, never decoration.
+- Custom styling: component props first; else Tailwind utilities backed by tokens (bg-surface, text-primary, rounded-lg) via tailwind-theme.css. No raw hex/px.
+- Tokens for every value (`astryx docs tokens`). Brand/accent via `astryx theme` — never override --color-* in :root.
+
+MORE CLI:
+  search "<query>"   find any component / hook / doc / template / block
+  component --list   149 components by category
+  template --list    page + block recipes
+  docs <topic>       color, elevation, icons, illustrations, layout, migration, motion, principles, shape, spacing, styling, theme, tokens, typography
+  swizzle <Name>     eject component source for deep customization
+  upgrade --apply    run after any @astryxdesign/core bump
+<!-- ASTRYX:END -->
+
+### mdreadr + Astryx exceptions
+
+- **Reader layout** uses `@styled-cva/react` for panels/prose shells — not raw `<div>` for new UI, but existing `tw.*` layout in [`layout.tsx`](src/webview/app/ui/layout.tsx) is intentional. See [mdreadr-styling](.agents/skills/mdreadr-styling/SKILL.md).
+- **Markdown** uses `@astryxdesign/core/Markdown`, not generic markdown libraries.

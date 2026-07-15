@@ -1,8 +1,9 @@
 import { Markdown } from "@astryxdesign/core/Markdown";
-import type { BlockAnchor } from "@mdreadr/domain";
+import type { BlockAnchor, Note } from "@mdreadr/domain";
 import { blockIdForHeading, extractHeadings } from "@mdreadr/domain";
 import { useMemo, useRef } from "react";
 import { linkedBadgePlugin } from "../markdown/badges.tsx";
+import { createBlockIdAllocator } from "../markdown/block-ids.ts";
 import { inlineMathPlugin } from "../markdown/math.tsx";
 import { createPinComponents } from "../markdown/pin-components.tsx";
 import { preprocessReaderMarkdown } from "../markdown/preprocess.ts";
@@ -10,6 +11,7 @@ import { ReaderArticle } from "../ui/reader.tsx";
 
 type MarkdownViewProps = {
   content: string;
+  notes: Note[];
   onPinBlock?: (anchor: BlockAnchor) => void;
 };
 
@@ -25,11 +27,13 @@ function headingPathForLevel(
   return stack.map((item) => item.text);
 }
 
-export function MarkdownView({ content, onPinBlock }: MarkdownViewProps) {
+export function MarkdownView({ content, notes, onPinBlock }: MarkdownViewProps) {
   const headingStackRef = useRef<{ level: number; text: string }[]>([]);
   const headingIndexRef = useRef(0);
   const headings = useMemo(() => extractHeadings(content), [content]);
   const prepared = useMemo(() => preprocessReaderMarkdown(content), [content]);
+  const blockIds = useMemo(() => createBlockIdAllocator(prepared), [prepared]);
+  const notedBlockIds = useMemo(() => new Set(notes.map((note) => note.anchor.blockId)), [notes]);
 
   const contentKeyRef = useRef(content);
   if (contentKeyRef.current !== content) {
@@ -50,8 +54,10 @@ export function MarkdownView({ content, onPinBlock }: MarkdownViewProps) {
       nextHeadingId,
       headingPathForLevel: (level, text) =>
         headingPathForLevel(headingStackRef.current, level, text),
+      blockIds,
+      notedBlockIds,
     });
-  }, [headings, onPinBlock]);
+  }, [blockIds, headings, notedBlockIds, onPinBlock]);
 
   return (
     <ReaderArticle>

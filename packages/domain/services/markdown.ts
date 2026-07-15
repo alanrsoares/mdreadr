@@ -34,3 +34,33 @@ export function extractHeadings(markdown: string): TocEntry[] {
 }
 
 export const blockIdForHeading = (entry: TocEntry): string => `heading-${entry.id}`;
+
+/** FNV-1a 32-bit — stable across reloads, sync, no crypto dependency */
+export function hashBlockContent(text: string): string {
+  let hash = 0x811c9dc5;
+  const normalized = text.replace(/\s+/g, " ").trim();
+  for (let index = 0; index < normalized.length; index += 1) {
+    hash ^= normalized.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+export function blockIdForParagraph(text: string, occurrence: number): string {
+  return `paragraph-${hashBlockContent(text)}-${occurrence}`;
+}
+
+export function blockIdForCode(
+  code: string,
+  language: string | undefined,
+  occurrence: number,
+): string {
+  const key = `${language ?? ""}\n${code}`;
+  return `code-${hashBlockContent(key)}-${occurrence}`;
+}
+
+export function truncateAnchorLabel(text: string, maxLength = 72): string {
+  const singleLine = text.replace(/\s+/g, " ").trim();
+  if (singleLine.length <= maxLength) return singleLine;
+  return `${singleLine.slice(0, maxLength - 1)}…`;
+}

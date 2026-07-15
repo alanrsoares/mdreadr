@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   addReply,
+  blockIdForCode,
+  blockIdForParagraph,
   createNote,
   extractHeadings,
   findNote,
@@ -65,5 +67,20 @@ describe("markdown helpers", () => {
       { id: "title", level: 1, text: "Title" },
       { id: "section", level: 2, text: "Section" },
     ]);
+  });
+
+  test("builds stable paragraph block ids from content hash", () => {
+    const first = blockIdForParagraph("Same text", 0);
+    const second = blockIdForParagraph("Same text", 0);
+    const duplicate = blockIdForParagraph("Same text", 1);
+    expect(first).toBe(second);
+    expect(first).not.toBe(duplicate);
+  });
+
+  test("builds stable code block ids from content and language", () => {
+    const id = blockIdForCode("console.log(1)", "ts", 0);
+    expect(id.startsWith("code-")).toBe(true);
+    expect(blockIdForCode("console.log(1)", "ts", 0)).toBe(id);
+    expect(blockIdForCode("console.log(1)", "js", 0)).not.toBe(id);
   });
 });

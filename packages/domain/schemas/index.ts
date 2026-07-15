@@ -25,6 +25,8 @@ export const BlockAnchorSchema = z.object({
   kind: BlockAnchorKindSchema,
   blockId: z.string().min(1),
   headingPath: z.array(z.string()).optional(),
+  /** Short preview of anchored content for display in the notes panel */
+  label: z.string().optional(),
 });
 
 export const NoteStatusSchema = z.enum(["open", "resolved", "wontfix"]);

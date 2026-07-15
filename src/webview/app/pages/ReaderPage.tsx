@@ -1,15 +1,18 @@
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { Button } from "@astryxdesign/core/Button";
-import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
 import type { BlockAnchor, NoteStatus } from "@mdreadr/domain";
 import { extractHeadings } from "@mdreadr/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readOptionalPath, readPaths } from "../api-guards.ts";
 import { DocumentView, type DocumentViewMode } from "../components/DocumentView.tsx";
 import { NotesPanel } from "../components/NotesPanel.tsx";
+import { pathFileName, RecentsSidebar } from "../components/RecentsSidebar.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
+import { useMutationToast } from "../hooks/useMutationToast.ts";
+import { scrollToBlock } from "../markdown/block-ids.ts";
 import { api } from "../treaty.ts";
 import {
   EmptyState,
@@ -18,18 +21,36 @@ import {
   ReaderMain,
   ReaderNotesAside,
   ReaderPanel,
-  TopNavActions,
 } from "../ui/layout.tsx";
 
-function fileName(path: string): string {
-  const parts = path.split(/[/\\]/);
-  return parts.at(-1) ?? path;
+function ReaderDocumentTopNavHeading({ documentPath }: { documentPath?: string }) {
+  const anchorRef = useRef<HTMLDivElement>(null);
+
+  if (!documentPath) {
+    return <TopNavHeading heading="mdreadr" />;
+  }
+
+  return (
+    <>
+      <div ref={anchorRef}>
+        <TopNavHeading heading={pathFileName(documentPath)} subheading={documentPath} />
+      </div>
+      <Tooltip
+        content={documentPath}
+        placement="below"
+        alignment="start"
+        anchorRef={anchorRef}
+      />
+    </>
+  );
 }
 
 export function ReaderPage() {
   const queryClient = useQueryClient();
+  const { showError, showSuccess } = useMutationToast();
   const [pendingAnchor, setPendingAnchor] = useState<BlockAnchor | null>(null);
   const [documentViewMode, setDocumentViewMode] = useState<DocumentViewMode>("preview");
+  const [liveMessage, setLiveMessage] = useState("");
 
   const sessionQuery = useQuery({
     queryKey: ["session"],
@@ -58,6 +79,18 @@ export function ReaderPage() {
     },
   });
 
+  useEffect(() => {
+    if (sessionQuery.isError) {
+      showError("Load session", sessionQuery.error);
+    }
+  }, [sessionQuery.error, sessionQuery.isError, showError]);
+
+  useEffect(() => {
+    if (notesQuery.isError) {
+      showError("Load notes", notesQuery.error);
+    }
+  }, [notesQuery.error, notesQuery.isError, showError]);
+
   const openDocument = useMutation({
     mutationFn: async (path: string) => {
       const { data, error } = await api.documents.open.post({ path });
@@ -68,6 +101,9 @@ export function ReaderPage() {
       void queryClient.invalidateQueries({ queryKey: ["session"] });
       void queryClient.invalidateQueries({ queryKey: ["recents"] });
       setPendingAnchor(null);
+    },
+    onError: (error) => {
+      showError("Open document", error);
     },
   });
 
@@ -85,6 +121,9 @@ export function ReaderPage() {
         openDocument.mutate(path);
       }
     },
+    onError: (error) => {
+      showError("Pick file", error);
+    },
   });
 
   const createNote = useMutation({
@@ -100,6 +139,11 @@ export function ReaderPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["notes"] });
       setPendingAnchor(null);
+      setLiveMessage("Note added");
+      showSuccess("Note added");
+    },
+    onError: (error) => {
+      showError("Add note", error);
     },
   });
 
@@ -115,6 +159,10 @@ export function ReaderPage() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["notes"] });
+      setLiveMessage("Reply added");
+    },
+    onError: (error) => {
+      showError("Add reply", error);
     },
   });
 
@@ -127,8 +175,12 @@ export function ReaderPage() {
       if (!data || "error" in data) throw new Error("Failed to update status");
       return data.note;
     },
-    onSuccess: () => {
+    onSuccess: (note) => {
       void queryClient.invalidateQueries({ queryKey: ["notes"] });
+      setLiveMessage(`Note marked ${note?.status ?? "updated"}`);
+    },
+    onError: (error) => {
+      showError("Update note status", error);
     },
   });
 
@@ -151,6 +203,15 @@ export function ReaderPage() {
       });
       if (error) throw error;
       return data;
+    },
+    onSuccess: (data) => {
+      if (data) {
+        showSuccess("Notes saved");
+        setLiveMessage("Notes saved");
+      }
+    },
+    onError: (error) => {
+      showError("Save notes", error);
     },
   });
 
@@ -177,6 +238,11 @@ export function ReaderPage() {
       }
       void queryClient.invalidateQueries({ queryKey: ["notes"] });
       void queryClient.invalidateQueries({ queryKey: ["session"] });
+      showSuccess("Notes loaded");
+      setLiveMessage("Notes loaded");
+    },
+    onError: (error) => {
+      showError("Load notes", error);
     },
   });
 
@@ -185,45 +251,81 @@ export function ReaderPage() {
       event.preventDefault();
       const file = event.dataTransfer.files.item(0);
       if (!file) return;
+
       const path = (file as File & { path?: string }).path;
       if (path?.endsWith(".md")) {
         openDocument.mutate(path);
+        return;
+      }
+
+      if (!path) {
+        showError(
+          "Open dropped file",
+          "This environment cannot read the file path from drag-and-drop. Use Open… instead.",
+        );
       }
     },
-    [openDocument],
+    [openDocument, showError],
   );
 
   const content = sessionQuery.data?.documentContent ?? "";
   const documentPath = sessionQuery.data?.document?.path;
+  const notes = notesQuery.data ?? [];
   const toc = useMemo(() => extractHeadings(content), [content]);
+  const isOpening = pickDocument.isPending || openDocument.isPending;
+
+  const onScrollToAnchor = useCallback(
+    (blockId: string) => {
+      const jump = () => {
+        if (!scrollToBlock(blockId)) {
+          showError("Jump to note", "Could not find that block in the document.");
+        }
+      };
+
+      if (documentViewMode !== "preview") {
+        setDocumentViewMode("preview");
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(jump);
+        });
+        return;
+      }
+
+      jump();
+    },
+    [documentViewMode, showError],
+  );
 
   return (
     <AppShell
-      variant="section"
       contentPadding={0}
       topNav={
-        <TopNav>
-          <TopNavHeading heading={documentPath ? fileName(documentPath) : "mdreadr"} />
-          <TopNavActions>
-            <Button label="Open…" variant="secondary" onClick={() => pickDocument.mutate()} />
-          </TopNavActions>
-        </TopNav>
+        <TopNav
+          label="Reader"
+          heading={<ReaderDocumentTopNavHeading documentPath={documentPath} />}
+          endContent={
+            <Button
+              label="Open…"
+              variant="secondary"
+              isLoading={isOpening}
+              onClick={() => pickDocument.mutate()}
+            />
+          }
+        />
       }
       sideNav={
-        <SideNav>
-          <SideNavSection title="Recents">
-            {(recentsQuery.data ?? []).map((path: string) => (
-              <SideNavItem
-                key={path}
-                label={fileName(path)}
-                isSelected={path === documentPath}
-                onClick={() => openDocument.mutate(path)}
-              />
-            ))}
-          </SideNavSection>
-        </SideNav>
+        <RecentsSidebar
+          paths={recentsQuery.data ?? []}
+          selectedPath={documentPath}
+          homeDirectory={sessionQuery.data?.homeDirectory}
+          onOpen={(path) => openDocument.mutate(path)}
+          onPickDocument={() => pickDocument.mutate()}
+          isOpening={isOpening}
+        />
       }
     >
+      <div aria-live="polite" className="sr-only">
+        {liveMessage}
+      </div>
       <ReaderLayout
         aria-label="Document reader"
         onDragOver={(event) => event.preventDefault()}
@@ -245,16 +347,19 @@ export function ReaderPage() {
               <DocumentView
                 key={documentPath}
                 content={content}
+                notes={notes}
+                viewMode={documentViewMode}
                 onViewModeChange={setDocumentViewMode}
                 onPinBlock={(anchor) => setPendingAnchor(anchor)}
               />
             </ReaderContent>
           ) : (
             <EmptyState>
-              <p>Open a markdown Document to begin reading.</p>
+              <p>Drop a markdown file here, or open one to begin reading.</p>
               <Button
                 label="Open markdown…"
                 variant="primary"
+                isLoading={isOpening}
                 onClick={() => pickDocument.mutate()}
               />
             </EmptyState>
@@ -263,8 +368,11 @@ export function ReaderPage() {
 
         <ReaderNotesAside>
           <NotesPanel
-            notes={notesQuery.data ?? []}
+            notes={notes}
             pendingAnchor={pendingAnchor}
+            isSaving={saveNotes.isPending}
+            isLoadingNotes={loadNotes.isPending}
+            isCreatingNote={createNote.isPending}
             onCreateNote={async (input) => {
               await createNote.mutateAsync(input);
             }}
@@ -280,6 +388,7 @@ export function ReaderPage() {
             onLoadNotes={async () => {
               await loadNotes.mutateAsync();
             }}
+            onScrollToAnchor={onScrollToAnchor}
           />
         </ReaderNotesAside>
       </ReaderLayout>

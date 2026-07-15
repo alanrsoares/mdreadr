@@ -17,9 +17,10 @@ Runs: `biome ci --error-on-warnings` → `tsc --noEmit` → `bun test`
 
 ```bash
 bun install
-bun run dev:hmr    # Vite :5173 + Electrobun (preferred)
+nvm use                 # Node 26 — required for Astryx CLI
+bun run dev:hmr         # Vite :5173 + Electrobun (preferred)
 # or
-bun run start      # one-shot webview build + electrobun dev
+bun run start           # one-shot webview build + electrobun dev
 ```
 
 Open with a file:
@@ -31,7 +32,8 @@ bun run start -- /path/to/doc.md
 ## Build & package
 
 ```bash
-bun run build      # vite build → electrobun build --env=stable
+bun run build           # theme:build → vite build → electrobun build
+bun run theme:build     # mdreadrTheme.ts → mdreadr.css + mdreadr.js
 ```
 
 **Linux installer** (after build):
@@ -82,22 +84,37 @@ Config: [`biome.json`](../../biome.json) — strict recommended preset, warnings
 
 Do not use Vite for the Elysia server.
 
-## Astryx CLI
+## Astryx CLI & AI
 
-Requires `@astryxdesign/cli` (devDependency).
+Requires `@astryxdesign/cli` (devDependency) and **Node ≥22** (`nvm use` — [`.nvmrc`](../../.nvmrc)).
+
+Use the npm script alias ([Working with AI](https://astryx.atmeta.com/docs/working-with-ai)) — never guess paths under `node_modules`:
 
 ```bash
-bunx astryx --help
-bunx astryx component Button
-bunx astryx docs theme
-bunx astryx init              # if re-scaffolding theme setup
+bun run astryx -- --help
+bun run astryx -- component Button
+bun run astryx -- component Dialog --dense
+bun run astryx -- docs tokens --dense
+bun run astryx -- theme build src/webview/app/theme/mdreadrTheme.ts --out src/webview/app/theme/mdreadr.css
 ```
 
-Theme CSS is imported in [`src/webview/main.tsx`](../../src/webview/main.tsx):
+**Agent docs** (in [`AGENTS.md`](../../AGENTS.md) `<!-- ASTRYX:START -->` block):
+
+```bash
+bun run astryx -- init --features agents --agent codex   # refresh after version bumps
+bun run astryx -- upgrade --apply
+```
+
+**MCP** (Cursor): [`.cursor/mcp.json`](../../.cursor/mcp.json) → `https://astryx.atmeta.com/mcp`
+
+**Theme** in [`src/webview/main.tsx`](../../src/webview/main.tsx):
 
 - `@astryxdesign/core/reset.css`
 - `@astryxdesign/core/astryx.css`
-- `@astryxdesign/theme-neutral/theme.css`
+- `./app/theme/mdreadr.css` (built)
+- `Theme` + `mdreadrTheme` from `./app/theme/mdreadr.js`
+
+Source: [`mdreadrTheme.ts`](../../src/webview/app/theme/mdreadrTheme.ts) — edit then `bun run theme:build`.
 
 ## Platform notes
 
@@ -107,4 +124,4 @@ Theme CSS is imported in [`src/webview/main.tsx`](../../src/webview/main.tsx):
 
 ## Bun conventions
 
-Use `bun`, `bun run`, `bun test`, `bunx` — not npm/npx. See [`CLAUDE.md`](../../CLAUDE.md).
+Use `bun`, `bun run`, `bun test`, `bunx` — not npm/npx for app scripts. **Exception**: `bun run astryx -- …` wraps the CLI via Node (see above). See [`CLAUDE.md`](../../CLAUDE.md).

@@ -1,28 +1,38 @@
 import { Button } from "@astryxdesign/core/Button";
+import { Selector } from "@astryxdesign/core/Selector";
 import { TextArea } from "@astryxdesign/core/TextArea";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
 import type { BlockAnchor, Note, NoteStatus } from "@mdreadr/domain";
 import { formatAuthorLabel } from "@mdreadr/domain";
 import { useMemo, useState } from "react";
+import { anchorDisplayLabel } from "../markdown/block-ids.ts";
 import {
   ButtonRow,
   MutedText,
+  NoteAnchorButton,
   NoteCard,
   NoteCardHeader,
   NoteMeta,
   PanelStack,
   ReplyAuthor,
+  ReplyBody,
   ReplyBubble,
   ReplyList,
+  ReplyStack,
 } from "../ui/layout.tsx";
 
 type NotesPanelProps = {
   notes: Note[];
   pendingAnchor: BlockAnchor | null;
+  isSaving?: boolean;
+  isLoadingNotes?: boolean;
+  isCreatingNote?: boolean;
   onCreateNote: (input: { anchor: BlockAnchor; body: string }) => Promise<void>;
   onAddReply: (noteId: string, body: string) => Promise<void>;
   onUpdateStatus: (noteId: string, status: NoteStatus) => Promise<void>;
   onSaveNotes: () => Promise<void>;
   onLoadNotes: () => Promise<void>;
+  onScrollToAnchor: (blockId: string) => void;
 };
 
 const statusOptions = [
@@ -31,17 +41,29 @@ const statusOptions = [
   { value: "wontfix", label: "Won't fix" },
 ];
 
+function formatNoteTime(iso: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(iso));
+}
+
 export function NotesPanel({
   notes,
   pendingAnchor,
+  isSaving = false,
+  isLoadingNotes = false,
+  isCreatingNote = false,
   onCreateNote,
   onAddReply,
   onUpdateStatus,
   onSaveNotes,
   onLoadNotes,
+  onScrollToAnchor,
 }: NotesPanelProps) {
   const [draft, setDraft] = useState("");
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
 
   const sortedNotes = useMemo(
     () =>
@@ -54,17 +76,24 @@ export function NotesPanel({
   return (
     <PanelStack>
       <ButtonRow>
-        <Button label="Save notes" variant="primary" onClick={() => void onSaveNotes()} />
-        <Button label="Open notes" variant="secondary" onClick={() => void onLoadNotes()} />
+        <Button
+          label="Save notes"
+          variant="primary"
+          isLoading={isSaving}
+          onClick={() => void onSaveNotes()}
+        />
+        <Button
+          label="Open notes"
+          variant="secondary"
+          isLoading={isLoadingNotes}
+          onClick={() => void onLoadNotes()}
+        />
       </ButtonRow>
 
       {pendingAnchor ? (
         <NoteCard $status="open">
           <MutedText>
-            New note on <strong>{pendingAnchor.kind}</strong>
-            {pendingAnchor.headingPath?.length
-              ? `: ${pendingAnchor.headingPath.join(" › ")}`
-              : null}
+            New note on <strong>{anchorDisplayLabel(pendingAnchor)}</strong>
           </MutedText>
           <TextArea
             label="New note"
@@ -79,6 +108,7 @@ export function NotesPanel({
               label="Add note"
               variant="primary"
               isDisabled={draft.trim().length === 0}
+              isLoading={isCreatingNote}
               onClick={() => {
                 void onCreateNote({
                   anchor: pendingAnchor,
@@ -89,7 +119,10 @@ export function NotesPanel({
           </div>
         </NoteCard>
       ) : (
-        <MutedText>Right-click a heading, paragraph, or code block to pin a note.</MutedText>
+        <MutedText>
+          Hover a block and choose Pin, or use the pin control beside headings, paragraphs, and
+          code.
+        </MutedText>
       )}
 
       {sortedNotes.map((note) => (
@@ -97,11 +130,16 @@ export function NotesPanel({
           key={note.id}
           note={note}
           replyDraft={replyDrafts[note.id] ?? ""}
+          isReplyOpen={expandedReplies[note.id] ?? false}
+          onToggleReply={() =>
+            setExpandedReplies((current) => ({ ...current, [note.id]: !current[note.id] }))
+          }
           onReplyDraftChange={(value) =>
             setReplyDrafts((current) => ({ ...current, [note.id]: value }))
           }
           onAddReply={(body) => onAddReply(note.id, body)}
           onUpdateStatus={(status) => onUpdateStatus(note.id, status)}
+          onScrollToAnchor={() => onScrollToAnchor(note.anchor.blockId)}
         />
       ))}
     </PanelStack>
@@ -111,65 +149,94 @@ export function NotesPanel({
 function NoteCardItem({
   note,
   replyDraft,
+  isReplyOpen,
+  onToggleReply,
   onReplyDraftChange,
   onAddReply,
   onUpdateStatus,
+  onScrollToAnchor,
 }: {
   note: Note;
   replyDraft: string;
+  isReplyOpen: boolean;
+  onToggleReply: () => void;
   onReplyDraftChange: (value: string) => void;
   onAddReply: (body: string) => Promise<void>;
   onUpdateStatus: (status: NoteStatus) => Promise<void>;
+  onScrollToAnchor: () => void;
 }) {
   return (
     <NoteCard $status={note.status}>
       <NoteCardHeader>
-        <strong>{note.anchor.kind}</strong>
-        <select
-          aria-label="Note status"
+        <NoteAnchorLink anchor={note.anchor} onClick={onScrollToAnchor} />
+        <Selector
+          label="Status"
+          isLabelHidden
+          size="sm"
+          options={statusOptions}
           value={note.status}
-          onChange={(event) => {
-            void onUpdateStatus(event.target.value as NoteStatus);
+          onChange={(value) => {
+            if (value === "open" || value === "resolved" || value === "wontfix") {
+              void onUpdateStatus(value);
+            }
           }}
-        >
-          {statusOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        />
       </NoteCardHeader>
-      {note.anchor.headingPath?.length ? (
-        <NoteMeta>{note.anchor.headingPath.join(" › ")}</NoteMeta>
-      ) : null}
+      <NoteMeta>Updated {formatNoteTime(note.updatedAt)}</NoteMeta>
 
       <ReplyList>
         {note.replies.map((reply) => (
           <ReplyBubble key={reply.id}>
-            <ReplyAuthor>{formatAuthorLabel(reply.author)}</ReplyAuthor>
-            <div>{reply.body}</div>
+            <ReplyAuthor>
+              {formatAuthorLabel(reply.author)} · {formatNoteTime(reply.createdAt)}
+            </ReplyAuthor>
+            <ReplyBody>{reply.body}</ReplyBody>
           </ReplyBubble>
         ))}
       </ReplyList>
 
-      <TextArea
-        label="Reply"
-        isLabelHidden
-        value={replyDraft}
-        onChange={onReplyDraftChange}
-        placeholder="Reply…"
-        rows={3}
-        style={{ marginTop: "8px" }}
-      />
-      <Button
-        label="Reply"
-        variant="secondary"
-        isDisabled={replyDraft.trim().length === 0}
-        onClick={() => {
-          void onAddReply(replyDraft.trim()).then(() => onReplyDraftChange(""));
-        }}
-        style={{ marginTop: "8px" }}
-      />
+      {isReplyOpen ? (
+        <ReplyStack>
+          <TextArea
+            label="Reply"
+            isLabelHidden
+            value={replyDraft}
+            onChange={onReplyDraftChange}
+            placeholder="Reply…"
+            rows={3}
+          />
+          <Button
+            label="Reply"
+            variant="secondary"
+            isDisabled={replyDraft.trim().length === 0}
+            onClick={() => {
+              void onAddReply(replyDraft.trim()).then(() => onReplyDraftChange(""));
+            }}
+          />
+        </ReplyStack>
+      ) : (
+        <div className="mt-2">
+          <Button label="Reply…" variant="secondary" onClick={onToggleReply} />
+        </div>
+      )}
     </NoteCard>
+  );
+}
+
+function NoteAnchorLink({
+  anchor,
+  onClick,
+}: {
+  anchor: BlockAnchor;
+  onClick: () => void;
+}) {
+  const label = anchorDisplayLabel(anchor);
+
+  return (
+    <Tooltip content={`Jump to ${label}`} placement="start">
+      <NoteAnchorButton type="button" onClick={onClick}>
+        {label}
+      </NoteAnchorButton>
+    </Tooltip>
   );
 }

@@ -9,13 +9,15 @@
     "start": "vite build && GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 electrobun dev",
     "dev": "vite build && GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 electrobun dev --watch",
     "dev:hmr": "concurrently \"bun run hmr\" \"bun run start\"",
-    "build": "vite build && electrobun build --env=stable",
+    "build": "bun run theme:build && vite build && electrobun build --env=stable",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "tersify": "onrails-codemod-neverthrow . --tersify",
     "tersify:dry": "onrails-codemod-neverthrow . --tersify --dry",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
+    "astryx": "node node_modules/@astryxdesign/cli/bin/astryx.mjs",
+    "theme:build": "npm run astryx -- theme build src/webview/app/theme/mdreadrTheme.ts --out src/webview/app/theme/mdreadr.css",
     "check": "biome ci --error-on-warnings . && bun run typecheck && bun test"
   },
   "dependencies": {

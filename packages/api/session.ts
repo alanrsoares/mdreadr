@@ -1,9 +1,11 @@
+import { homedir } from "node:os";
 import type { DocumentRef, Note } from "../domain/index.ts";
 
 export type SessionSnapshot = {
   document: DocumentRef | null;
   documentContent: string | null;
   notes: Note[];
+  homeDirectory: string;
 };
 
 export class SessionStore {
@@ -16,6 +18,7 @@ export class SessionStore {
       document: this.document,
       documentContent: this.documentContent,
       notes: [...this.notes],
+      homeDirectory: process.env.HOME ?? homedir(),
     };
   }
 
