@@ -1,24 +1,38 @@
-<!-- Reader icon from SVG Repo (CC0) — https://www.svgrepo.com/svg/76556/reader -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 505 505" aria-hidden="true">
-  <g>
-    <rect x="53.128" y="7.5" fill="#5A9DEE" width="398.743" height="490" />
-    <path
-      fill="#214245"
-      d="M459.372,505H45.628V0h413.743V505z M60.628,490h383.743V15H60.628V490z"
-    />
-    <rect x="112.521" y="66.894" fill="#FFA317" width="279.958" height="341.516" />
-    <path
-      fill="#214245"
-      d="M399.979,415.909H105.021V59.394h294.958V415.909z M120.021,400.909h264.958V74.394H120.021V400.909z"
-    />
-    <rect x="152.508" y="105.889" fill="#214245" width="199.983" height="15" />
-    <rect x="152.508" y="147.31" fill="#214245" width="199.983" height="15" />
-    <rect x="152.508" y="188.73" fill="#214245" width="199.983" height="15" />
-    <rect x="152.508" y="230.151" fill="#214245" width="199.983" height="15" />
-    <rect x="152.508" y="271.572" fill="#214245" width="199.983" height="15" />
-    <rect x="152.508" y="312.993" fill="#214245" width="199.983" height="15" />
-    <rect x="222.505" y="354.414" fill="#214245" width="129.987" height="15" />
-    <rect x="152.508" y="354.414" fill="#214245" width="49.995" height="15" />
-    <rect x="212.497" y="445.455" fill="#214245" width="80.007" height="15" />
-  </g>
+
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
+	 viewBox="0 0 512.001 512.001" xml:space="preserve" aria-label="Reader Logo">
+<path style="fill:#5EBAE7;" d="M256.001,432.48H7.856V40.253h221.799c14.55,0,26.344,11.795,26.344,26.344V432.48H256.001z"/>
+<path style="fill:#36A9E1;" d="M256.001,432.48h-56.032V40.253h20.401c19.679,0,35.631,15.953,35.631,35.632V432.48H256.001z"/>
+<path style="fill:#5EBAE7;" d="M256.001,432.48h248.143V40.253H281.306c-13.976,0-25.306,11.33-25.306,25.306L256.001,432.48
+	L256.001,432.48z"/>
+<path style="fill:#36A9E1;" d="M256.001,432.48h56.032V40.253h-26.975c-16.048,0-29.057,13.01-29.057,29.057L256.001,432.48
+	L256.001,432.48z"/>
+<g>
+	<path style="fill:#1D1D1B;" d="M280.015,31.641c-9.752,0-18.49,4.407-24.341,11.329c-5.838-6.486-14.293-10.575-23.686-10.575H0
+		v407.941h231.986c8.909,0,16.158,7.248,16.158,16.157h15.713v-0.755c0-8.909,7.249-16.158,16.158-16.158h231.986V31.641H280.015z
+		 M231.986,424.624H15.713V48.109h216.273c8.909,0,16.158,7.249,16.158,16.158v364.764
+		C243.403,426.23,237.88,424.624,231.986,424.624z M496.287,423.868H280.015c-5.893,0-11.417,1.607-16.158,4.407V64.267v-0.755
+		c0-8.909,7.249-16.158,16.158-16.158h216.273v376.514H496.287z"/>
+	<rect x="248" y="464.647" style="fill:#1D1D1B;" width="16.009" height="15.713"/>
+</g>
+<g>
+	<rect x="47.88" y="88.431" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="47.88" y="128.447" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="47.88" y="168.472" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="47.88" y="208.498" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="47.88" y="248.523" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="47.88" y="288.549" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="47.88" y="328.564" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="47.88" y="368.59" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="296.028" y="88.431" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="296.028" y="128.447" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="296.028" y="168.472" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="296.028" y="208.498" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="296.028" y="248.523" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="296.028" y="288.549" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="296.028" y="328.564" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+	<rect x="296.028" y="368.59" style="fill:#FFFFFF;" width="168.095" height="15.713"/>
+</g>
 </svg>
