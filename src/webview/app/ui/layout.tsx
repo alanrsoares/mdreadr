@@ -11,13 +11,13 @@ export const ReaderMain = tw.main(
 );
 
 export const ReaderNotesAside = tw.aside(
-  "overflow-auto border-[var(--color-border)] border-l bg-[var(--color-background-surface)]",
+  "overflow-auto border-[var(--color-border)] border-l bg-[var(--color-background-surface)] transition-[box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] data-[pending=true]:shadow-[inset_3px_0_0_0_var(--color-text-accent)]",
 );
 
 export const ReaderContent = tw.div`mx-auto w-full max-w-[820px] px-6 py-6`;
 
 export const ReaderSheet = tw.article(
-  "min-h-full overflow-hidden rounded-[var(--radius-container)] border border-[var(--color-border)] bg-[var(--reader-paper-bg)] shadow-[var(--shadow-low)]",
+  "min-h-full overflow-hidden rounded-[var(--radius-container)] border border-[var(--color-border)] bg-[var(--reader-paper-bg)] shadow-[var(--shadow-low)] transition-[box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-med)]",
 );
 
 export const ReaderDocumentChrome = tw.header(
@@ -31,7 +31,7 @@ export const ReaderChromeControls = tw.div`mx-auto flex w-fit justify-center`;
 export const ReaderBadgeRow = tw.div`flex flex-wrap items-center gap-1.5`;
 
 export const EmptyState = tw.div(
-  "grid h-full place-items-center p-6 text-center text-[var(--color-text-secondary)]",
+  "grid h-full place-items-center content-center gap-4 p-6 text-center text-[var(--color-text-secondary)]",
 );
 
 export const PanelStack = tw.div`grid gap-3 p-4`;

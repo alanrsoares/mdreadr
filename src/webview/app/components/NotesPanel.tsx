@@ -4,7 +4,7 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import type { BlockAnchor, Note, NoteStatus } from "@mdreadr/domain";
 import { formatAuthorLabel } from "@mdreadr/domain";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { anchorDisplayLabel } from "../markdown/block-ids.ts";
 import {
   ButtonRow,
@@ -64,6 +64,7 @@ export function NotesPanel({
   const [draft, setDraft] = useState("");
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
+  const composerRef = useRef<HTMLDivElement>(null);
 
   const sortedNotes = useMemo(
     () =>
@@ -72,6 +73,11 @@ export function NotesPanel({
       ),
     [notes],
   );
+
+  useEffect(() => {
+    if (!pendingAnchor) return;
+    composerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [pendingAnchor]);
 
   return (
     <PanelStack>
@@ -91,33 +97,36 @@ export function NotesPanel({
       </ButtonRow>
 
       {pendingAnchor ? (
-        <NoteCard $status="open" className="reader-enter">
-          <MutedText>
-            New note on <strong>{anchorDisplayLabel(pendingAnchor)}</strong>
-          </MutedText>
-          <TextArea
-            label="New note"
-            isLabelHidden
-            value={draft}
-            onChange={setDraft}
-            placeholder="Start a thread…"
-            rows={4}
-          />
-          <div className="mt-2">
-            <Button
-              label="Add note"
-              variant="primary"
-              isDisabled={draft.trim().length === 0}
-              isLoading={isCreatingNote}
-              onClick={() => {
-                void onCreateNote({
-                  anchor: pendingAnchor,
-                  body: draft.trim(),
-                }).then(() => setDraft(""));
-              }}
+        <div ref={composerRef}>
+          <NoteCard $status="open" className="reader-composer-attention">
+            <MutedText>
+              New note on <strong>{anchorDisplayLabel(pendingAnchor)}</strong>
+            </MutedText>
+            <TextArea
+              label="New note"
+              isLabelHidden
+              hasAutoFocus
+              value={draft}
+              onChange={setDraft}
+              placeholder="Start a thread…"
+              rows={4}
             />
-          </div>
-        </NoteCard>
+            <div className="mt-2">
+              <Button
+                label="Add note"
+                variant="primary"
+                isDisabled={draft.trim().length === 0}
+                isLoading={isCreatingNote}
+                onClick={() => {
+                  void onCreateNote({
+                    anchor: pendingAnchor,
+                    body: draft.trim(),
+                  }).then(() => setDraft(""));
+                }}
+              />
+            </div>
+          </NoteCard>
+        </div>
       ) : (
         <MutedText>
           Hover a block and choose Pin, or use the pin control beside headings, paragraphs, and

@@ -18,7 +18,7 @@ import { pathFileName, RecentsSidebar } from "../components/RecentsSidebar.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
 import { ArrowDownTrayIcon } from "../icons.ts";
-import { scrollToBlock } from "../markdown/block-ids.ts";
+import { scrollToBlock, flashBlock } from "../markdown/block-ids.ts";
 import { api } from "../treaty.ts";
 import {
   EmptyState,
@@ -444,11 +444,16 @@ export function ReaderPage() {
                 notes={notes}
                 viewMode={documentViewMode}
                 onViewModeChange={setDocumentViewMode}
-                onPinBlock={(anchor) => setPendingAnchor(anchor)}
+                onPinBlock={(anchor) => {
+                  setPendingAnchor(anchor);
+                  flashBlock(anchor.blockId, "reader-block-pin-flash");
+                  setLiveMessage(`Pinning note to ${anchor.label ?? anchor.kind}`);
+                }}
               />
             </ReaderContent>
           ) : (
             <EmptyState className="reader-empty-enter">
+              <AppLogo size={48} />
               <ReaderDropHint />
               <Button
                 label="Open markdown…"
@@ -460,7 +465,7 @@ export function ReaderPage() {
           )}
         </ReaderMain>
 
-        <ReaderNotesAside>
+        <ReaderNotesAside data-pending={pendingAnchor ? "true" : "false"}>
           <NotesPanel
             notes={notes}
             pendingAnchor={pendingAnchor}

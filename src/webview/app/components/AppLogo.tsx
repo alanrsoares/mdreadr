@@ -1,18 +1,38 @@
-import readerLogoUrl from "../assets/reader-logo.svg";
-
 type AppLogoProps = {
   size?: number;
 };
 
+/** Inlined so Electrobun `views://` does not depend on Vite hashed asset URLs. */
 export function AppLogo({ size = 28 }: AppLogoProps) {
   return (
-    <img
-      src={readerLogoUrl}
-      alt=""
-      aria-hidden
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 505 505"
       width={size}
       height={size}
+      aria-hidden
       className="reader-app-logo"
-    />
+    >
+      <title>mdreadr logo</title>
+      <rect x="53.128" y="7.5" fill="#5A9DEE" width="398.743" height="490" />
+      <path
+        fill="#214245"
+        d="M459.372,505H45.628V0h413.743V505z M60.628,490h383.743V15H60.628V490z"
+      />
+      <rect x="112.521" y="66.894" fill="#FFA317" width="279.958" height="341.516" />
+      <path
+        fill="#214245"
+        d="M399.979,415.909H105.021V59.394h294.958V415.909z M120.021,400.909h264.958V74.394H120.021V400.909z"
+      />
+      <rect x="152.508" y="105.889" fill="#214245" width="199.983" height="15" />
+      <rect x="152.508" y="147.31" fill="#214245" width="199.983" height="15" />
+      <rect x="152.508" y="188.73" fill="#214245" width="199.983" height="15" />
+      <rect x="152.508" y="230.151" fill="#214245" width="199.983" height="15" />
+      <rect x="152.508" y="271.572" fill="#214245" width="199.983" height="15" />
+      <rect x="152.508" y="312.993" fill="#214245" width="199.983" height="15" />
+      <rect x="222.505" y="354.414" fill="#214245" width="129.987" height="15" />
+      <rect x="152.508" y="354.414" fill="#214245" width="49.995" height="15" />
+      <rect x="212.497" y="445.455" fill="#214245" width="80.007" height="15" />
+    </svg>
   );
 }

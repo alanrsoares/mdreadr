@@ -120,15 +120,24 @@ export function createBlockIdAllocator(preparedMarkdown: string): BlockIdAllocat
   };
 }
 
+export function flashBlock(blockId: string, className = "reader-block-highlight"): boolean {
+  const element = document.querySelector(`[data-block-id="${CSS.escape(blockId)}"]`);
+  if (!(element instanceof HTMLElement)) return false;
+  element.classList.remove(className);
+  // Force restart when re-pinning the same block.
+  void element.offsetWidth;
+  element.classList.add(className);
+  window.setTimeout(() => {
+    element.classList.remove(className);
+  }, 1800);
+  return true;
+}
+
 export function scrollToBlock(blockId: string): boolean {
   const element = document.querySelector(`[data-block-id="${CSS.escape(blockId)}"]`);
   if (!(element instanceof HTMLElement)) return false;
   element.scrollIntoView({ behavior: "smooth", block: "center" });
-  element.classList.add("reader-block-highlight");
-  window.setTimeout(() => {
-    element.classList.remove("reader-block-highlight");
-  }, 1800);
-  return true;
+  return flashBlock(blockId);
 }
 
 export function anchorDisplayLabel(anchor: BlockAnchor): string {

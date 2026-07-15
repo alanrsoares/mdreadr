@@ -59,11 +59,47 @@ body,
   display: block;
   flex-shrink: 0;
   border-radius: var(--radius-inner);
+  margin-inline: auto;
   transition: transform var(--duration-fast) var(--ease-standard);
 }
 
 .reader-app-logo:hover {
   transform: scale(1.04);
+}
+
+@keyframes reader-composer-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-text-accent) 0%, transparent);
+    border-color: var(--color-border);
+  }
+
+  40% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-text-accent) 22%, transparent);
+    border-color: var(--color-text-accent);
+  }
+}
+
+.reader-composer-attention {
+  animation:
+    reader-enter var(--duration-medium) var(--ease-standard) both,
+    reader-composer-pulse var(--duration-slow) var(--ease-standard) 2 both;
+  animation-delay: 0ms, var(--duration-medium);
+}
+
+@keyframes reader-pin-flash {
+  0%,
+  20% {
+    background: color-mix(in srgb, var(--color-background-accent) 28%, transparent);
+  }
+
+  100% {
+    background: transparent;
+  }
+}
+
+.reader-block-pin-flash {
+  animation: reader-pin-flash 1.2s var(--ease-standard);
 }
 
 /* Shared entrance motion — medium for panels, fast for list items */
@@ -231,8 +267,14 @@ body,
   .reader-note-enter,
   .reader-sheet-enter,
   .reader-empty-enter,
-  .reader-reveal {
+  .reader-reveal,
+  .reader-composer-attention {
     animation: none;
+  }
+
+  .reader-block-pin-flash {
+    animation: none;
+    background: color-mix(in srgb, var(--color-background-accent) 28%, transparent);
   }
 
   .reader-drop-overlay-content {
