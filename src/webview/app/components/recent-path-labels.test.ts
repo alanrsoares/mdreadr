@@ -21,26 +21,25 @@ describe("buildRecentPathDisplays", () => {
   });
 
   test("adds parent hints when basenames collide", () => {
-    const paths = [
-      "/home/alan/dev/mdreadr/packages/domain/README.md",
-      "/home/alan/dev/mdreadr/packages/api/README.md",
-      "/home/alan/dev/mdreadr/docs/README.md",
-    ];
+    const domainPath = "/home/alan/dev/mdreadr/packages/domain/README.md";
+    const apiPath = "/home/alan/dev/mdreadr/packages/api/README.md";
+    const docsPath = "/home/alan/dev/mdreadr/docs/README.md";
 
-    const displays = buildRecentPathDisplays(paths);
+    const displays = buildRecentPathDisplays([domainPath, apiPath, docsPath]);
 
-    expect(displays.get(paths[0]!)).toEqual({ label: "README.md", hint: "domain" });
-    expect(displays.get(paths[1]!)).toEqual({ label: "README.md", hint: "api" });
-    expect(displays.get(paths[2]!)).toEqual({ label: "README.md", hint: "docs" });
+    expect(displays.get(domainPath)).toEqual({ label: "README.md", hint: "domain" });
+    expect(displays.get(apiPath)).toEqual({ label: "README.md", hint: "api" });
+    expect(displays.get(docsPath)).toEqual({ label: "README.md", hint: "docs" });
   });
 
   test("uses deeper hints when parent folder names also collide", () => {
-    const paths = ["/repo/a/pkg/README.md", "/repo/b/pkg/README.md"];
+    const firstPath = "/repo/a/pkg/README.md";
+    const secondPath = "/repo/b/pkg/README.md";
 
-    const displays = buildRecentPathDisplays(paths);
+    const displays = buildRecentPathDisplays([firstPath, secondPath]);
 
-    expect(displays.get(paths[0]!)).toEqual({ label: "README.md", hint: "a/pkg" });
-    expect(displays.get(paths[1]!)).toEqual({ label: "README.md", hint: "b/pkg" });
+    expect(displays.get(firstPath)).toEqual({ label: "README.md", hint: "a/pkg" });
+    expect(displays.get(secondPath)).toEqual({ label: "README.md", hint: "b/pkg" });
   });
 });
 
