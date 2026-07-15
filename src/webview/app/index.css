@@ -1,0 +1,121 @@
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-background-body);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Reader prose — complements Astryx Markdown for elements we customise */
+.reader-prose {
+  --text-body-size: var(--font-size-lg);
+  --text-body-leading: 1.65;
+  --reader-block-gap: 0.75rem;
+  --reader-heading-major-gap: 0.75rem;
+  --reader-heading-minor-gap: 0.25rem;
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
+}
+
+/*
+ * One vertical rhythm for every top-level block. Custom pin components and
+ * default Astryx blocks (lists, tables, …) all sit as direct children here;
+ * per-block margins were fighting each other and collapsing unevenly.
+ */
+.reader-prose .reader-flow {
+  display: flex;
+  flex-direction: column;
+  row-gap: var(--reader-block-gap);
+}
+
+.reader-prose .reader-flow > * {
+  margin-block: 0;
+}
+
+.reader-prose .reader-flow > :is(h1, h2, h3) {
+  margin-block-start: var(--reader-heading-major-gap);
+}
+
+.reader-prose .reader-flow > :is(h4, h5, h6) {
+  margin-block-start: var(--reader-heading-minor-gap);
+}
+
+.reader-prose .reader-flow > :first-child {
+  margin-block-start: 0;
+}
+
+.reader-prose .reader-blockquote {
+  display: flex;
+  flex-direction: column;
+  row-gap: 0.5rem;
+}
+
+.reader-prose .reader-blockquote > * {
+  margin-block: 0;
+}
+
+.reader-prose a {
+  color: var(--color-text-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+
+.reader-prose a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.reader-prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-container);
+}
+
+.reader-prose hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.reader-prose .reader-math-block {
+  overflow-x: auto;
+  padding-block: 0.25rem;
+}
+
+.reader-prose .reader-math-inline {
+  font-size: 1em;
+}
+
+.reader-prose blockquote strong:first-child {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.reader-prose table {
+  font-size: var(--font-size-sm);
+}
+
+.reader-prose .reader-badge-link {
+  display: inline-block;
+  line-height: 0;
+}
+
+.reader-prose .reader-badge {
+  display: block;
+  height: 1.25rem;
+  width: auto;
+  max-width: none;
+  border-radius: var(--radius-inner);
+}

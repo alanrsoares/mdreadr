@@ -1,0 +1,52 @@
+# mdreadr
+
+A desktop markdown Reader for reviewing Documents with agent-human feedback Notes.
+
+## Stack
+
+- Electrobun + Bun main process
+- React + Astryx webview
+- Elysia API + Eden Treaty client
+- Zod-first domain with Onrails (`@onrails/result`, `@onrails/pattern`, `@onrails/maybe`)
+
+## Develop
+
+```bash
+bun install
+bun run dev:hmr
+```
+
+Or without HMR:
+
+```bash
+bun run start
+```
+
+Open a document on launch:
+
+```bash
+bun run start -- /path/to/file.md
+```
+
+## Test & typecheck
+
+```bash
+bun check
+```
+
+Runs Biome (strict recommended, warnings as errors), TypeScript, and tests.
+
+```bash
+bun test
+bun run typecheck
+bun run lint
+bun run lint:fix
+```
+
+## Build (Linux)
+
+```bash
+bun run build
+```
+
+Requires `zenity` on Linux for native open/save dialogs.

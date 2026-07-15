@@ -1,0 +1,49 @@
+import type { DocumentRef, Note } from "../domain/index.ts";
+
+export type SessionSnapshot = {
+  document: DocumentRef | null;
+  documentContent: string | null;
+  notes: Note[];
+};
+
+export class SessionStore {
+  private document: DocumentRef | null = null;
+  private documentContent: string | null = null;
+  private notes: Note[] = [];
+
+  snapshot(): SessionSnapshot {
+    return {
+      document: this.document,
+      documentContent: this.documentContent,
+      notes: [...this.notes],
+    };
+  }
+
+  setDocument(document: DocumentRef, content: string): void {
+    this.document = document;
+    this.documentContent = content;
+  }
+
+  clearDocument(): void {
+    this.document = null;
+    this.documentContent = null;
+  }
+
+  getNotes(): Note[] {
+    return [...this.notes];
+  }
+
+  setNotes(notes: Note[]): void {
+    this.notes = [...notes];
+  }
+
+  replaceNote(note: Note): void {
+    this.notes = this.notes.map((item) => (item.id === note.id ? note : item));
+  }
+
+  addNote(note: Note): void {
+    this.notes = [...this.notes, note];
+  }
+}
+
+export const sessionStore = new SessionStore();
