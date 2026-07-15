@@ -18,7 +18,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "astryx": "node node_modules/@astryxdesign/cli/bin/astryx.mjs",
-    "theme:build": "npm run astryx -- theme build src/webview/app/theme/mdreadrTheme.ts --out src/webview/app/theme/mdreadr.css",
+    "theme:build": "npm run astryx -- theme build src/webview/app/theme/mdreadrTheme.ts --out src/webview/app/theme/mdreadr.css && biome format --write src/webview/app/theme",
     "check": "biome ci --error-on-warnings . && bun run typecheck && bun test"
   },
   "dependencies": {
