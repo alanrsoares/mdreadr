@@ -49,6 +49,17 @@ export const app = new Elysia()
     }),
   )
   .get("/health", () => ({ ok: true as const }))
+  .post("/log", ({ body }) => {
+    const msg = (body as { message: string })?.message;
+    console.log(`[webview-log] ${msg}`);
+    try {
+      require("node:fs").appendFileSync(
+        "/tmp/mdreadr-webview.log",
+        `[${new Date().toISOString()}] ${msg}\n`,
+      );
+    } catch {}
+    return { ok: true };
+  })
   .get("/session", () => sessionStore.snapshot())
   .get("/documents/recent", async ({ set }) => {
     const result = await readRecents();

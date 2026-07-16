@@ -340,6 +340,33 @@ export function ReaderPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [pickDocument]);
 
+  useEffect(() => {
+    const apiBase =
+      (window as Window & { __MDREADR_API__?: string }).__MDREADR_API__ ?? "http://127.0.0.1:3000";
+
+    fetch(`${apiBase}/log`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "ReaderPage mounted" }),
+    }).catch(() => {});
+
+    const handleOpenDocument = () => {
+      fetch(`${apiBase}/log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "mdreadr:open-document received, invalidating queries...",
+        }),
+      }).catch(() => {});
+
+      void queryClient.invalidateQueries({ queryKey: ["session"] });
+      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+    };
+
+    window.addEventListener("mdreadr:open-document", handleOpenDocument);
+    return () => window.removeEventListener("mdreadr:open-document", handleOpenDocument);
+  }, [queryClient]);
+
   const content = sessionQuery.data?.documentContent ?? "";
   const documentPath = sessionQuery.data?.document?.path;
   const notes = notesQuery.data ?? [];

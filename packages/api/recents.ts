@@ -1,3 +1,4 @@
+import { mkdir } from "node:fs/promises";
 import { errAsync, okAsync, ResultAsync } from "@onrails/result";
 import { z } from "zod";
 import { configDir, MAX_RECENTS, RECENTS_FILENAME } from "../../shared/constants.ts";
@@ -11,7 +12,7 @@ export type RecentsError = { _tag: "RecentsIo"; message: string };
 const recentsPath = (): string => `${configDir()}/${RECENTS_FILENAME}`;
 
 async function ensureConfigDir(): Promise<void> {
-  await Bun.$`mkdir -p ${configDir()}`.quiet();
+  await mkdir(configDir(), { recursive: true });
 }
 
 export const loadRecents = (): ResultAsync<string[], RecentsError> =>
