@@ -65,7 +65,7 @@ export const api = treaty<App>(getApiBase());
 
 Base URL comes from `?api=` query param set by Electrobun main.
 
-Use [`api-guards.ts`](../../src/webview/app/api-guards.ts) helpers when Treaty response unions are wide.
+Response-union narrowing lives behind the `ReaderApi` seam in [`session/reader-api.ts`](../../src/webview/app/session/reader-api.ts) (`createTreatyReaderApi`, `unwrap`) — call sites use the typed `ReaderApi` methods instead of narrowing raw Treaty response unions themselves.
 
 ## Testing routes
 

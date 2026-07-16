@@ -4,11 +4,9 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { Stack } from "@astryxdesign/core/Stack";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
-import type { BlockAnchor, NoteStatus } from "@mdreadr/domain";
+import type { BlockAnchor } from "@mdreadr/domain";
 import { extractHeadings } from "@mdreadr/domain";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { readOptionalPath, readPaths } from "../api-guards.ts";
 import { AppLogo } from "../components/AppLogo.tsx";
 import { DocumentView, type DocumentViewMode } from "../components/DocumentView.tsx";
 import { NotesPanel } from "../components/NotesPanel.tsx";
@@ -19,7 +17,8 @@ import { TocSidebar } from "../components/TocSidebar.tsx";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
 import { ArrowDownTrayIcon } from "../icons.ts";
 import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
-import { api } from "../treaty.ts";
+import { createTreatyReaderApi } from "../session/reader-api.ts";
+import { useReaderSession } from "../session/useReaderSession.ts";
 import {
   EmptyState,
   ReaderContent,
@@ -28,6 +27,8 @@ import {
   ReaderNotesAside,
   ReaderPanel,
 } from "../ui/layout.tsx";
+
+const readerApi = createTreatyReaderApi();
 
 function ReaderDocumentTopNavHeading({
   documentPath,
@@ -62,8 +63,7 @@ function ReaderDocumentTopNavHeading({
 }
 
 export function ReaderPage() {
-  const queryClient = useQueryClient();
-  const { showError, showSuccess } = useMutationToast();
+  const { showError } = useMutationToast();
   const [pendingAnchor, setPendingAnchor] = useState<BlockAnchor | null>(null);
   const [documentViewMode, setDocumentViewMode] = useState<DocumentViewMode>("preview");
   const [liveMessage, setLiveMessage] = useState("");
@@ -71,202 +71,26 @@ export function ReaderPage() {
   const readerMainRef = useRef<HTMLElement>(null);
   const dragDepthRef = useRef(0);
 
-  const sessionQuery = useQuery({
-    queryKey: ["session"],
-    queryFn: async () => {
-      const { data, error } = await api.session.get();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const recentsQuery = useQuery({
-    queryKey: ["recents"],
-    queryFn: async () => {
-      const { data, error } = await api.documents.recent.get();
-      if (error) throw error;
-      return readPaths(data);
-    },
-  });
-
-  const notesQuery = useQuery({
-    queryKey: ["notes"],
-    queryFn: async () => {
-      const { data, error } = await api.notes.get();
-      if (error) throw error;
-      return data?.notes ?? [];
-    },
-  });
-
-  useEffect(() => {
-    if (sessionQuery.isError) {
-      showError("Load session", sessionQuery.error);
-    }
-  }, [sessionQuery.error, sessionQuery.isError, showError]);
-
-  useEffect(() => {
-    if (notesQuery.isError) {
-      showError("Load notes", notesQuery.error);
-    }
-  }, [notesQuery.error, notesQuery.isError, showError]);
-
-  const openDocument = useMutation({
-    mutationFn: async (path: string) => {
-      const { data, error } = await api.documents.open.post({ path });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (_data, path) => {
-      void queryClient.invalidateQueries({ queryKey: ["session"] });
-      void queryClient.invalidateQueries({ queryKey: ["recents"] });
+  const reader = useReaderSession(readerApi, {
+    onOpened: (path) => {
       setPendingAnchor(null);
-      const homeDirectory = queryClient.getQueryData<{ homeDirectory?: string }>([
-        "session",
-      ])?.homeDirectory;
-      showSuccess(`Opened ${formatDisplayPath(path, homeDirectory)}`);
       setLiveMessage(`Opened ${pathFileName(path)}`);
     },
-    onError: (error) => {
-      showError("Open document", error);
-    },
-  });
-
-  const pickDocument = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await api.dialogs.pick.post({
-        mode: "open",
-        filters: ["*.md"],
-      });
-      if (error) throw error;
-      return readOptionalPath(data);
-    },
-    onSuccess: (path) => {
-      if (path) {
-        openDocument.mutate(path);
-      }
-    },
-    onError: (error) => {
-      showError("Pick file", error);
-    },
-  });
-
-  const createNote = useMutation({
-    mutationFn: async (input: { anchor: BlockAnchor; body: string }) => {
-      const { data, error } = await api.notes.post({
-        anchor: input.anchor,
-        body: input.body,
-        author: { kind: "human" },
-      });
-      if (error) throw error;
-      return data?.note;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+    onNoteCreated: () => {
       setPendingAnchor(null);
       setLiveMessage("Note added");
-      showSuccess("Note added");
     },
-    onError: (error) => {
-      showError("Add note", error);
-    },
-  });
-
-  const addReply = useMutation({
-    mutationFn: async (input: { noteId: string; body: string }) => {
-      const { data, error } = await api.notes({ id: input.noteId }).replies.post({
-        body: input.body,
-        author: { kind: "human" },
-      });
-      if (error) throw error;
-      if (!data || "error" in data) throw new Error("Failed to add reply");
-      return data.note;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+    onReplyAdded: () => {
       setLiveMessage("Reply added");
     },
-    onError: (error) => {
-      showError("Add reply", error);
+    onStatusChanged: (status) => {
+      setLiveMessage(`Note marked ${status ?? "updated"}`);
     },
-  });
-
-  const updateStatus = useMutation({
-    mutationFn: async (input: { noteId: string; status: NoteStatus }) => {
-      const { data, error } = await api
-        .notes({ id: input.noteId })
-        .status.patch({ status: input.status });
-      if (error) throw error;
-      if (!data || "error" in data) throw new Error("Failed to update status");
-      return data.note;
+    onNotesSaved: () => {
+      setLiveMessage("Notes saved");
     },
-    onSuccess: (note) => {
-      void queryClient.invalidateQueries({ queryKey: ["notes"] });
-      setLiveMessage(`Note marked ${note?.status ?? "updated"}`);
-    },
-    onError: (error) => {
-      showError("Update note status", error);
-    },
-  });
-
-  const saveNotes = useMutation({
-    mutationFn: async () => {
-      const pick = await api.dialogs.pick.post({
-        mode: "save",
-        defaultPath: "notes.json",
-      });
-      if (pick.error) throw pick.error;
-      const path = readOptionalPath(pick.data);
-      if (!path) return null;
-
-      const notes = notesQuery.data ?? [];
-      const document = sessionQuery.data?.document ?? undefined;
-      const { data, error } = await api.notes.save.post({
-        path,
-        notes,
-        document,
-      });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      if (data) {
-        showSuccess("Notes saved");
-        setLiveMessage("Notes saved");
-      }
-    },
-    onError: (error) => {
-      showError("Save notes", error);
-    },
-  });
-
-  const loadNotes = useMutation({
-    mutationFn: async () => {
-      const pick = await api.dialogs.pick.post({
-        mode: "open",
-        filters: ["*.json"],
-      });
-      if (pick.error) throw pick.error;
-      const path = readOptionalPath(pick.data);
-      if (!path) return null;
-
-      const { data, error } = await api.notes.load.post({ path });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      if (data && typeof data === "object" && "document" in data) {
-        const document = (data as { document?: { path: string } }).document;
-        if (document?.path) {
-          openDocument.mutate(document.path);
-        }
-      }
-      void queryClient.invalidateQueries({ queryKey: ["notes"] });
-      void queryClient.invalidateQueries({ queryKey: ["session"] });
-      showSuccess("Notes loaded");
+    onNotesLoaded: () => {
       setLiveMessage("Notes loaded");
-    },
-    onError: (error) => {
-      showError("Load notes", error);
     },
   });
 
@@ -281,7 +105,7 @@ export function ReaderPage() {
 
       const path = (file as File & { path?: string }).path;
       if (path?.endsWith(".md")) {
-        openDocument.mutate(path);
+        reader.open(path);
         return;
       }
 
@@ -292,7 +116,7 @@ export function ReaderPage() {
         );
       }
     },
-    [openDocument, showError],
+    [reader, showError],
   );
 
   const onDragEnter = useCallback((event: React.DragEvent) => {
@@ -333,45 +157,30 @@ export function ReaderPage() {
       }
 
       event.preventDefault();
-      pickDocument.mutate();
+      reader.pick();
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [pickDocument]);
+  }, [reader]);
 
   useEffect(() => {
-    const apiBase =
-      (window as Window & { __MDREADR_API__?: string }).__MDREADR_API__ ?? "http://127.0.0.1:3000";
-
-    fetch(`${apiBase}/log`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: "ReaderPage mounted" }),
-    }).catch(() => {});
+    readerApi.log("ReaderPage mounted");
 
     const handleOpenDocument = () => {
-      fetch(`${apiBase}/log`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: "mdreadr:open-document received, invalidating queries...",
-        }),
-      }).catch(() => {});
-
-      void queryClient.invalidateQueries({ queryKey: ["session"] });
-      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+      readerApi.log("mdreadr:open-document received, invalidating queries...");
+      reader.refresh();
     };
 
     window.addEventListener("mdreadr:open-document", handleOpenDocument);
     return () => window.removeEventListener("mdreadr:open-document", handleOpenDocument);
-  }, [queryClient]);
+  }, [reader]);
 
-  const content = sessionQuery.data?.documentContent ?? "";
-  const documentPath = sessionQuery.data?.document?.path;
-  const notes = notesQuery.data ?? [];
+  const content = reader.session.data?.documentContent ?? "";
+  const documentPath = reader.session.data?.document?.path;
+  const notes = reader.notes.data ?? [];
   const toc = useMemo(() => extractHeadings(content), [content]);
-  const isOpening = pickDocument.isPending || openDocument.isPending;
+  const isOpening = reader.isOpening;
 
   const onScrollToAnchor = useCallback(
     (blockId: string) => {
@@ -403,7 +212,7 @@ export function ReaderPage() {
           heading={
             <ReaderDocumentTopNavHeading
               documentPath={documentPath}
-              homeDirectory={sessionQuery.data?.homeDirectory}
+              homeDirectory={reader.session.data?.homeDirectory}
             />
           }
           endContent={
@@ -411,18 +220,18 @@ export function ReaderPage() {
               label="Open…"
               variant="secondary"
               isLoading={isOpening}
-              onClick={() => pickDocument.mutate()}
+              onClick={() => reader.pick()}
             />
           }
         />
       }
       sideNav={
         <RecentsSidebar
-          paths={recentsQuery.data ?? []}
+          paths={reader.recents.data ?? []}
           selectedPath={documentPath}
-          homeDirectory={sessionQuery.data?.homeDirectory}
-          onOpen={(path) => openDocument.mutate(path)}
-          onPickDocument={() => pickDocument.mutate()}
+          homeDirectory={reader.session.data?.homeDirectory}
+          onOpen={(path) => reader.open(path)}
+          onPickDocument={() => reader.pick()}
           isOpening={isOpening}
         />
       }
@@ -482,7 +291,7 @@ export function ReaderPage() {
                 label="Open markdown…"
                 variant="primary"
                 isLoading={isOpening}
-                onClick={() => pickDocument.mutate()}
+                onClick={() => reader.pick()}
               />
             </EmptyState>
           )}
@@ -492,23 +301,23 @@ export function ReaderPage() {
           <NotesPanel
             notes={notes}
             pendingAnchor={pendingAnchor}
-            isSaving={saveNotes.isPending}
-            isLoadingNotes={loadNotes.isPending}
-            isCreatingNote={createNote.isPending}
+            isSaving={reader.isSaving}
+            isLoadingNotes={reader.isLoadingNotes}
+            isCreatingNote={reader.isCreatingNote}
             onCreateNote={async (input) => {
-              await createNote.mutateAsync(input);
+              await reader.createNote(input);
             }}
             onAddReply={async (noteId, body) => {
-              await addReply.mutateAsync({ noteId, body });
+              await reader.addReply(noteId, body);
             }}
             onUpdateStatus={async (noteId, status) => {
-              await updateStatus.mutateAsync({ noteId, status });
+              await reader.setStatus(noteId, status);
             }}
             onSaveNotes={async () => {
-              await saveNotes.mutateAsync();
+              await reader.save();
             }}
             onLoadNotes={async () => {
-              await loadNotes.mutateAsync();
+              await reader.load();
             }}
             onScrollToAnchor={onScrollToAnchor}
           />
