@@ -1,8 +1,7 @@
 import { Markdown } from "@astryxdesign/core/Markdown";
 import type { BlockAnchor, Note } from "@mdreadr/domain";
-import { blockIdForHeading, extractHeadings } from "@mdreadr/domain";
-import { useMemo, useRef } from "react";
-import { createBlockIdAllocator } from "../markdown/block-ids.ts";
+import { useMemo } from "react";
+import { createAnchorPlan } from "../markdown/anchors.ts";
 import { createPinComponents } from "../markdown/pin-components.tsx";
 import {
   createAssetResolver,
@@ -19,24 +18,9 @@ type MarkdownViewProps = {
   onPinBlock?: (anchor: BlockAnchor) => void;
 };
 
-function headingPathForLevel(
-  stack: { level: number; text: string }[],
-  level: number,
-  text: string,
-): string[] {
-  while (stack.length > 0 && (stack.at(-1)?.level ?? 0) >= level) {
-    stack.pop();
-  }
-  stack.push({ level, text });
-  return stack.map((item) => item.text);
-}
-
 export function MarkdownView({ content, notes, documentPath, onPinBlock }: MarkdownViewProps) {
-  const headingStackRef = useRef<{ level: number; text: string }[]>([]);
-  const headingIndexRef = useRef(0);
-  const headings = useMemo(() => extractHeadings(content), [content]);
   const prepared = useMemo(() => preprocessReaderMarkdown(content), [content]);
-  const blockIds = useMemo(() => createBlockIdAllocator(prepared), [prepared]);
+  const plan = useMemo(() => createAnchorPlan(prepared), [prepared]);
   const notedBlockIds = useMemo(() => new Set(notes.map((note) => note.anchor.blockId)), [notes]);
   const resolveImageSrc = useMemo(
     () => createAssetResolver(getApiBase(), documentPath),
@@ -47,30 +31,15 @@ export function MarkdownView({ content, notes, documentPath, onPinBlock }: Markd
     [resolveImageSrc],
   );
 
-  const contentKeyRef = useRef(content);
-  if (contentKeyRef.current !== content) {
-    contentKeyRef.current = content;
-    headingIndexRef.current = 0;
-    headingStackRef.current = [];
-  }
+  const components = useMemo(
+    () => createPinComponents({ onPinBlock, plan, notedBlockIds, resolveImageSrc }),
+    [notedBlockIds, onPinBlock, plan, resolveImageSrc],
+  );
 
-  const components = useMemo(() => {
-    const nextHeadingId = () => {
-      const entry = headings[headingIndexRef.current];
-      headingIndexRef.current += 1;
-      return entry ? blockIdForHeading(entry) : `heading-${headingIndexRef.current}`;
-    };
-
-    return createPinComponents({
-      onPinBlock,
-      nextHeadingId,
-      headingPathForLevel: (level, text) =>
-        headingPathForLevel(headingStackRef.current, level, text),
-      blockIds,
-      notedBlockIds,
-      resolveImageSrc,
-    });
-  }, [blockIds, headings, notedBlockIds, onPinBlock, resolveImageSrc]);
+  // MUST run at the start of every render pass so cursors restart in sync
+  // with the actual Markdown render, regardless of whether `components`
+  // was recreated (fixes re-render cursor exhaustion).
+  plan.begin();
 
   return (
     <ReaderArticle>

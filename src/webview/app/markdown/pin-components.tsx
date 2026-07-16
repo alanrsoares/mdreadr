@@ -1,7 +1,6 @@
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import type { MarkdownComponents } from "@astryxdesign/core/Markdown";
 import type { BlockAnchor } from "@mdreadr/domain";
-import { truncateAnchorLabel } from "@mdreadr/domain";
 import type { ReactNode } from "react";
 import { PinButton } from "../ui/pin-button.tsx";
 import { PinnableBlock } from "../ui/pinnable-block.tsx";
@@ -11,14 +10,12 @@ import {
   ReaderParagraph,
   readerHeadingByLevel,
 } from "../ui/reader.tsx";
-import type { BlockIdAllocator } from "./block-ids.ts";
+import type { AnchorPlan } from "./anchors.ts";
 import { type ImageSrcResolver, ReaderImage, renderSpecialFence } from "./pipeline.tsx";
 
 export type PinContext = {
   onPinBlock?: (anchor: BlockAnchor) => void;
-  nextHeadingId: () => string;
-  headingPathForLevel: (level: number, text: string) => string[];
-  blockIds: BlockIdAllocator;
+  plan: AnchorPlan;
   notedBlockIds: ReadonlySet<string>;
   resolveImageSrc?: ImageSrcResolver;
 };
@@ -43,21 +40,17 @@ const blockClasses = (notedBlockIds: ReadonlySet<string>, blockId: string): stri
 function PinParagraph({
   children,
   onPinBlock,
-  blockIds,
+  plan,
   notedBlockIds,
 }: {
   children: ReactNode;
   onPinBlock?: (anchor: BlockAnchor) => void;
-  blockIds: BlockIdAllocator;
+  plan: AnchorPlan;
   notedBlockIds: ReadonlySet<string>;
 }) {
   const text = textFromChildren(children);
-  const blockId = blockIds.nextParagraphId(text);
-  const anchor: BlockAnchor = {
-    kind: "paragraph",
-    blockId,
-    label: truncateAnchorLabel(text),
-  };
+  const anchor = plan.nextParagraph(text);
+  const blockId = anchor.blockId;
 
   return (
     <PinnableBlock>
@@ -73,26 +66,22 @@ function PinCodeBlock({
   code,
   language,
   onPinBlock,
-  blockIds,
+  plan,
   notedBlockIds,
   resolveImageSrc,
 }: {
   code: string;
   language?: string;
   onPinBlock?: (anchor: BlockAnchor) => void;
-  blockIds: BlockIdAllocator;
+  plan: AnchorPlan;
   notedBlockIds: ReadonlySet<string>;
   resolveImageSrc?: ImageSrcResolver;
 }) {
   const special = renderSpecialFence(language, code, { resolveImageSrc });
   if (special !== null) return special;
 
-  const blockId = blockIds.nextCodeId(code, language);
-  const anchor: BlockAnchor = {
-    kind: "code",
-    blockId,
-    label: truncateAnchorLabel(code.split("\n")[0] ?? code),
-  };
+  const anchor = plan.nextCode(code, language);
+  const blockId = anchor.blockId;
 
   return (
     <PinnableBlock>
@@ -107,21 +96,18 @@ function PinCodeBlock({
 export const createPinComponents = (ctx: PinContext): Partial<MarkdownComponents> => ({
   heading({ level, children }) {
     const text = textFromChildren(children);
-    const id = ctx.nextHeadingId();
-    const headingPath = ctx.headingPathForLevel(level, text);
-    const anchor: BlockAnchor = {
-      kind: "heading",
-      blockId: id,
-      headingPath,
-      label: truncateAnchorLabel(text),
-    };
+    const { anchor, domId } = ctx.plan.nextHeading(level, text);
 
     const Heading = readerHeadingByLevel[level];
 
     return (
       <PinnableBlock>
         {ctx.onPinBlock ? <PinButton anchor={anchor} onPin={ctx.onPinBlock} /> : null}
-        <Heading id={id} data-block-id={id} className={blockClasses(ctx.notedBlockIds, id)}>
+        <Heading
+          id={domId}
+          data-block-id={domId}
+          className={blockClasses(ctx.notedBlockIds, domId)}
+        >
           {children}
         </Heading>
       </PinnableBlock>
@@ -129,11 +115,7 @@ export const createPinComponents = (ctx: PinContext): Partial<MarkdownComponents
   },
   paragraph({ children }) {
     return (
-      <PinParagraph
-        onPinBlock={ctx.onPinBlock}
-        blockIds={ctx.blockIds}
-        notedBlockIds={ctx.notedBlockIds}
-      >
+      <PinParagraph onPinBlock={ctx.onPinBlock} plan={ctx.plan} notedBlockIds={ctx.notedBlockIds}>
         {children}
       </PinParagraph>
     );
@@ -144,7 +126,7 @@ export const createPinComponents = (ctx: PinContext): Partial<MarkdownComponents
         code={code}
         language={language}
         onPinBlock={ctx.onPinBlock}
-        blockIds={ctx.blockIds}
+        plan={ctx.plan}
         notedBlockIds={ctx.notedBlockIds}
         resolveImageSrc={ctx.resolveImageSrc}
       />

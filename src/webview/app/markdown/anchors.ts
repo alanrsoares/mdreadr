@@ -2,14 +2,24 @@ import { type BlockNode, type InlineNode, parseMarkdown } from "@astryxdesign/co
 import {
   type BlockAnchor,
   blockIdForCode,
+  blockIdForHeading,
   blockIdForParagraph,
+  extractHeadings,
   hashBlockContent,
+  type TocEntry,
+  truncateAnchorLabel,
 } from "@mdreadr/domain";
 import { isSpecialFence } from "./pipeline.tsx";
 
-export type BlockIdAllocator = {
-  nextParagraphId: (text: string) => string;
-  nextCodeId: (code: string, language?: string) => string;
+export type AnchorPlan = {
+  /** Headings of the *prepared* markdown, in order (drives heading ids). */
+  headings: TocEntry[];
+  /** Reset render cursors. MUST be called at the start of every render pass. */
+  begin(): void;
+  /** Next heading: anchor + the DOM id to stamp (id === anchor.blockId). */
+  nextHeading(level: number, text: string): { anchor: BlockAnchor; domId: string };
+  nextParagraph(text: string): BlockAnchor;
+  nextCode(code: string, language?: string): BlockAnchor;
 };
 
 const inlineToText = (nodes: InlineNode[]): string =>
@@ -73,8 +83,23 @@ function collectPinnableBlocks(
   return result;
 }
 
-export function createBlockIdAllocator(preparedMarkdown: string): BlockIdAllocator {
-  const blocks = parseMarkdown(preparedMarkdown, { autolink: "gfm" });
+function headingPathForLevel(
+  stack: { level: number; text: string }[],
+  level: number,
+  text: string,
+): string[] {
+  while (stack.length > 0 && (stack.at(-1)?.level ?? 0) >= level) {
+    stack.pop();
+  }
+  stack.push({ level, text });
+  return stack.map((item) => item.text);
+}
+
+/** Build the Anchor plan for a Document's *prepared* markdown (post-preprocess). */
+export function createAnchorPlan(prepared: string): AnchorPlan {
+  const headings = extractHeadings(prepared);
+
+  const blocks = parseMarkdown(prepared, { autolink: "gfm" });
   const pinnable = collectPinnableBlocks(blocks);
 
   const paragraphCounts = new Map<string, number>();
@@ -99,22 +124,50 @@ export function createBlockIdAllocator(preparedMarkdown: string): BlockIdAllocat
 
   let paragraphIndex = 0;
   let codeIndex = 0;
+  let headingIndex = 0;
+  let headingStack: { level: number; text: string }[] = [];
 
   return {
-    nextParagraphId(text: string) {
+    headings,
+    begin() {
+      paragraphIndex = 0;
+      codeIndex = 0;
+      headingIndex = 0;
+      headingStack = [];
+    },
+    nextHeading(level, text) {
+      const headingPath = headingPathForLevel(headingStack, level, text);
+      const entry = headings[headingIndex];
+      headingIndex += 1;
+      const blockId = entry ? blockIdForHeading(entry) : `heading-${headingIndex}`;
+
+      return {
+        anchor: { kind: "heading", blockId, headingPath, label: truncateAnchorLabel(text) },
+        domId: blockId,
+      };
+    },
+    nextParagraph(text) {
       const id = paragraphIds[paragraphIndex];
       paragraphIndex += 1;
-      return id ?? blockIdForParagraph(text, 0);
+      return {
+        kind: "paragraph",
+        blockId: id ?? blockIdForParagraph(text, 0),
+        label: truncateAnchorLabel(text),
+      };
     },
-    nextCodeId(code: string, language?: string) {
+    nextCode(code, language) {
       const id = codeIds[codeIndex];
       codeIndex += 1;
-      return id ?? blockIdForCode(code, language, 0);
+      return {
+        kind: "code",
+        blockId: id ?? blockIdForCode(code, language, 0),
+        label: truncateAnchorLabel(code.split("\n")[0] ?? code),
+      };
     },
   };
 }
 
-export function flashBlock(blockId: string, className = "reader-block-highlight"): boolean {
+export function flashAnchor(blockId: string, className = "reader-block-highlight"): boolean {
   const element = document.querySelector(`[data-block-id="${CSS.escape(blockId)}"]`);
   if (!(element instanceof HTMLElement)) return false;
   element.classList.remove(className);
@@ -127,11 +180,11 @@ export function flashBlock(blockId: string, className = "reader-block-highlight"
   return true;
 }
 
-export function scrollToBlock(blockId: string): boolean {
+export function scrollToAnchor(blockId: string): boolean {
   const element = document.querySelector(`[data-block-id="${CSS.escape(blockId)}"]`);
   if (!(element instanceof HTMLElement)) return false;
   element.scrollIntoView({ behavior: "smooth", block: "center" });
-  return flashBlock(blockId);
+  return flashAnchor(blockId);
 }
 
 export function anchorDisplayLabel(anchor: BlockAnchor): string {

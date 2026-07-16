@@ -18,7 +18,7 @@ import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
 import { ArrowDownTrayIcon } from "../icons.ts";
-import { flashBlock, scrollToBlock } from "../markdown/block-ids.ts";
+import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
 import { api } from "../treaty.ts";
 import {
   EmptyState,
@@ -376,7 +376,7 @@ export function ReaderPage() {
   const onScrollToAnchor = useCallback(
     (blockId: string) => {
       const jump = () => {
-        if (!scrollToBlock(blockId)) {
+        if (!scrollToAnchor(blockId)) {
           showError("Jump to note", "Could not find that block in the document.");
         }
       };
@@ -469,7 +469,7 @@ export function ReaderPage() {
                 onViewModeChange={setDocumentViewMode}
                 onPinBlock={(anchor) => {
                   setPendingAnchor(anchor);
-                  flashBlock(anchor.blockId, "reader-block-pin-flash");
+                  flashAnchor(anchor.blockId, "reader-block-pin-flash");
                   setLiveMessage(`Pinning note to ${anchor.label ?? anchor.kind}`);
                 }}
               />

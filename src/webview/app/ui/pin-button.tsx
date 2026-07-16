@@ -2,7 +2,7 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import type { BlockAnchor } from "@mdreadr/domain";
 import { MapPinIcon } from "../icons.ts";
-import { anchorDisplayLabel } from "../markdown/block-ids.ts";
+import { anchorDisplayLabel } from "../markdown/anchors.ts";
 
 type PinButtonProps = {
   onPin: (anchor: BlockAnchor) => void;

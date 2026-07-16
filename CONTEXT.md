@@ -20,6 +20,10 @@ _Avoid_: Message, comment
 The place on a Document that a Note refers to — either the whole Document or a specific block such as a heading or code fence.
 _Avoid_: Pin, reference, location
 
+**Anchor Plan**:
+The per-render sequence that assigns each pinnable block (heading, paragraph, code) its Anchor id, in document order, for one Document's prepared markdown.
+_Avoid_: Allocator, id map
+
 **Session Notes**:
 The in-memory Note collection for the current app session before the user explicitly saves them.
 _Avoid_: Draft notes, cache
