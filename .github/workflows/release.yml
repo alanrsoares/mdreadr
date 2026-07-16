@@ -44,6 +44,9 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Build theme
+        run: bun run theme:build
+
       - name: Run check (Lint, Typecheck, Test)
         run: bun run check
 
