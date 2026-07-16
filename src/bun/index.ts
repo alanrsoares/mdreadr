@@ -1,11 +1,26 @@
 import * as fs from "node:fs";
 import { ApplicationMenu, app, BrowserWindow } from "electrobun/bun";
-import { app as apiApp, startServer } from "../../packages/api/index.ts";
+import { app as apiApp, sessionStore, startServer } from "../../packages/api/index.ts";
 import { APP_NAME } from "../../shared/constants.ts";
 
 let activeApiBase: string | null = null;
 let activeMainWindow: BrowserWindow | null = null;
 let pendingOpenUrl: string | null = null;
+
+// Register file change notification to update the webview dynamically
+sessionStore.onDocumentChange(() => {
+  if (activeMainWindow) {
+    try {
+      fs.appendFileSync(
+        "/tmp/mdreadr-debug.log",
+        `[${new Date().toISOString()}] File change detected, dispatching open-document event to webview...\n`,
+      );
+    } catch {}
+    activeMainWindow.webview.executeJavascript(
+      "window.dispatchEvent(new CustomEvent('mdreadr:open-document'))",
+    );
+  }
+});
 
 // Register the open-url listener for runtime triggers (when app is already running)
 app.on("open-url", async (data: unknown) => {

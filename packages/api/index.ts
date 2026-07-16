@@ -1,3 +1,4 @@
+import { type FSWatcher, watch } from "node:fs";
 import { cors } from "@elysiajs/cors";
 import { match } from "@onrails/pattern";
 import { isErr } from "@onrails/result";
@@ -31,6 +32,39 @@ import {
 } from "./documents.ts";
 import { readRecents, toRecentsHttpError } from "./recents.ts";
 import { sessionStore } from "./session.ts";
+
+let currentWatcher: FSWatcher | null = null;
+
+function watchFile(path: string) {
+  if (currentWatcher) {
+    try {
+      currentWatcher.close();
+    } catch {}
+    currentWatcher = null;
+  }
+
+  try {
+    currentWatcher = watch(path, async (eventType) => {
+      if (eventType === "change") {
+        try {
+          const file = Bun.file(path);
+          if (await file.exists()) {
+            const newContent = await file.text();
+            const snapshot = sessionStore.snapshot();
+            if (snapshot.documentContent !== newContent) {
+              sessionStore.setDocument({ path }, newContent);
+              sessionStore.triggerDocumentChange(newContent);
+            }
+          }
+        } catch (e) {
+          console.error(`Error reading watched file: ${e}`);
+        }
+      }
+    });
+  } catch (e) {
+    console.error(`Failed to watch file ${path}: ${e}`);
+  }
+}
 
 function domainError(error: NotesDomainError): { error: string; code: string } {
   switch (error._tag) {
@@ -88,6 +122,7 @@ export const app = new Elysia()
       }
 
       sessionStore.setDocument({ path: result.value.path }, result.value.content);
+      watchFile(result.value.path);
       return {
         path: result.value.path,
         content: result.value.content,

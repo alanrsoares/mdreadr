@@ -12,6 +12,19 @@ export class SessionStore {
   private document: DocumentRef | null = null;
   private documentContent: string | null = null;
   private notes: Note[] = [];
+  private onDocumentChangeCallbacks: Array<(content: string) => void> = [];
+
+  onDocumentChange(callback: (content: string) => void): void {
+    this.onDocumentChangeCallbacks.push(callback);
+  }
+
+  triggerDocumentChange(content: string): void {
+    for (const cb of this.onDocumentChangeCallbacks) {
+      try {
+        cb(content);
+      } catch {}
+    }
+  }
 
   snapshot(): SessionSnapshot {
     return {
