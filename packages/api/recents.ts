@@ -1,13 +1,18 @@
 import { mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
 import { okAsync, ResultAsync } from "@onrails/result";
 import { z } from "zod";
-import { configDir, MAX_RECENTS, RECENTS_FILENAME } from "../../shared/constants.ts";
+
+const RECENTS_FILENAME = "recents.json";
+const MAX_RECENTS = 20;
 
 const RecentsSchema = z.object({
   paths: z.array(z.string()),
 });
 
 export type RecentsError = { _tag: "RecentsIo"; message: string };
+
+const configDir = (): string => `${process.env.HOME ?? homedir()}/.config/mdreadr`;
 
 const recentsPath = (): string => `${configDir()}/${RECENTS_FILENAME}`;
 
