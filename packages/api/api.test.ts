@@ -1,5 +1,18 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { app, sessionStore, startServer } from "../../packages/api/index.ts";
+
+function post(url: string, path: string, body: unknown) {
+  return app.handle(
+    new Request(`${url}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+}
 
 describe("mdreadr api", () => {
   test("health and notes roundtrip", async () => {
@@ -25,5 +38,176 @@ describe("mdreadr api", () => {
     const notes = await app.handle(new Request(`${url}/notes`));
     const json = await notes?.json();
     expect(json.notes).toHaveLength(1);
+  });
+
+  describe("/documents/asset", () => {
+    let dir: string;
+
+    afterEach(async () => {
+      sessionStore.clearDocument();
+      if (dir) await rm(dir, { recursive: true, force: true });
+    });
+
+    test("403s when doc does not match the currently open document", async () => {
+      const { url } = startServer(0);
+      dir = await mkdtemp(join(tmpdir(), "mdreadr-asset-"));
+      const docPath = join(dir, "doc.md");
+      sessionStore.setDocument({ path: docPath }, "# Doc");
+
+      const response = await app.handle(
+        new Request(
+          `${url}/documents/asset?doc=${encodeURIComponent(join(dir, "other.md"))}&src=hero.png`,
+        ),
+      );
+
+      expect(response?.status).toBe(403);
+    });
+
+    test("200s when the asset exists next to the open document", async () => {
+      const { url } = startServer(0);
+      dir = await mkdtemp(join(tmpdir(), "mdreadr-asset-"));
+      const docPath = join(dir, "doc.md");
+      await writeFile(join(dir, "hero.png"), "fake-image-bytes");
+      sessionStore.setDocument({ path: docPath }, "# Doc");
+
+      const response = await app.handle(
+        new Request(`${url}/documents/asset?doc=${encodeURIComponent(docPath)}&src=hero.png`),
+      );
+
+      expect(response?.status).toBe(200);
+    });
+
+    test("404s when the asset is missing", async () => {
+      const { url } = startServer(0);
+      dir = await mkdtemp(join(tmpdir(), "mdreadr-asset-"));
+      const docPath = join(dir, "doc.md");
+      sessionStore.setDocument({ path: docPath }, "# Doc");
+
+      const response = await app.handle(
+        new Request(`${url}/documents/asset?doc=${encodeURIComponent(docPath)}&src=missing.png`),
+      );
+
+      expect(response?.status).toBe(404);
+    });
+  });
+
+  describe("/notes/save + /notes/load", () => {
+    let dir: string;
+
+    afterEach(async () => {
+      if (dir) await rm(dir, { recursive: true, force: true });
+    });
+
+    test("round-trips notes through a saved file", async () => {
+      const { url } = startServer(0);
+      dir = await mkdtemp(join(tmpdir(), "mdreadr-notes-"));
+      const notesPath = join(dir, "notes.json");
+      const notes = [
+        {
+          id: "note-1",
+          anchor: { kind: "document" as const, blockId: "doc" },
+          status: "open" as const,
+          replies: [
+            {
+              id: "reply-1",
+              author: { kind: "human" as const },
+              body: "hi",
+              createdAt: "2024-01-01T00:00:00.000Z",
+            },
+          ],
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      ];
+
+      const save = await post(url, "/notes/save", { path: notesPath, notes });
+      expect(save?.status).toBe(200);
+
+      const load = await post(url, "/notes/load", { path: notesPath });
+      expect(load?.status).toBe(200);
+      const json = await load?.json();
+      expect(json.notes).toEqual(notes);
+    });
+
+    test("rejects a notes file with an unsupported schemaVersion", async () => {
+      const { url } = startServer(0);
+      dir = await mkdtemp(join(tmpdir(), "mdreadr-notes-"));
+      const notesPath = join(dir, "bad-notes.json");
+      await writeFile(
+        notesPath,
+        JSON.stringify({ schemaVersion: 2, notes: [] satisfies unknown[] }),
+      );
+
+      const load = await post(url, "/notes/load", { path: notesPath });
+
+      expect(load?.status).toBe(400);
+      const json = await load?.json();
+      expect(json.code).toBe("InvalidNotesFile");
+    });
+  });
+
+  describe("/notes/:id/replies and /notes/:id/status", () => {
+    afterEach(() => {
+      sessionStore.setNotes([]);
+    });
+
+    test("adds a reply on the happy path and 404s for an unknown note", async () => {
+      const { url } = startServer(0);
+      sessionStore.setNotes([]);
+
+      const create = await post(url, "/notes", {
+        anchor: { kind: "document", blockId: "document-root" },
+        body: "Review this",
+        author: { kind: "human" },
+      });
+      const created = await create?.json();
+      expect(created.note.replies).toHaveLength(1);
+
+      const reply = await post(url, `/notes/${created.note.id}/replies`, {
+        body: "Following up",
+        author: { kind: "human" },
+      });
+      expect(reply?.status).toBe(200);
+      const replyJson = await reply?.json();
+      expect(replyJson.note.replies).toHaveLength(2);
+
+      const missing = await post(url, "/notes/does-not-exist/replies", {
+        body: "Following up",
+        author: { kind: "human" },
+      });
+      expect(missing?.status).toBe(404);
+    });
+
+    test("updates status on the happy path and 404s for an unknown note", async () => {
+      const { url } = startServer(0);
+      sessionStore.setNotes([]);
+
+      const create = await post(url, "/notes", {
+        anchor: { kind: "document", blockId: "document-root" },
+        body: "Review this",
+        author: { kind: "human" },
+      });
+      const created = await create?.json();
+
+      const update = await app.handle(
+        new Request(`${url}/notes/${created.note.id}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "resolved" }),
+        }),
+      );
+      expect(update?.status).toBe(200);
+      const updateJson = await update?.json();
+      expect(updateJson.note.status).toBe("resolved");
+
+      const missing = await app.handle(
+        new Request(`${url}/notes/does-not-exist/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "resolved" }),
+        }),
+      );
+      expect(missing?.status).toBe(404);
+    });
   });
 });

@@ -1,4 +1,3 @@
-import { type FSWatcher, watch } from "node:fs";
 import { cors } from "@elysiajs/cors";
 import { match } from "@onrails/pattern";
 import { isErr } from "@onrails/result";
@@ -22,8 +21,8 @@ import {
   SaveNotesBodySchema,
   UpdateNoteStatusBodySchema,
 } from "../domain/schemas/index.ts";
+import { documentSession } from "./document-session.ts";
 import {
-  openDocument,
   pickNativePath,
   readJsonFile,
   resolveAssetPath,
@@ -32,39 +31,6 @@ import {
 } from "./documents.ts";
 import { readRecents, toRecentsHttpError } from "./recents.ts";
 import { sessionStore } from "./session.ts";
-
-let currentWatcher: FSWatcher | null = null;
-
-function watchFile(path: string) {
-  if (currentWatcher) {
-    try {
-      currentWatcher.close();
-    } catch {}
-    currentWatcher = null;
-  }
-
-  try {
-    currentWatcher = watch(path, async (eventType) => {
-      if (eventType === "change") {
-        try {
-          const file = Bun.file(path);
-          if (await file.exists()) {
-            const newContent = await file.text();
-            const snapshot = sessionStore.snapshot();
-            if (snapshot.documentContent !== newContent) {
-              sessionStore.setDocument({ path }, newContent);
-              sessionStore.triggerDocumentChange(newContent);
-            }
-          }
-        } catch (e) {
-          console.error(`Error reading watched file: ${e}`);
-        }
-      }
-    });
-  } catch (e) {
-    console.error(`Failed to watch file ${path}: ${e}`);
-  }
-}
 
 function domainError(error: NotesDomainError): { error: string; code: string } {
   switch (error._tag) {
@@ -112,7 +78,7 @@ export const app = new Elysia()
         return { error: parsed.error.message, code: "ValidationError" };
       }
 
-      const result = await openDocument(parsed.data.path);
+      const result = await documentSession.open(parsed.data.path);
       if (isErr(result)) {
         set.status = match(result.error._tag)
           .with("DocumentNotFound", () => 404)
@@ -121,8 +87,6 @@ export const app = new Elysia()
         return toDocumentHttpError(result.error);
       }
 
-      sessionStore.setDocument({ path: result.value.path }, result.value.content);
-      watchFile(result.value.path);
       return {
         path: result.value.path,
         content: result.value.content,
@@ -146,8 +110,7 @@ export const app = new Elysia()
       return { error: "doc and src query params are required", code: "ValidationError" };
     }
 
-    const current = sessionStore.snapshot().document?.path;
-    if (!current || current !== doc) {
+    if (!documentSession.isAssetAllowed(doc)) {
       set.status = 403;
       return { error: "Asset requests must reference the open Document", code: "AssetForbidden" };
     }
@@ -302,6 +265,7 @@ export const app = new Elysia()
 
 export type App = typeof app;
 
+export { documentSession } from "./document-session.ts";
 export { sessionStore } from "./session.ts";
 
 export function startServer(port = 0): { port: number; url: string } {

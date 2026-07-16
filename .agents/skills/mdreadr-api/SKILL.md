@@ -11,6 +11,7 @@ description: Extend mdreadr's Elysia API, session store, Eden Treaty client, and
 |------|------|
 | `packages/api/index.ts` | Elysia app, routes, `export type App` |
 | `packages/api/session.ts` | In-memory `SessionStore` |
+| `packages/api/document-session.ts` | Open + watch + current-Document scope, change notification (`DocumentSession`) |
 | `packages/api/documents.ts` | Read/write files, zenity dialogs |
 | `packages/api/recents.ts` | `~/.config/mdreadr/recents.json` |
 | `src/bun/index.ts` | `startServer(0)` before opening window |
