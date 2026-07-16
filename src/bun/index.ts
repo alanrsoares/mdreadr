@@ -165,9 +165,11 @@ if (pendingOpenUrl) {
 
 buildApplicationMenu();
 
+const viewUrl = await getMainViewUrl();
+
 const mainWindow = new BrowserWindow({
   title: APP_NAME,
-  url: await getMainViewUrl(),
+  url: viewUrl,
   preload: `window.__MDREADR_API__ = ${JSON.stringify(apiBase)};`,
   frame: {
     width: 1280,
@@ -190,7 +192,9 @@ mainWindow.on("close", () => {
 
 mainWindow.webview.on("dom-ready", () => {
   console.log("mdreadr webview ready");
-  mainWindow.webview.openDevTools();
+  if (viewUrl.startsWith("http://localhost")) {
+    mainWindow.webview.openDevTools();
+  }
 });
 
 console.log(`${APP_NAME} started`);
