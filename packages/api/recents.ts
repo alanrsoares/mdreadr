@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import { errAsync, okAsync, ResultAsync } from "@onrails/result";
+import { okAsync, ResultAsync } from "@onrails/result";
 import { z } from "zod";
 import { configDir, MAX_RECENTS, RECENTS_FILENAME } from "../../shared/constants.ts";
 
@@ -59,14 +59,3 @@ export const readRecents = (): ResultAsync<string[], RecentsError> =>
 export const toRecentsHttpError = (error: RecentsError): { error: string } => ({
   error: error.message,
 });
-
-export const isRecentsError = (value: unknown): value is RecentsError =>
-  typeof value === "object" &&
-  value !== null &&
-  "_tag" in value &&
-  (value as RecentsError)._tag === "RecentsIo";
-
-export const recentsErr = (message: string): RecentsError => ({ _tag: "RecentsIo", message });
-
-export const readRecentsSafe = (): ResultAsync<string[], RecentsError> =>
-  loadRecents().orElse((error) => errAsync(error));
