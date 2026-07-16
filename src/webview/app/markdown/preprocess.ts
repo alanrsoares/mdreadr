@@ -1,6 +1,8 @@
 const LINKED_IMAGE_RE = /\[!\[([^\]\n]*)\]\(([^)\n]+)\)\]\(([^)\n]+)\)/g;
 const BADGE_LINE_RE = /^\[\[\[BADGE:\{.*?\}\]\]\]$/;
-const BADGE_TOKEN_RE = /\[\[\[BADGE:(\{.*?\})\]\]\]/g;
+/** Single source of truth for the linked-badge token shape (preprocess replace + inline plugin match). */
+export const LINKED_BADGE_TOKEN_SOURCE = String.raw`\[\[\[BADGE:(\{.*?\})\]\]\]`;
+const BADGE_TOKEN_RE = new RegExp(LINKED_BADGE_TOKEN_SOURCE, "g");
 
 export const encodeLinkedBadge = (alt: string, src: string, href: string): string =>
   `[[[BADGE:${JSON.stringify({ alt, src, href })}]]]`;

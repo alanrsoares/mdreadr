@@ -11,12 +11,8 @@ import {
   ReaderParagraph,
   readerHeadingByLevel,
 } from "../ui/reader.tsx";
-import { AlignBlock } from "./align-block.tsx";
-import { DANGEROUS_URL_PATTERN, type ImageSrcResolver } from "./assets.ts";
-import { BadgeRow, parseBadgeBlock } from "./badges.tsx";
 import type { BlockIdAllocator } from "./block-ids.ts";
-import { MathBlock } from "./math.tsx";
-import { MermaidChart } from "./mermaid.tsx";
+import { type ImageSrcResolver, ReaderImage, renderSpecialFence } from "./pipeline.tsx";
 
 export type PinContext = {
   onPinBlock?: (anchor: BlockAnchor) => void;
@@ -88,21 +84,8 @@ function PinCodeBlock({
   notedBlockIds: ReadonlySet<string>;
   resolveImageSrc?: ImageSrcResolver;
 }) {
-  switch (language) {
-    case "align":
-      return <AlignBlock code={code} resolveImageSrc={resolveImageSrc} />;
-    case "mermaid":
-      return <MermaidChart chart={code} />;
-    case "math":
-      return <MathBlock tex={code} />;
-    case "badges": {
-      const badges = parseBadgeBlock(code);
-      if (badges) {
-        return <BadgeRow badges={badges} />;
-      }
-      break;
-    }
-  }
+  const special = renderSpecialFence(language, code, { resolveImageSrc });
+  if (special !== null) return special;
 
   const blockId = blockIds.nextCodeId(code, language);
   const anchor: BlockAnchor = {
@@ -168,17 +151,7 @@ export const createPinComponents = (ctx: PinContext): Partial<MarkdownComponents
     );
   },
   image({ src, alt }) {
-    if (DANGEROUS_URL_PATTERN.test(src.trim())) {
-      return <span>{alt}</span>;
-    }
-    return (
-      <img
-        alt={alt}
-        className="reader-inline-img"
-        loading="lazy"
-        src={ctx.resolveImageSrc ? ctx.resolveImageSrc(src) : src}
-      />
-    );
+    return <ReaderImage src={src} alt={alt} resolveImageSrc={ctx.resolveImageSrc} />;
   },
   blockquote({ children }) {
     return <ReaderBlockquote>{children}</ReaderBlockquote>;

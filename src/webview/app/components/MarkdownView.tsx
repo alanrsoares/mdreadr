@@ -2,13 +2,13 @@ import { Markdown } from "@astryxdesign/core/Markdown";
 import type { BlockAnchor, Note } from "@mdreadr/domain";
 import { blockIdForHeading, extractHeadings } from "@mdreadr/domain";
 import { useMemo, useRef } from "react";
-import { createAssetResolver } from "../markdown/assets.ts";
-import { linkedBadgePlugin } from "../markdown/badges.tsx";
 import { createBlockIdAllocator } from "../markdown/block-ids.ts";
-import { createInlineHtmlPlugins } from "../markdown/inline-html.tsx";
-import { inlineMathPlugin } from "../markdown/math.tsx";
 import { createPinComponents } from "../markdown/pin-components.tsx";
-import { preprocessReaderMarkdown } from "../markdown/preprocess.ts";
+import {
+  createAssetResolver,
+  createReaderInlinePlugins,
+  preprocessReaderMarkdown,
+} from "../markdown/pipeline.tsx";
 import { getApiBase } from "../treaty.ts";
 import { ReaderArticle } from "../ui/reader.tsx";
 
@@ -43,7 +43,7 @@ export function MarkdownView({ content, notes, documentPath, onPinBlock }: Markd
     [documentPath],
   );
   const inlinePlugins = useMemo(
-    () => [linkedBadgePlugin, inlineMathPlugin, ...createInlineHtmlPlugins(resolveImageSrc)],
+    () => createReaderInlinePlugins(resolveImageSrc),
     [resolveImageSrc],
   );
 

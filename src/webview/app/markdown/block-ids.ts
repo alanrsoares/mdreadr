@@ -5,6 +5,7 @@ import {
   blockIdForParagraph,
   hashBlockContent,
 } from "@mdreadr/domain";
+import { isSpecialFence } from "./pipeline.tsx";
 
 export type BlockIdAllocator = {
   nextParagraphId: (text: string) => string;
@@ -36,8 +37,7 @@ const inlineToText = (nodes: InlineNode[]): string =>
     })
     .join("");
 
-const isPinnableCodeBlock = (language: string | undefined): boolean =>
-  language !== "mermaid" && language !== "math" && language !== "badges";
+const isPinnableCodeBlock = (language: string | undefined): boolean => !isSpecialFence(language);
 
 function collectPinnableBlocks(
   blocks: BlockNode[],
