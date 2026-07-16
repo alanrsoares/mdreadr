@@ -38,3 +38,10 @@ artifacts/
 # Finder (MacOS) folder config
 .DS_Store
 .serena/
+
+# compiled theme files
+/src/webview/app/theme/mdreadr.css
+/src/webview/app/theme/mdreadr.js
+/src/webview/app/theme/mdreadr.d.ts
+/src/webview/app/theme/mdreadr.variants.d.ts
+
