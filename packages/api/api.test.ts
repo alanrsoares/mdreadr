@@ -91,6 +91,63 @@ describe("mdreadr api", () => {
     });
   });
 
+  describe("/documents/save", () => {
+    let dir: string;
+
+    afterEach(async () => {
+      sessionStore.clearDocument();
+      if (dir) await rm(dir, { recursive: true, force: true });
+    });
+
+    test("403s with nothing open", async () => {
+      const { url } = startServer(0);
+      dir = await mkdtemp(join(tmpdir(), "mdreadr-save-"));
+      const docPath = join(dir, "doc.md");
+
+      const response = await post(url, "/documents/save", { path: docPath, content: "new" });
+
+      expect(response?.status).toBe(403);
+      const json = await response?.json();
+      expect(json.code).toBe("DocumentNotOpen");
+    });
+
+    test("saves the open document and updates the session", async () => {
+      const { url } = startServer(0);
+      dir = await mkdtemp(join(tmpdir(), "mdreadr-save-"));
+      const docPath = join(dir, "doc.md");
+      await writeFile(docPath, "original");
+
+      const open = await post(url, "/documents/open", { path: docPath });
+      expect(open?.status).toBe(200);
+
+      const response = await post(url, "/documents/save", { path: docPath, content: "updated" });
+      expect(response?.status).toBe(200);
+      const json = await response?.json();
+      expect(json.path).toBe(docPath);
+
+      const onDisk = await Bun.file(docPath).text();
+      expect(onDisk).toBe("updated");
+
+      const session = await app.handle(new Request(`${url}/session`));
+      const sessionJson = await session?.json();
+      expect(sessionJson.documentContent).toBe("updated");
+    });
+
+    test("400s on an invalid body", async () => {
+      const { url } = startServer(0);
+      dir = await mkdtemp(join(tmpdir(), "mdreadr-save-"));
+      const docPath = join(dir, "doc.md");
+      await writeFile(docPath, "original");
+      await post(url, "/documents/open", { path: docPath });
+
+      const response = await post(url, "/documents/save", { path: docPath });
+
+      expect(response?.status).toBe(400);
+      const json = await response?.json();
+      expect(json.code).toBe("ValidationError");
+    });
+  });
+
   describe("/notes/save + /notes/load", () => {
     let dir: string;
 
