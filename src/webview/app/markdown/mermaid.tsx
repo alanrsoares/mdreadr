@@ -261,7 +261,7 @@ export function MermaidChart({ chart }: { chart: string }) {
           endContent={
             <div className="flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950 p-1">
               <IconButton
-                icon={<PlusIcon className="size-4 text-white" />}
+                icon={<PlusIcon className="size-4 text-(--color-on-dark)" />}
                 label="Zoom In"
                 tooltip="Zoom In"
                 variant="ghost"
@@ -269,7 +269,7 @@ export function MermaidChart({ chart }: { chart: string }) {
                 onClick={modalZoomIn}
               />
               <IconButton
-                icon={<MinusIcon className="size-4 text-white" />}
+                icon={<MinusIcon className="size-4 text-(--color-on-dark)" />}
                 label="Zoom Out"
                 tooltip="Zoom Out"
                 variant="ghost"
@@ -277,7 +277,7 @@ export function MermaidChart({ chart }: { chart: string }) {
                 onClick={modalZoomOut}
               />
               <IconButton
-                icon={<ArrowPathIcon className="size-4 text-white" />}
+                icon={<ArrowPathIcon className="size-4 text-(--color-on-dark)" />}
                 label="Reset View"
                 tooltip="Reset View"
                 variant="ghost"
