@@ -1,7 +1,5 @@
 /** Normalize separators and drop a trailing slash. */
-function normalizeDirectory(path: string): string {
-  return path.replace(/\\/g, "/").replace(/\/$/, "");
-}
+const normalizeDirectory = (path: string): string => path.replace(/\\/g, "/").replace(/\/$/, "");
 
 /**
  * Replace the user's home directory prefix with `~`.

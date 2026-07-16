@@ -20,15 +20,11 @@ export const TocSidebar = ({ entries, scrollRootRef, documentKey }: TocSidebarPr
 
   const activeId = useOutlineScrollSpy(scrollRootRef, items, documentKey);
 
-  if (entries.length === 0) {
-    return (
-      <EmptyState>
-        <p>No headings yet.</p>
-      </EmptyState>
-    );
-  }
-
-  return (
+  return entries.length === 0 ? (
+    <EmptyState>
+      <p>No headings yet.</p>
+    </EmptyState>
+  ) : (
     <TocNav>
       <Outline density="compact" items={items} activeId={activeId} />
     </TocNav>

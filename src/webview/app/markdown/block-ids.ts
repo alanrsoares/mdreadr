@@ -11,8 +11,8 @@ export type BlockIdAllocator = {
   nextCodeId: (code: string, language?: string) => string;
 };
 
-function inlineToText(nodes: InlineNode[]): string {
-  return nodes
+const inlineToText = (nodes: InlineNode[]): string =>
+  nodes
     .map((node) => {
       switch (node.type) {
         case "text":
@@ -35,11 +35,9 @@ function inlineToText(nodes: InlineNode[]): string {
       }
     })
     .join("");
-}
 
-function isPinnableCodeBlock(language: string | undefined): boolean {
-  return language !== "mermaid" && language !== "math" && language !== "badges";
-}
+const isPinnableCodeBlock = (language: string | undefined): boolean =>
+  language !== "mermaid" && language !== "math" && language !== "badges";
 
 function collectPinnableBlocks(
   blocks: BlockNode[],
@@ -52,27 +50,23 @@ function collectPinnableBlocks(
   > = [];
 
   for (const block of blocks) {
-    if (block.type === "paragraph") {
-      result.push({ kind: "paragraph", text: inlineToText(block.children) });
-      continue;
-    }
-
-    if (block.type === "codeblock") {
-      if (isPinnableCodeBlock(block.language)) {
-        result.push({ kind: "code", text: block.content, language: block.language });
-      }
-      continue;
-    }
-
-    if (block.type === "blockquote") {
-      result.push(...collectPinnableBlocks(block.children));
-      continue;
-    }
-
-    if (block.type === "list") {
-      for (const item of block.items) {
-        result.push(...collectPinnableBlocks(item.children));
-      }
+    switch (block.type) {
+      case "paragraph":
+        result.push({ kind: "paragraph", text: inlineToText(block.children) });
+        continue;
+      case "codeblock":
+        if (isPinnableCodeBlock(block.language)) {
+          result.push({ kind: "code", text: block.content, language: block.language });
+        }
+        continue;
+      case "blockquote":
+        result.push(...collectPinnableBlocks(block.children));
+        continue;
+      case "list":
+        for (const item of block.items) {
+          result.push(...collectPinnableBlocks(item.children));
+        }
+        break;
     }
   }
 

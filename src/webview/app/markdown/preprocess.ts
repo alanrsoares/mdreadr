@@ -6,8 +6,8 @@ export const encodeLinkedBadge = (alt: string, src: string, href: string): strin
   `[[[BADGE:${JSON.stringify({ alt, src, href })}]]]`;
 
 /** Normalise markdown before Astryx parsing. */
-export function preprocessReaderMarkdown(content: string): string {
-  return mapOutsideCodeFences(content, (chunk) =>
+export const preprocessReaderMarkdown = (content: string): string =>
+  mapOutsideCodeFences(content, (chunk) =>
     convertAlignWrappers(
       convertBadgeRowsToBlocks(
         collapseBadgeRows(
@@ -18,7 +18,6 @@ export function preprocessReaderMarkdown(content: string): string {
       ),
     ),
   );
-}
 
 // <div align> / <p align> wrappers, the GitHub README hero-block idiom. The
 // payload goes into an `align` fence JSON-encoded, so one escaped line can

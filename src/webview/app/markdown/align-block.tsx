@@ -28,34 +28,37 @@ export function decodeAlignPayload(code: string): AlignPayload | null {
 // Blocks inside an align wrapper render without pin buttons or block ids —
 // the wrapper is hero chrome, not annotatable prose. Special fences still
 // need their custom renderers.
-function createNestedComponents(
+const createNestedComponents = (
   resolveImageSrc: ImageSrcResolver | undefined,
-): Partial<MarkdownComponents> {
-  return {
-    code({ code, language }) {
-      if (language === "mermaid") return <MermaidChart chart={code} />;
-      if (language === "math") return <MathBlock tex={code} />;
-      if (language === "badges") {
+): Partial<MarkdownComponents> => ({
+  code({ code, language }) {
+    switch (language) {
+      case "mermaid":
+        return <MermaidChart chart={code} />;
+      case "math":
+        return <MathBlock tex={code} />;
+      case "badges": {
         const badges = parseBadgeBlock(code);
         if (badges) return <BadgeRow badges={badges} />;
+        break;
       }
-      return <CodeBlock code={code} language={language} isCollapsible />;
-    },
-    image({ src, alt }) {
-      if (DANGEROUS_URL_PATTERN.test(src.trim())) {
-        return <span>{alt}</span>;
-      }
-      return (
-        <img
-          alt={alt}
-          className="reader-inline-img"
-          loading="lazy"
-          src={resolveImageSrc ? resolveImageSrc(src) : src}
-        />
-      );
-    },
-  };
-}
+    }
+    return <CodeBlock code={code} language={language} isCollapsible />;
+  },
+  image({ src, alt }) {
+    if (DANGEROUS_URL_PATTERN.test(src.trim())) {
+      return <span>{alt}</span>;
+    }
+    return (
+      <img
+        alt={alt}
+        className="reader-inline-img"
+        loading="lazy"
+        src={resolveImageSrc ? resolveImageSrc(src) : src}
+      />
+    );
+  },
+});
 
 export function AlignBlock({
   code,
@@ -66,11 +69,9 @@ export function AlignBlock({
 }) {
   const payload = decodeAlignPayload(code);
 
-  if (payload === null) {
-    return <CodeBlock code={code} language="text" />;
-  }
-
-  return (
+  return payload === null ? (
+    <CodeBlock code={code} language="text" />
+  ) : (
     <div className="reader-align-block" data-align={payload.align}>
       <Markdown
         autolink="gfm"

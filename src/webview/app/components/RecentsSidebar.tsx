@@ -39,21 +39,17 @@ type RecentsSidebarOpenActionProps = {
 function RecentsSidebarOpenAction({ onPickDocument, isOpening }: RecentsSidebarOpenActionProps) {
   const { isCollapsed } = useSideNavCollapse();
 
-  if (isCollapsed) {
-    return (
-      <IconButton
-        label="Open markdown…"
-        tooltip="Open markdown…"
-        variant="primary"
-        size="sm"
-        icon={<Icon icon={DocumentTextIcon} size="sm" />}
-        isLoading={isOpening}
-        onClick={onPickDocument}
-      />
-    );
-  }
-
-  return (
+  return isCollapsed ? (
+    <IconButton
+      label="Open markdown…"
+      tooltip="Open markdown…"
+      variant="primary"
+      size="sm"
+      icon={<Icon icon={DocumentTextIcon} size="sm" />}
+      isLoading={isOpening}
+      onClick={onPickDocument}
+    />
+  ) : (
     <Button
       label="Open markdown…"
       variant="primary"

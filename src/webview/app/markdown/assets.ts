@@ -11,15 +11,11 @@ const ABSOLUTE_URL_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
  * asset endpoint so they resolve against the Document's directory instead of
  * the webview origin. Absolute URLs pass through untouched.
  */
-export function createAssetResolver(
-  apiBase: string,
-  documentPath: string | undefined,
-): ImageSrcResolver {
-  return (src) => {
+export const createAssetResolver =
+  (apiBase: string, documentPath: string | undefined): ImageSrcResolver =>
+  (src) => {
     const trimmed = src.trim();
-    if (!documentPath || trimmed.length === 0 || ABSOLUTE_URL_RE.test(trimmed)) {
-      return src;
-    }
-    return `${apiBase}/documents/asset?doc=${encodeURIComponent(documentPath)}&src=${encodeURIComponent(trimmed)}`;
+    return !documentPath || trimmed.length === 0 || ABSOLUTE_URL_RE.test(trimmed)
+      ? src
+      : `${apiBase}/documents/asset?doc=${encodeURIComponent(documentPath)}&src=${encodeURIComponent(trimmed)}`;
   };
-}

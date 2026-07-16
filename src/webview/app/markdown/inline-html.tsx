@@ -18,8 +18,7 @@ export function imgAttribute(attrs: string, name: string): string | null {
     `(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`,
     "i",
   ).exec(attrs);
-  if (!match) return null;
-  return match[1] ?? match[2] ?? match[3] ?? null;
+  return !match ? null : (match[1] ?? match[2] ?? match[3] ?? null);
 }
 
 export function parseImgTag(attrs: string): {
@@ -76,31 +75,33 @@ const brPlugin: MarkdownInlinePlugin = {
   },
 };
 
-function createImgPlugin(resolveImageSrc?: ImageSrcResolver): MarkdownInlinePlugin {
-  return {
-    pattern: IMG_PATTERN,
-    render(match, key) {
-      const parsed = parseImgTag(match[1] ?? "");
-      if (!parsed) {
-        return <span key={key}>{match[0]}</span>;
-      }
-      return (
-        <img
-          alt={parsed.alt}
-          className="reader-inline-img"
-          height={parsed.height}
-          key={key}
-          loading="lazy"
-          src={resolveImageSrc ? resolveImageSrc(parsed.src) : parsed.src}
-          width={parsed.width}
-        />
-      );
-    },
-  };
-}
+const createImgPlugin = (resolveImageSrc?: ImageSrcResolver): MarkdownInlinePlugin => ({
+  pattern: IMG_PATTERN,
+  render(match, key) {
+    const parsed = parseImgTag(match[1] ?? "");
+    if (!parsed) {
+      return <span key={key}>{match[0]}</span>;
+    }
+    return (
+      <img
+        alt={parsed.alt}
+        className="reader-inline-img"
+        height={parsed.height}
+        key={key}
+        loading="lazy"
+        src={resolveImageSrc ? resolveImageSrc(parsed.src) : parsed.src}
+        width={parsed.width}
+      />
+    );
+  },
+});
 
-export function createInlineHtmlPlugins(
+export const createInlineHtmlPlugins = (
   resolveImageSrc?: ImageSrcResolver,
-): MarkdownInlinePlugin[] {
-  return [kbdPlugin, supPlugin, subPlugin, brPlugin, createImgPlugin(resolveImageSrc)];
-}
+): MarkdownInlinePlugin[] => [
+  kbdPlugin,
+  supPlugin,
+  subPlugin,
+  brPlugin,
+  createImgPlugin(resolveImageSrc),
+];

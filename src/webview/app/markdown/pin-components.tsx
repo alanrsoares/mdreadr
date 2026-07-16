@@ -41,9 +41,8 @@ function textFromChildren(children: ReactNode): string {
   return "";
 }
 
-function blockClasses(notedBlockIds: ReadonlySet<string>, blockId: string): string {
-  return notedBlockIds.has(blockId) ? "reader-block-has-note" : "";
-}
+const blockClasses = (notedBlockIds: ReadonlySet<string>, blockId: string): string =>
+  notedBlockIds.has(blockId) ? "reader-block-has-note" : "";
 
 function PinParagraph({
   children,
@@ -89,22 +88,19 @@ function PinCodeBlock({
   notedBlockIds: ReadonlySet<string>;
   resolveImageSrc?: ImageSrcResolver;
 }) {
-  if (language === "align") {
-    return <AlignBlock code={code} resolveImageSrc={resolveImageSrc} />;
-  }
-
-  if (language === "mermaid") {
-    return <MermaidChart chart={code} />;
-  }
-
-  if (language === "math") {
-    return <MathBlock tex={code} />;
-  }
-
-  if (language === "badges") {
-    const badges = parseBadgeBlock(code);
-    if (badges) {
-      return <BadgeRow badges={badges} />;
+  switch (language) {
+    case "align":
+      return <AlignBlock code={code} resolveImageSrc={resolveImageSrc} />;
+    case "mermaid":
+      return <MermaidChart chart={code} />;
+    case "math":
+      return <MathBlock tex={code} />;
+    case "badges": {
+      const badges = parseBadgeBlock(code);
+      if (badges) {
+        return <BadgeRow badges={badges} />;
+      }
+      break;
     }
   }
 
@@ -125,68 +121,66 @@ function PinCodeBlock({
   );
 }
 
-export function createPinComponents(ctx: PinContext): Partial<MarkdownComponents> {
-  return {
-    heading({ level, children }) {
-      const text = textFromChildren(children);
-      const id = ctx.nextHeadingId();
-      const headingPath = ctx.headingPathForLevel(level, text);
-      const anchor: BlockAnchor = {
-        kind: "heading",
-        blockId: id,
-        headingPath,
-        label: truncateAnchorLabel(text),
-      };
+export const createPinComponents = (ctx: PinContext): Partial<MarkdownComponents> => ({
+  heading({ level, children }) {
+    const text = textFromChildren(children);
+    const id = ctx.nextHeadingId();
+    const headingPath = ctx.headingPathForLevel(level, text);
+    const anchor: BlockAnchor = {
+      kind: "heading",
+      blockId: id,
+      headingPath,
+      label: truncateAnchorLabel(text),
+    };
 
-      const Heading = readerHeadingByLevel[level];
+    const Heading = readerHeadingByLevel[level];
 
-      return (
-        <PinnableBlock>
-          {ctx.onPinBlock ? <PinButton anchor={anchor} onPin={ctx.onPinBlock} /> : null}
-          <Heading id={id} data-block-id={id} className={blockClasses(ctx.notedBlockIds, id)}>
-            {children}
-          </Heading>
-        </PinnableBlock>
-      );
-    },
-    paragraph({ children }) {
-      return (
-        <PinParagraph
-          onPinBlock={ctx.onPinBlock}
-          blockIds={ctx.blockIds}
-          notedBlockIds={ctx.notedBlockIds}
-        >
+    return (
+      <PinnableBlock>
+        {ctx.onPinBlock ? <PinButton anchor={anchor} onPin={ctx.onPinBlock} /> : null}
+        <Heading id={id} data-block-id={id} className={blockClasses(ctx.notedBlockIds, id)}>
           {children}
-        </PinParagraph>
-      );
-    },
-    code({ code, language }) {
-      return (
-        <PinCodeBlock
-          code={code}
-          language={language}
-          onPinBlock={ctx.onPinBlock}
-          blockIds={ctx.blockIds}
-          notedBlockIds={ctx.notedBlockIds}
-          resolveImageSrc={ctx.resolveImageSrc}
-        />
-      );
-    },
-    image({ src, alt }) {
-      if (DANGEROUS_URL_PATTERN.test(src.trim())) {
-        return <span>{alt}</span>;
-      }
-      return (
-        <img
-          alt={alt}
-          className="reader-inline-img"
-          loading="lazy"
-          src={ctx.resolveImageSrc ? ctx.resolveImageSrc(src) : src}
-        />
-      );
-    },
-    blockquote({ children }) {
-      return <ReaderBlockquote>{children}</ReaderBlockquote>;
-    },
-  };
-}
+        </Heading>
+      </PinnableBlock>
+    );
+  },
+  paragraph({ children }) {
+    return (
+      <PinParagraph
+        onPinBlock={ctx.onPinBlock}
+        blockIds={ctx.blockIds}
+        notedBlockIds={ctx.notedBlockIds}
+      >
+        {children}
+      </PinParagraph>
+    );
+  },
+  code({ code, language }) {
+    return (
+      <PinCodeBlock
+        code={code}
+        language={language}
+        onPinBlock={ctx.onPinBlock}
+        blockIds={ctx.blockIds}
+        notedBlockIds={ctx.notedBlockIds}
+        resolveImageSrc={ctx.resolveImageSrc}
+      />
+    );
+  },
+  image({ src, alt }) {
+    if (DANGEROUS_URL_PATTERN.test(src.trim())) {
+      return <span>{alt}</span>;
+    }
+    return (
+      <img
+        alt={alt}
+        className="reader-inline-img"
+        loading="lazy"
+        src={ctx.resolveImageSrc ? ctx.resolveImageSrc(src) : src}
+      />
+    );
+  },
+  blockquote({ children }) {
+    return <ReaderBlockquote>{children}</ReaderBlockquote>;
+  },
+});

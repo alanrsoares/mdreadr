@@ -12,9 +12,7 @@ export type RecentPathMenuLabel = {
   ariaLabel: string;
 };
 
-function splitPath(path: string): string[] {
-  return path.split(/[/\\]/).filter(Boolean);
-}
+const splitPath = (path: string): string[] => path.split(/[/\\]/).filter(Boolean);
 
 function groupBy<T>(items: readonly T[], keyFn: (item: T) => string): Map<string, T[]> {
   const groups = new Map<string, T[]>();

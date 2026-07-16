@@ -5,10 +5,8 @@ type RawMarkdownViewProps = {
   content: string;
 };
 
-export function RawMarkdownView({ content }: RawMarkdownViewProps) {
-  return (
-    <ReaderRaw>
-      <CodeBlock code={content} language="markdown" />
-    </ReaderRaw>
-  );
-}
+export const RawMarkdownView = ({ content }: RawMarkdownViewProps) => (
+  <ReaderRaw>
+    <CodeBlock code={content} language="markdown" />
+  </ReaderRaw>
+);

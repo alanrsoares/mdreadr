@@ -41,12 +41,11 @@ const statusOptions = [
   { value: "wontfix", label: "Won't fix" },
 ];
 
-function formatNoteTime(iso: string): string {
-  return new Intl.DateTimeFormat(undefined, {
+const formatNoteTime = (iso: string): string =>
+  new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(iso));
-}
 
 export function NotesPanel({
   notes,
