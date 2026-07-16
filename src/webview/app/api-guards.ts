@@ -1,9 +1,3 @@
-export const hasApiError = (value: unknown): value is { error: string; code?: string } =>
-  typeof value === "object" &&
-  value !== null &&
-  "error" in value &&
-  typeof (value as { error: unknown }).error === "string";
-
 export const readPaths = (value: unknown): string[] =>
   typeof value === "object" &&
   value !== null &&
