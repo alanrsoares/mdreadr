@@ -5,8 +5,12 @@ A desktop Reader for markdown Documents with anchored feedback Notes for humanâ€
 ## Language
 
 **Document**:
-A source markdown file on disk that mdreadr renders read-only.
+A source markdown file on disk, rendered read-only in Preview/Source and rewritten on disk only by explicit save in Edit mode.
 _Avoid_: File, page, article
+
+**Draft**:
+In-memory edited content of the open Document before the user explicitly saves it back to disk. Discarded on switch unless confirmed.
+_Avoid_: buffer, unsaved changes, dirty state
 
 **Note**:
 An anchored feedback Thread on a Document, with a lifecycle status and one or more Replies.

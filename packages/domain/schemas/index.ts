@@ -75,6 +75,11 @@ export const LoadNotesBodySchema = z.object({
   path: z.string().min(1),
 });
 
+export const SaveDocumentBodySchema = z.object({
+  path: z.string().min(1),
+  content: z.string(),
+});
+
 export const PickFileBodySchema = z.object({
   mode: z.enum(["open", "save"]),
   defaultPath: z.string().optional(),

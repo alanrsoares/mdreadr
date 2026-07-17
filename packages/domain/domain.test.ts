@@ -7,6 +7,7 @@ import {
   extractHeadings,
   findNote,
   parseNotesFileJson,
+  SaveDocumentBodySchema,
   setNoteStatus,
 } from "@mdreadr/domain";
 import { isOk } from "@onrails/result";
@@ -82,5 +83,22 @@ describe("markdown helpers", () => {
     expect(id.startsWith("code-")).toBe(true);
     expect(blockIdForCode("console.log(1)", "ts", 0)).toBe(id);
     expect(blockIdForCode("console.log(1)", "js", 0)).not.toBe(id);
+  });
+});
+
+describe("SaveDocumentBodySchema", () => {
+  test("accepts a path and content", () => {
+    const result = SaveDocumentBodySchema.safeParse({ path: "/tmp/doc.md", content: "hello" });
+    expect(result.success).toBe(true);
+  });
+
+  test("rejects an empty path", () => {
+    const result = SaveDocumentBodySchema.safeParse({ path: "", content: "hello" });
+    expect(result.success).toBe(false);
+  });
+
+  test("rejects a missing content field", () => {
+    const result = SaveDocumentBodySchema.safeParse({ path: "/tmp/doc.md" });
+    expect(result.success).toBe(false);
   });
 });

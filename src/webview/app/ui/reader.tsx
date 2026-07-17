@@ -49,3 +49,7 @@ export const ReaderBlockquote = tw.blockquote(
 );
 
 export const ReaderRaw = tw.div`w-full min-w-0`;
+
+export const ReaderEditor = tw.div(
+  "w-full min-w-0 font-[family-name:var(--font-family-code)] [&_textarea]:min-h-[60vh]",
+);

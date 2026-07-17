@@ -18,6 +18,7 @@ import {
   NotesFileSchema,
   OpenDocumentBodySchema,
   PickFileBodySchema,
+  SaveDocumentBodySchema,
   SaveNotesBodySchema,
   UpdateNoteStatusBodySchema,
 } from "../domain/schemas/index.ts";
@@ -123,6 +124,38 @@ export const app = new Elysia()
 
     return file;
   })
+  .post(
+    "/documents/save",
+    async ({ body, set }) => {
+      const parsed = SaveDocumentBodySchema.safeParse(body);
+      if (!parsed.success) {
+        set.status = 400;
+        return { error: parsed.error.message, code: "ValidationError" };
+      }
+
+      const result = await documentSession.save(parsed.data.path, parsed.data.content);
+      if (isErr(result)) {
+        return match(result.error)
+          .with({ _tag: "DocumentNotOpen" }, () => {
+            set.status = 403;
+            return { error: "Only the open Document can be saved", code: "DocumentNotOpen" };
+          })
+          .with({ _tag: "WriteFailed" }, (error) => {
+            set.status = 500;
+            return { error: error.message, code: "WriteFailed" };
+          })
+          .exhaustive();
+      }
+
+      return { path: parsed.data.path };
+    },
+    // No route-level `body` schema here: Elysia validates a declared body
+    // schema before the handler runs and returns its own 422 on failure,
+    // preempting the manual `safeParse` 400/ValidationError path below (a
+    // pre-existing quirk shared by every schema-guarded route in this file,
+    // just never exercised by a test until this one). Parsing manually
+    // inside the handler is what actually produces the intended 400 here.
+  )
   .get("/notes", () => ({ notes: sessionStore.getNotes() }))
   .post(
     "/notes",

@@ -3,7 +3,7 @@ import type { FSWatcher } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isErr } from "@onrails/result";
+import { errAsync, isErr, isOk } from "@onrails/result";
 import { createDocumentSession, type WatchFn } from "./document-session.ts";
 import { SessionStore } from "./session.ts";
 
@@ -149,5 +149,82 @@ describe("createDocumentSession", () => {
       session.close();
       session.close();
     }).not.toThrow();
+  });
+
+  test("save() happy path writes to disk and updates the store", async () => {
+    const docPath = join(dir, "save-happy.md");
+    await writeFile(docPath, "original");
+    const store = new SessionStore();
+    const { watch } = createFakeWatch();
+    const session = createDocumentSession({ store, watch });
+    await session.open(docPath);
+
+    const result = await session.save(docPath, "updated");
+
+    expect(isOk(result)).toBe(true);
+    expect(await Bun.file(docPath).text()).toBe("updated");
+    expect(store.snapshot().documentContent).toBe("updated");
+  });
+
+  test("save() rejects a path that is not the open document", async () => {
+    const docPath = join(dir, "save-scope.md");
+    const otherPath = join(dir, "save-scope-other.md");
+    await writeFile(docPath, "original");
+    await writeFile(otherPath, "other");
+    const store = new SessionStore();
+    const { watch } = createFakeWatch();
+    const session = createDocumentSession({ store, watch });
+    await session.open(docPath);
+
+    const result = await session.save(otherPath, "hacked");
+
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error).toEqual({ _tag: "DocumentNotOpen", path: otherPath });
+    }
+    expect(await Bun.file(otherPath).text()).toBe("other");
+  });
+
+  test("save() does not trigger onChange via the watcher (no watcher echo)", async () => {
+    const docPath = join(dir, "save-no-echo.md");
+    await writeFile(docPath, "original");
+    const store = new SessionStore();
+    const { watch, registered } = createFakeWatch();
+    const session = createDocumentSession({ store, watch });
+    await session.open(docPath);
+
+    const fired: string[] = [];
+    session.onChange(() => fired.push("changed"));
+
+    const result = await session.save(docPath, "saved-content");
+    expect(isOk(result)).toBe(true);
+
+    const listener = registered.at(-1)?.listener;
+    if (!listener) throw new Error("test bug: watcher listener was not registered");
+    listener("change");
+    await flushMicrotasks();
+
+    expect(fired).toEqual([]);
+  });
+
+  test("save() restores the previous content on write failure", async () => {
+    const docPath = join(dir, "save-write-failed.md");
+    await writeFile(docPath, "original");
+    const store = new SessionStore();
+    const { watch } = createFakeWatch();
+    const session = createDocumentSession({
+      store,
+      watch,
+      writeFile: () => errAsync({ _tag: "WriteFailed", message: "disk full" }),
+    });
+    await session.open(docPath);
+
+    const result = await session.save(docPath, "new-content");
+
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error).toEqual({ _tag: "WriteFailed", message: "disk full" });
+    }
+    expect(store.snapshot().documentContent).toBe("original");
   });
 });
