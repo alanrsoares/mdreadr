@@ -1,9 +1,9 @@
 import { Icon } from "@astryxdesign/core/Icon";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
-import { CodeBracketIcon, EyeIcon, PencilSquareIcon } from "../icons.ts";
+import { EyeIcon, PencilSquareIcon } from "../icons.ts";
 
-export type DocumentViewMode = "preview" | "source" | "edit";
+export type DocumentViewMode = "preview" | "edit";
 
 type DocumentViewModeSwitchProps = {
   value: DocumentViewMode;
@@ -12,7 +12,7 @@ type DocumentViewModeSwitchProps = {
 
 export function DocumentViewModeSwitch({ value, onChange }: DocumentViewModeSwitchProps) {
   const selectMode = (next: string) => {
-    if (next === "preview" || next === "source" || next === "edit") {
+    if (next === "preview" || next === "edit") {
       onChange(next);
     }
   };
@@ -31,14 +31,6 @@ export function DocumentViewModeSwitch({ value, onChange }: DocumentViewModeSwit
           label="Preview"
           isLabelHidden
           icon={<Icon icon={EyeIcon} size="sm" />}
-        />
-      </Tooltip>
-      <Tooltip content="Source markdown">
-        <SegmentedControlItem
-          value="source"
-          label="Source markdown"
-          isLabelHidden
-          icon={<Icon icon={CodeBracketIcon} size="sm" />}
         />
       </Tooltip>
       <Tooltip content="Edit markdown">

@@ -2,6 +2,7 @@ import type { BlockAnchor, Note } from "@mdreadr/domain";
 import type { ReactNode } from "react";
 import {
   ReaderChromeControls,
+  ReaderChromeEnd,
   ReaderDocumentBody,
   ReaderDocumentChrome,
   ReaderSheet,
@@ -9,7 +10,6 @@ import {
 import { DocumentEditor } from "./DocumentEditor.tsx";
 import { type DocumentViewMode, DocumentViewModeSwitch } from "./DocumentViewModeSwitch.tsx";
 import { MarkdownView } from "./MarkdownView.tsx";
-import { RawMarkdownView } from "./RawMarkdownView.tsx";
 
 export type { DocumentViewMode };
 
@@ -40,8 +40,8 @@ export const DocumentView = ({
     <ReaderDocumentChrome>
       <ReaderChromeControls>
         <DocumentViewModeSwitch value={viewMode} onChange={onViewModeChange} />
-        {chromeEnd}
       </ReaderChromeControls>
+      {chromeEnd ? <ReaderChromeEnd>{chromeEnd}</ReaderChromeEnd> : null}
     </ReaderDocumentChrome>
 
     <ReaderDocumentBody className="reader-document-body" key={viewMode}>
@@ -52,8 +52,6 @@ export const DocumentView = ({
           notes={notes}
           onPinBlock={onPinBlock}
         />
-      ) : viewMode === "source" ? (
-        <RawMarkdownView content={content} />
       ) : (
         <DocumentEditor value={editorValue} onChange={onEditorChange} />
       )}

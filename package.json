@@ -10,6 +10,7 @@
     "dev": "vite build && GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 electrobun dev --watch",
     "dev:hmr": "concurrently \"bun run hmr\" \"bun run start\"",
     "build": "bun run theme:build && vite build && electrobun build --env=stable",
+    "install:mac": "rm -rf /Applications/mdreadr.app && cp -R build/stable-macos-arm64/mdreadr.app /Applications/",
     "icons:build": "bun run scripts/build-icons.ts",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -25,6 +26,7 @@
   "dependencies": {
     "@astryxdesign/core": "^0.1.5",
     "@astryxdesign/theme-neutral": "^0.1.5",
+    "@codemirror/lang-markdown": "^6.5.1",
     "@elysiajs/cors": "^1.4.2",
     "@elysiajs/eden": "^1.4.9",
     "@heroicons/react": "^2.2.0",
@@ -35,6 +37,7 @@
     "@tailwindcss/vite": "^4.3.2",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.18",
+    "@uiw/react-codemirror": "^4.25.11",
     "electrobun": "^1.18.1",
     "elysia": "^1.4.29",
     "katex": "^0.17.0",

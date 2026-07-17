@@ -30,6 +30,8 @@ export const ReaderDocumentBody = tw.div`px-8 pt-6 pb-14`;
 
 export const ReaderChromeControls = tw.div`mx-auto flex w-fit items-center justify-center gap-2`;
 
+export const ReaderChromeEnd = tw.div("absolute right-8 top-1/2 -translate-y-1/2");
+
 export const ReaderBadgeRow = tw.div`flex flex-wrap items-center gap-1.5`;
 
 export const EmptyState = tw.div(
