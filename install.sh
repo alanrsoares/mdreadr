@@ -4,10 +4,14 @@
 #   curl -fsSL https://raw.githubusercontent.com/alanrsoares/mdreadr/main/install.sh | sh
 #   wget -qO-  https://raw.githubusercontent.com/alanrsoares/mdreadr/main/install.sh | sh
 #
+# While the repo is private, authenticate with a token first:
+#   GITHUB_TOKEN=$(gh auth token) sh install.sh
+#
 # Options (env vars):
+#   GITHUB_TOKEN / GH_TOKEN  auth for private repos / rate limits
 #   MDREADR_VERSION      install a specific tag (e.g. v0.1.0); default: latest release
 #   MDREADR_INSTALL_DIR  macOS: .app destination (default /Applications, falls back
-#                        to ~/Applications); Linux: bundle dir for the tarball path
+#                        to ~/Applications); Linux: bundle dir for the tar.zst path
 #                        (default ~/.local/opt/mdreadr)
 #   MDREADR_BIN_DIR      Linux: where the launcher/AppImage lands (default ~/.local/bin)
 set -eu
@@ -15,20 +19,53 @@ set -eu
 REPO="alanrsoares/mdreadr"
 APP="mdreadr"
 CHANNEL="stable"
+TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 
 say() { printf '%s\n' "$*"; }
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 # --- downloader (curl or wget) -----------------------------------------------
 if command -v curl >/dev/null 2>&1; then
-  fetch() { curl -fsSL "$1"; }
-  fetch_to() { curl -fsSL -o "$2" "$1"; }
+  HTTP=curl
 elif command -v wget >/dev/null 2>&1; then
-  fetch() { wget -qO- "$1"; }
-  fetch_to() { wget -qO "$2" "$1"; }
+  HTTP=wget
 else
   fail "need curl or wget"
 fi
+
+# fetch <url>: print body. fetch_asset <ref> <out>: download a release asset —
+# with a token the ref is an API asset URL and needs the octet-stream Accept.
+fetch() {
+  if [ "$HTTP" = curl ]; then
+    if [ -n "$TOKEN" ]; then
+      curl -fsSL -H "Authorization: Bearer $TOKEN" "$1"
+    else
+      curl -fsSL "$1"
+    fi
+  else
+    if [ -n "$TOKEN" ]; then
+      wget -qO- --header="Authorization: Bearer $TOKEN" "$1"
+    else
+      wget -qO- "$1"
+    fi
+  fi
+}
+
+fetch_asset() {
+  if [ "$HTTP" = curl ]; then
+    if [ -n "$TOKEN" ]; then
+      curl -fsSL -H "Authorization: Bearer $TOKEN" -H "Accept: application/octet-stream" -o "$2" "$1"
+    else
+      curl -fsSL -o "$2" "$1"
+    fi
+  else
+    if [ -n "$TOKEN" ]; then
+      wget -qO "$2" --header="Authorization: Bearer $TOKEN" --header="Accept: application/octet-stream" "$1"
+    else
+      wget -qO "$2" "$1"
+    fi
+  fi
+}
 
 # --- platform detection ------------------------------------------------------
 case "$(uname -s)" in
@@ -57,23 +94,40 @@ fi
 
 say "» looking up release (${MDREADR_VERSION:-latest})…"
 RELEASE_JSON=$(fetch "$API_URL") ||
-  fail "no published release found. Note: CI creates draft releases — publish one on
-       https://github.com/${REPO}/releases first (drafts are invisible to this installer)."
+  fail "no release found. If the repo is private, pass a token:
+       GITHUB_TOKEN=\$(gh auth token) sh install.sh
+       Also note: draft releases are invisible — publish one first."
 
-# Asset URLs for this platform, one per line. No jq dependency: match the
-# browser_download_url lines and strip the JSON around them.
-assets_for_platform() {
-  printf '%s\n' "$RELEASE_JSON" |
-    grep -o "\"browser_download_url\"[^\"]*\"[^\"]*\"" |
-    sed 's/.*"\(http[^"]*\)"/\1/' |
-    grep "/${PREFIX}-" || true
+# One "<name>\t<download-ref>" line per asset for this platform.
+# With a token: pair each asset's API url with its name (browser URLs 404 on
+# private repos). Without: derive the name from the public browser URL.
+list_assets() {
+  if [ -n "$TOKEN" ]; then
+    printf '%s\n' "$RELEASE_JSON" |
+      tr ',' '\n' |
+      grep -oE '"(url|name)" *: *"[^"]*"' |
+      awk -F'"' '
+        $2 == "url" && $4 ~ /\/releases\/assets\// { u = $4; next }
+        $2 == "name" && u != "" { print $4 "\t" u; u = "" }
+      '
+  else
+    printf '%s\n' "$RELEASE_JSON" |
+      grep -oE '"browser_download_url" *: *"http[^"]*"' |
+      sed 's/.*"\(http[^"]*\)"/\1/' |
+      awk -F/ '{ print $NF "\t" $0 }'
+  fi
 }
 
-ASSETS=$(assets_for_platform)
+ASSETS=$(list_assets | grep "^${PREFIX}-" || true)
 [ -n "$ASSETS" ] || fail "this release has no ${OS}-${ARCH} build.
        CI currently builds macos-arm64 and linux-x64."
 
-pick_asset() { printf '%s\n' "$ASSETS" | grep "$1\$" | head -n 1 || true; }
+# pick_asset <name-suffix>: print the download ref, empty when absent.
+pick_asset() {
+  printf '%s\n' "$ASSETS" | awk -F'\t' -v suffix="$1" '
+    index($1, suffix) == length($1) - length(suffix) + 1 { print $2; exit }
+  '
+}
 
 TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/mdreadr-install.XXXXXX")
 trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
@@ -86,10 +140,10 @@ install_macos() {
     mkdir -p "$DEST"
   fi
 
-  DMG_URL=$(pick_asset ".dmg")
-  if [ -n "$DMG_URL" ]; then
-    say "» downloading $(basename "$DMG_URL")…"
-    fetch_to "$DMG_URL" "$TMP_DIR/$APP.dmg"
+  DMG_REF=$(pick_asset ".dmg")
+  if [ -n "$DMG_REF" ]; then
+    say "» downloading ${APP}.dmg…"
+    fetch_asset "$DMG_REF" "$TMP_DIR/$APP.dmg"
     MOUNT_DIR="$TMP_DIR/mnt"
     mkdir -p "$MOUNT_DIR"
     say "» mounting DMG…"
@@ -108,11 +162,11 @@ install_macos() {
     return
   fi
 
-  TAR_URL=$(pick_asset ".app.tar.zst")
-  [ -n "$TAR_URL" ] || fail "release has neither a .dmg nor an .app.tar.zst for ${PREFIX}"
+  TAR_REF=$(pick_asset ".app.tar.zst")
+  [ -n "$TAR_REF" ] || fail "release has neither a .dmg nor an .app.tar.zst for ${PREFIX}"
   command -v zstd >/dev/null 2>&1 || fail "the .app.tar.zst fallback needs zstd (brew install zstd)"
-  say "» downloading $(basename "$TAR_URL")…"
-  fetch_to "$TAR_URL" "$TMP_DIR/$APP.app.tar.zst"
+  say "» downloading ${APP}.app.tar.zst…"
+  fetch_asset "$TAR_REF" "$TMP_DIR/$APP.app.tar.zst"
   zstd -d -q "$TMP_DIR/$APP.app.tar.zst" -o "$TMP_DIR/$APP.app.tar"
   tar -xf "$TMP_DIR/$APP.app.tar" -C "$TMP_DIR"
   APP_BUNDLE=$(find "$TMP_DIR" -maxdepth 2 -name "*.app" | head -n 1)
@@ -123,30 +177,53 @@ install_macos() {
   say "✓ installed: $DEST/$(basename "$APP_BUNDLE")"
 }
 
-# --- Linux: prefer the AppImage (single self-contained executable) -----------
+# --- Linux ---------------------------------------------------------------------
+# Preference order:
+#   1. -Setup.tar.gz — electrobun's self-extracting installer (extracts to
+#      ~/.local/share and creates a desktop entry with the app icon)
+#   2. .AppImage — single-file executable straight into MDREADR_BIN_DIR
+#   3. .tar.zst — raw bundle; extract and symlink the launcher
 install_linux() {
   BIN_DIR="${MDREADR_BIN_DIR:-$HOME/.local/bin}"
-  mkdir -p "$BIN_DIR"
 
-  APPIMAGE_URL=$(pick_asset ".AppImage")
-  if [ -n "$APPIMAGE_URL" ]; then
-    say "» downloading $(basename "$APPIMAGE_URL")…"
-    fetch_to "$APPIMAGE_URL" "$BIN_DIR/$APP"
-    chmod +x "$BIN_DIR/$APP"
-    say "✓ installed: $BIN_DIR/$APP"
+  path_hint() {
     case ":$PATH:" in
       *":$BIN_DIR:"*) ;;
       *) say "note: $BIN_DIR is not on your PATH" ;;
     esac
+  }
+
+  SETUP_REF=$(pick_asset "-Setup.tar.gz")
+  if [ -n "$SETUP_REF" ]; then
+    say "» downloading ${APP} installer…"
+    fetch_asset "$SETUP_REF" "$TMP_DIR/setup.tar.gz"
+    tar -xzf "$TMP_DIR/setup.tar.gz" -C "$TMP_DIR"
+    [ -f "$TMP_DIR/installer" ] || fail "Setup archive has no 'installer' binary"
+    chmod +x "$TMP_DIR/installer"
+    say "» running the ${APP} installer (extracts to ~/.local/share, adds a desktop entry)…"
+    (cd "$TMP_DIR" && ./installer)
+    say "✓ installed via the ${APP} installer"
     return
   fi
 
-  TAR_URL=$(pick_asset ".tar.zst")
-  [ -n "$TAR_URL" ] || fail "release has neither an .AppImage nor a .tar.zst for ${PREFIX}"
+  APPIMAGE_REF=$(pick_asset ".AppImage")
+  if [ -n "$APPIMAGE_REF" ]; then
+    mkdir -p "$BIN_DIR"
+    say "» downloading AppImage…"
+    fetch_asset "$APPIMAGE_REF" "$BIN_DIR/$APP"
+    chmod +x "$BIN_DIR/$APP"
+    say "✓ installed: $BIN_DIR/$APP"
+    path_hint
+    return
+  fi
+
+  TAR_REF=$(pick_asset ".tar.zst")
+  [ -n "$TAR_REF" ] || fail "release has no -Setup.tar.gz, .AppImage, or .tar.zst for ${PREFIX}"
   command -v zstd >/dev/null 2>&1 || fail "the .tar.zst fallback needs zstd (apt install zstd)"
   OPT_DIR="${MDREADR_INSTALL_DIR:-$HOME/.local/opt/$APP}"
-  say "» downloading $(basename "$TAR_URL")…"
-  fetch_to "$TAR_URL" "$TMP_DIR/$APP.tar.zst"
+  mkdir -p "$BIN_DIR"
+  say "» downloading ${APP}.tar.zst…"
+  fetch_asset "$TAR_REF" "$TMP_DIR/$APP.tar.zst"
   zstd -d -q "$TMP_DIR/$APP.tar.zst" -o "$TMP_DIR/$APP.tar"
   rm -rf "$OPT_DIR"
   mkdir -p "$OPT_DIR"
@@ -155,10 +232,7 @@ install_linux() {
   [ -n "$LAUNCHER" ] || fail "could not find the $APP launcher inside the bundle at $OPT_DIR"
   ln -sf "$LAUNCHER" "$BIN_DIR/$APP"
   say "✓ installed: $OPT_DIR (launcher: $BIN_DIR/$APP)"
-  case ":$PATH:" in
-    *":$BIN_DIR:"*) ;;
-    *) say "note: $BIN_DIR is not on your PATH" ;;
-  esac
+  path_hint
 }
 
 say "» platform: ${OS}-${ARCH}"

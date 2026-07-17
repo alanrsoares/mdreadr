@@ -14,7 +14,13 @@ or with wget:
 wget -qO- https://raw.githubusercontent.com/alanrsoares/mdreadr/main/install.sh | sh
 ```
 
-Picks the right build from the latest GitHub release for your platform (macOS arm64 → `.app` into `/Applications`, Linux x64 → AppImage into `~/.local/bin`). Pin a version with `MDREADR_VERSION=v0.1.0`; see the header of [`install.sh`](install.sh) for all options.
+Picks the right build from the latest GitHub release for your platform (macOS arm64 → `.app` into `/Applications`, Linux x64 → electrobun's self-extracting installer with a desktop entry). Pin a version with `MDREADR_VERSION=v0.1.0`; see the header of [`install.sh`](install.sh) for all options.
+
+While the repo is private, authenticate first:
+
+```bash
+GITHUB_TOKEN=$(gh auth token) sh -c "$(gh api repos/alanrsoares/mdreadr/contents/install.sh -H 'Accept: application/vnd.github.raw')"
+```
 
 ## Stack
 
