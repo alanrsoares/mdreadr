@@ -5,7 +5,7 @@ export default {
   app: {
     name: APP_NAME,
     identifier: APP_IDENTIFIER,
-    version: "0.1.0",
+    version: "0.1.1",
     fileAssociations: [
       {
         ext: ["md", "markdown"],
