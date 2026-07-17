@@ -13,6 +13,7 @@ export type ReaderSessionCallbacks = {
   onStatusChanged?: (status: NoteStatus | undefined) => void;
   onNotesSaved?: () => void;
   onNotesLoaded?: () => void;
+  onDocumentSaved?: () => void;
 };
 
 export type ReaderSession = {
@@ -26,11 +27,13 @@ export type ReaderSession = {
   setStatus: (noteId: string, status: NoteStatus) => Promise<void>;
   save: () => Promise<void>;
   load: () => Promise<void>;
+  saveDocument: (path: string, content: string) => Promise<void>;
   refresh: () => void;
   isOpening: boolean;
   isSaving: boolean;
   isLoadingNotes: boolean;
   isCreatingNote: boolean;
+  isSavingDocument: boolean;
 };
 
 export function useReaderSession(
@@ -157,6 +160,19 @@ export function useReaderSession(
     },
   });
 
+  const saveDocumentMutation = useMutation({
+    mutationFn: (input: { path: string; content: string }) =>
+      readerApi.saveDocument(input.path, input.content),
+    onSuccess: () => {
+      invalidateSession();
+      showSuccess("Document saved");
+      callbacks.onDocumentSaved?.();
+    },
+    onError: (error) => {
+      showError("Save document", error);
+    },
+  });
+
   const loadNotesMutation = useMutation({
     mutationFn: () => loadNotesFlow(readerApi),
     onSuccess: (outcome) => {
@@ -195,6 +211,9 @@ export function useReaderSession(
     load: async () => {
       await loadNotesMutation.mutateAsync();
     },
+    saveDocument: async (path, content) => {
+      await saveDocumentMutation.mutateAsync({ path, content });
+    },
     refresh: () => {
       invalidateSession();
       invalidateNotes();
@@ -203,5 +222,6 @@ export function useReaderSession(
     isSaving: saveNotesMutation.isPending,
     isLoadingNotes: loadNotesMutation.isPending,
     isCreatingNote: createNoteMutation.isPending,
+    isSavingDocument: saveDocumentMutation.isPending,
   };
 }

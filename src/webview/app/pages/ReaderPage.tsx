@@ -1,3 +1,4 @@
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { Button } from "@astryxdesign/core/Button";
 import { Icon } from "@astryxdesign/core/Icon";
@@ -17,6 +18,14 @@ import { TocSidebar } from "../components/TocSidebar.tsx";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
 import { ArrowDownTrayIcon } from "../icons.ts";
 import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
+import {
+  type DraftState,
+  discardDraft,
+  draftSaved,
+  editDraft,
+  emptyDraft,
+  isDirty,
+} from "../session/document-draft.ts";
 import { createTreatyReaderApi } from "../session/reader-api.ts";
 import { useReaderSession } from "../session/useReaderSession.ts";
 import {
@@ -68,8 +77,11 @@ export function ReaderPage() {
   const [documentViewMode, setDocumentViewMode] = useState<DocumentViewMode>("preview");
   const [liveMessage, setLiveMessage] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
+  const [draft, setDraft] = useState<DraftState>(emptyDraft);
+  const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false);
   const readerMainRef = useRef<HTMLElement>(null);
   const dragDepthRef = useRef(0);
+  const pendingActionRef = useRef<(() => void) | null>(null);
 
   const reader = useReaderSession(readerApi, {
     onOpened: (path) => {
@@ -92,7 +104,48 @@ export function ReaderPage() {
     onNotesLoaded: () => {
       setLiveMessage("Notes loaded");
     },
+    onDocumentSaved: () => {
+      setDraft(draftSaved);
+      setLiveMessage("Document saved");
+    },
   });
+
+  const content = reader.session.data?.documentContent ?? "";
+  const documentPath = reader.session.data?.document?.path;
+  const dirty = isDirty(draft, documentPath);
+  const editorValue = (draft.path === documentPath ? draft.text : null) ?? content;
+
+  const runGuarded = useCallback(
+    (action: () => void) => {
+      if (dirty) {
+        pendingActionRef.current = action;
+        setIsDiscardDialogOpen(true);
+        return;
+      }
+      action();
+    },
+    [dirty],
+  );
+
+  const requestOpen = useCallback(
+    (path: string) => runGuarded(() => reader.open(path)),
+    [reader, runGuarded],
+  );
+
+  const requestPick = useCallback(() => runGuarded(() => reader.pick()), [reader, runGuarded]);
+
+  const onEditorChange = useCallback(
+    (text: string) => {
+      if (!documentPath) return;
+      setDraft(editDraft(documentPath, text, content));
+    },
+    [documentPath, content],
+  );
+
+  const saveDraft = useCallback(async () => {
+    if (!documentPath || draft.path !== documentPath || draft.text === null) return;
+    await reader.saveDocument(documentPath, draft.text);
+  }, [documentPath, draft, reader]);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
@@ -105,7 +158,7 @@ export function ReaderPage() {
 
       const path = (file as File & { path?: string }).path;
       if (path?.endsWith(".md")) {
-        reader.open(path);
+        requestOpen(path);
         return;
       }
 
@@ -116,7 +169,7 @@ export function ReaderPage() {
         );
       }
     },
-    [reader, showError],
+    [requestOpen, showError],
   );
 
   const onDragEnter = useCallback((event: React.DragEvent) => {
@@ -144,25 +197,38 @@ export function ReaderPage() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
-      if (event.key.toLowerCase() !== "o" || event.shiftKey) return;
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      const key = event.key.toLowerCase();
 
-      const target = event.target;
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable ||
-          target.closest("input, textarea, select, [contenteditable='true']"))
-      ) {
+      if (key === "s") {
+        if (documentViewMode !== "edit") return;
+        event.preventDefault();
+        if (dirty) {
+          void saveDraft();
+        }
         return;
       }
 
-      event.preventDefault();
-      reader.pick();
+      if (key === "o") {
+        // Cmd+S must work while the editor textarea has focus, so this
+        // input/textarea focus guard applies only to Cmd+O.
+        const target = event.target;
+        if (
+          target instanceof HTMLElement &&
+          (target.isContentEditable ||
+            target.closest("input, textarea, select, [contenteditable='true']"))
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        requestPick();
+      }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [reader]);
+  }, [dirty, documentViewMode, requestPick, saveDraft]);
 
   useEffect(() => {
     readerApi.log("ReaderPage mounted");
@@ -176,8 +242,19 @@ export function ReaderPage() {
     return () => window.removeEventListener("mdreadr:open-document", handleOpenDocument);
   }, [reader]);
 
-  const content = reader.session.data?.documentContent ?? "";
-  const documentPath = reader.session.data?.document?.path;
+  const prevContentRef = useRef(content);
+  useEffect(() => {
+    if (prevContentRef.current !== content) {
+      if (dirty) {
+        showError(
+          "Document changed on disk",
+          "Your draft is kept. Save to overwrite, or discard to reload.",
+        );
+      }
+      prevContentRef.current = content;
+    }
+  }, [content, dirty, showError]);
+
   const notes = reader.notes.data ?? [];
   const toc = useMemo(() => extractHeadings(content), [content]);
   const isOpening = reader.isOpening;
@@ -216,12 +293,7 @@ export function ReaderPage() {
             />
           }
           endContent={
-            <Button
-              label="Open…"
-              variant="secondary"
-              isLoading={isOpening}
-              onClick={() => reader.pick()}
-            />
+            <Button label="Open…" variant="secondary" isLoading={isOpening} onClick={requestPick} />
           }
         />
       }
@@ -230,8 +302,8 @@ export function ReaderPage() {
           paths={reader.recents.data ?? []}
           selectedPath={documentPath}
           homeDirectory={reader.session.data?.homeDirectory}
-          onOpen={(path) => reader.open(path)}
-          onPickDocument={() => reader.pick()}
+          onOpen={requestOpen}
+          onPickDocument={requestPick}
           isOpening={isOpening}
         />
       }
@@ -281,6 +353,22 @@ export function ReaderPage() {
                   flashAnchor(anchor.blockId, "reader-block-pin-flash");
                   setLiveMessage(`Pinning note to ${anchor.label ?? anchor.kind}`);
                 }}
+                editorValue={editorValue}
+                onEditorChange={onEditorChange}
+                chromeEnd={
+                  documentViewMode === "edit" ? (
+                    <Button
+                      label="Save"
+                      variant="primary"
+                      size="sm"
+                      isDisabled={!dirty}
+                      isLoading={reader.isSavingDocument}
+                      onClick={() => {
+                        void saveDraft();
+                      }}
+                    />
+                  ) : undefined
+                }
               />
             </ReaderContent>
           ) : (
@@ -291,7 +379,7 @@ export function ReaderPage() {
                 label="Open markdown…"
                 variant="primary"
                 isLoading={isOpening}
-                onClick={() => reader.pick()}
+                onClick={requestPick}
               />
             </EmptyState>
           )}
@@ -323,6 +411,27 @@ export function ReaderPage() {
           />
         </ReaderNotesAside>
       </ReaderLayout>
+
+      <AlertDialog
+        isOpen={isDiscardDialogOpen}
+        onOpenChange={(open) => {
+          setIsDiscardDialogOpen(open);
+          if (!open) {
+            pendingActionRef.current = null;
+          }
+        }}
+        title="Discard draft?"
+        description={`${draft.path ? pathFileName(draft.path) : "This Document"} has unsaved changes. Discarding cannot be undone.`}
+        cancelLabel="Keep editing"
+        actionLabel="Discard"
+        onAction={() => {
+          setDraft(discardDraft);
+          setIsDiscardDialogOpen(false);
+          const pending = pendingActionRef.current;
+          pendingActionRef.current = null;
+          pending?.();
+        }}
+      />
     </AppShell>
   );
 }

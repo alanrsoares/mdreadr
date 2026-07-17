@@ -20,6 +20,8 @@ function createInMemoryReaderApi() {
     notes: [],
     document: null,
   };
+  let lastSaveDocumentCall: { path: string; content: string } | null = null;
+  let fakeDocumentContent = "";
 
   const api: ReaderApi = {
     async getSession() {
@@ -32,7 +34,7 @@ function createInMemoryReaderApi() {
       return [];
     },
     async openDocument(path) {
-      return { path, content: "" };
+      return { path, content: fakeDocumentContent };
     },
     async pickPath() {
       if (pickQueue.length === 0) throw new Error("test bug: no scripted pick left");
@@ -52,6 +54,10 @@ function createInMemoryReaderApi() {
     async loadNotes() {
       return loadNotesResult;
     },
+    async saveDocument(path, content) {
+      lastSaveDocumentCall = { path, content };
+      fakeDocumentContent = content;
+    },
     log() {},
   };
 
@@ -63,6 +69,7 @@ function createInMemoryReaderApi() {
     setLoadNotesResult: (result: { notes: Note[]; document?: DocumentRef | null }) => {
       loadNotesResult = result;
     },
+    getLastSaveDocumentCall: () => lastSaveDocumentCall,
   };
 }
 

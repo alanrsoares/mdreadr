@@ -28,7 +28,7 @@ export const ReaderDocumentChrome = tw.header(
 
 export const ReaderDocumentBody = tw.div`px-8 pt-6 pb-14`;
 
-export const ReaderChromeControls = tw.div`mx-auto flex w-fit justify-center`;
+export const ReaderChromeControls = tw.div`mx-auto flex w-fit items-center justify-center gap-2`;
 
 export const ReaderBadgeRow = tw.div`flex flex-wrap items-center gap-1.5`;
 

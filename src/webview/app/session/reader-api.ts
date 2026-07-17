@@ -23,6 +23,7 @@ export type ReaderApi = {
   setNoteStatus(noteId: string, status: NoteStatus): Promise<Note>;
   saveNotes(input: { path: string; notes: Note[]; document?: DocumentRef }): Promise<void>;
   loadNotes(path: string): Promise<{ notes: Note[]; document?: DocumentRef | null }>;
+  saveDocument(path: string, content: string): Promise<void>;
   log(message: string): void; // fire-and-forget diagnostics
 };
 
@@ -147,6 +148,9 @@ export function createTreatyReaderApi(): ReaderApi {
         notes: data.notes,
         document: "document" in data ? (data.document ?? null) : null,
       };
+    },
+    async saveDocument(path, content) {
+      unwrap(await api.documents.save.post({ path, content }));
     },
     log(message) {
       void api.log.post({ message }).catch(() => {});
