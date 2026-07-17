@@ -2,16 +2,30 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          release-type: node
+
   build:
     name: Build (${{ matrix.os }})
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created || github.event_name == 'workflow_dispatch' }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -53,34 +67,11 @@ jobs:
       - name: Build Application
         run: bun run build
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: mdreadr-${{ matrix.platform }}-artifacts
-          path: artifacts/
-
-  release:
-    name: Create GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts-download
-
-      - name: Flatten artifacts structure
-        run: |
-          mkdir -p release-assets
-          find artifacts-download -type f -exec cp {} release-assets/ \;
-          ls -la release-assets/
-
-      - name: Create Release
+      - name: Upload Release Asset
+        if: ${{ needs.release-please.outputs.release_created }}
         uses: softprops/action-gh-release@v2
         with:
-          files: release-assets/*
-          draft: true
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,11 +1,12 @@
 import type { ElectrobunConfig } from "electrobun/bun";
+import pkg from "./package.json";
 import { APP_IDENTIFIER, APP_NAME } from "./shared/constants.ts";
 
 export default {
   app: {
     name: APP_NAME,
     identifier: APP_IDENTIFIER,
-    version: "0.1.1",
+    version: pkg.version,
     fileAssociations: [
       {
         ext: ["md", "markdown"],
