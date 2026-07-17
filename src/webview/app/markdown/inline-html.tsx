@@ -1,5 +1,6 @@
 import type { MarkdownInlinePlugin } from "@astryxdesign/core/Markdown";
 import { DANGEROUS_URL_PATTERN, type ImageSrcResolver } from "./assets.ts";
+import { ReaderImage } from "./pipeline.tsx";
 
 // GitHub renders a sanitized subset of inline HTML; the Astryx parser passes
 // tags through as literal text, so these plugins pick them up from text nodes.
@@ -83,14 +84,13 @@ const createImgPlugin = (resolveImageSrc?: ImageSrcResolver): MarkdownInlinePlug
       return <span key={key}>{match[0]}</span>;
     }
     return (
-      <img
-        alt={parsed.alt}
-        className="reader-inline-img"
-        height={parsed.height}
+      <ReaderImage
         key={key}
-        loading="lazy"
-        src={resolveImageSrc ? resolveImageSrc(parsed.src) : parsed.src}
+        src={parsed.src}
+        alt={parsed.alt}
         width={parsed.width}
+        height={parsed.height}
+        resolveImageSrc={resolveImageSrc}
       />
     );
   },

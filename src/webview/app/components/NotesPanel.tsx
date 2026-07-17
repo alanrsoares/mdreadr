@@ -5,7 +5,7 @@ import { Tooltip } from "@astryxdesign/core/Tooltip";
 import type { BlockAnchor, Note, NoteStatus } from "@mdreadr/domain";
 import { formatAuthorLabel } from "@mdreadr/domain";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { anchorDisplayLabel } from "../markdown/block-ids.ts";
+import { anchorDisplayLabel } from "../markdown/anchors.ts";
 import {
   ButtonRow,
   MutedText,

@@ -1,6 +1,8 @@
 import * as fs from "node:fs";
+import { isErr } from "@onrails/result";
 import { ApplicationMenu, app, BrowserWindow } from "electrobun/bun";
-import { app as apiApp, sessionStore, startServer } from "../../packages/api/index.ts";
+import { toDocumentHttpError } from "../../packages/api/documents.ts";
+import { documentSession, startServer } from "../../packages/api/index.ts";
 import { APP_NAME } from "../../shared/constants.ts";
 
 let activeApiBase: string | null = null;
@@ -8,7 +10,7 @@ let activeMainWindow: BrowserWindow | null = null;
 let pendingOpenUrl: string | null = null;
 
 // Register file change notification to update the webview dynamically
-sessionStore.onDocumentChange(() => {
+documentSession.onChange(() => {
   if (activeMainWindow) {
     try {
       fs.appendFileSync(
@@ -39,7 +41,7 @@ app.on("open-url", async (data: unknown) => {
     return;
   }
 
-  await handleOpenUrl(urlStr, activeApiBase, activeMainWindow);
+  await handleOpenUrl(urlStr, activeMainWindow);
 });
 
 // Register parent thread message listener for open-url events forwarded by the launcher
@@ -62,24 +64,23 @@ self.onmessage = async (event: MessageEvent) => {
       return;
     }
 
-    await handleOpenUrl(urlStr, activeApiBase, activeMainWindow);
+    await handleOpenUrl(urlStr, activeMainWindow);
   }
 };
 
-async function handleOpenUrl(urlStr: string, apiBase: string, mainWindow: BrowserWindow) {
+async function handleOpenUrl(urlStr: string, mainWindow: BrowserWindow) {
   try {
     const url = new URL(urlStr);
     if (url.protocol === "file:") {
       const decodedPath = decodeURIComponent(url.pathname);
       console.log(`[open-url] Opening document: ${decodedPath}`);
 
-      await apiApp.handle(
-        new Request(`${apiBase}/documents/open`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: decodedPath }),
-        }),
-      );
+      const result = await documentSession.open(decodedPath);
+      if (isErr(result)) {
+        console.error(
+          `Failed to open document from open-url: ${toDocumentHttpError(result.error).error}`,
+        );
+      }
 
       mainWindow.activate();
       mainWindow.webview.executeJavascript(
@@ -140,17 +141,14 @@ function buildApplicationMenu(): void {
   ]);
 }
 
-async function openArgvDocument(apiBase: string): Promise<void> {
+async function openArgvDocument(): Promise<void> {
   const markdownArg = process.argv.find((arg) => arg.endsWith(".md") && !arg.startsWith("-"));
   if (!markdownArg) return;
 
-  await apiApp.handle(
-    new Request(`${apiBase}/documents/open`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: markdownArg }),
-    }),
-  );
+  const result = await documentSession.open(markdownArg);
+  if (isErr(result)) {
+    console.error(`Failed to open document from argv: ${toDocumentHttpError(result.error).error}`);
+  }
 }
 
 const { url: apiBase } = startServer(0);
@@ -163,19 +161,18 @@ if (pendingOpenUrl) {
     if (url.protocol === "file:") {
       const decodedPath = decodeURIComponent(url.pathname);
       console.log(`[startup-open] Opening startup document: ${decodedPath}`);
-      await apiApp.handle(
-        new Request(`${apiBase}/documents/open`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: decodedPath }),
-        }),
-      );
+      const result = await documentSession.open(decodedPath);
+      if (isErr(result)) {
+        console.error(
+          `Failed to open startup document: ${toDocumentHttpError(result.error).error}`,
+        );
+      }
     }
   } catch (e) {
     console.error("Failed to open startup document:", e);
   }
 } else {
-  await openArgvDocument(apiBase);
+  await openArgvDocument();
 }
 
 buildApplicationMenu();
@@ -198,7 +195,7 @@ activeApiBase = apiBase;
 activeMainWindow = mainWindow;
 
 if (pendingOpenUrl) {
-  await handleOpenUrl(pendingOpenUrl, apiBase, mainWindow);
+  await handleOpenUrl(pendingOpenUrl, mainWindow);
 }
 
 mainWindow.on("close", () => {

@@ -1,7 +1,6 @@
 import type { MarkdownInlinePlugin } from "@astryxdesign/core/Markdown";
 import { ReaderBadgeRow } from "../ui/layout.tsx";
-
-export const LINKED_BADGE_PATTERN = /\[\[\[BADGE:(\{.*?\})\]\]\]/g;
+import { LINKED_BADGE_TOKEN_SOURCE } from "./preprocess.ts";
 
 export type LinkedBadgePayload = {
   alt: string;
@@ -55,7 +54,8 @@ export function parseBadgeBlock(code: string): LinkedBadgePayload[] | null {
 
 /** Fallback for badge tokens left inline inside mixed paragraphs. */
 export const linkedBadgePlugin: MarkdownInlinePlugin = {
-  pattern: LINKED_BADGE_PATTERN,
+  // Fresh instance — never share a stateful /g regex object with preprocess.ts's replace pass.
+  pattern: new RegExp(LINKED_BADGE_TOKEN_SOURCE, "g"),
   render(match, key) {
     try {
       const payload = JSON.parse(match[1] ?? "{}") as LinkedBadgePayload;

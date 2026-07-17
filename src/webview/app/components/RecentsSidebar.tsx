@@ -10,15 +10,9 @@ import {
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DocumentTextIcon } from "../icons.ts";
-import { formatDisplayPath } from "./display-path.ts";
-import { formatRecentMenuLabels } from "./recent-path-labels.ts";
+import { formatDisplayPath, formatRecentMenuLabels, pathFileName } from "./path-display.ts";
 
 const RECENTS_SIDEBAR_COLLAPSED_KEY = "mdreadr-recents-sidebar-collapsed";
-
-function fileName(path: string): string {
-  const parts = path.split(/[/\\]/);
-  return parts.at(-1) ?? path;
-}
 
 function readCollapsedPreference(): boolean {
   try {
@@ -141,7 +135,7 @@ export function RecentsSidebar({
         ) : (
           paths.map((path) => {
             const { menuLabel } = menuLabels.get(path) ?? {
-              menuLabel: fileName(path),
+              menuLabel: pathFileName(path),
               ariaLabel: path,
             };
 
@@ -160,5 +154,3 @@ export function RecentsSidebar({
     </SideNav>
   );
 }
-
-export { fileName as pathFileName };

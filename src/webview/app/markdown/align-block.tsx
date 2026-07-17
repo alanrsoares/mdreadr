@@ -1,10 +1,7 @@
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Markdown, type MarkdownComponents } from "@astryxdesign/core/Markdown";
-import { DANGEROUS_URL_PATTERN, type ImageSrcResolver } from "./assets.ts";
-import { BadgeRow, linkedBadgePlugin, parseBadgeBlock } from "./badges.tsx";
-import { createInlineHtmlPlugins } from "./inline-html.tsx";
-import { inlineMathPlugin, MathBlock } from "./math.tsx";
-import { MermaidChart } from "./mermaid.tsx";
+import type { ImageSrcResolver } from "./assets.ts";
+import { createReaderInlinePlugins, ReaderImage, renderSpecialFence } from "./pipeline.tsx";
 import { preprocessReaderMarkdown } from "./preprocess.ts";
 
 export type BlockAlign = "center" | "left" | "right";
@@ -27,36 +24,20 @@ export function decodeAlignPayload(code: string): AlignPayload | null {
 
 // Blocks inside an align wrapper render without pin buttons or block ids —
 // the wrapper is hero chrome, not annotatable prose. Special fences still
-// need their custom renderers.
+// need their custom renderers, except `align` itself: nested align fences
+// render as plain code rather than recursing into AlignBlock.
 const createNestedComponents = (
   resolveImageSrc: ImageSrcResolver | undefined,
 ): Partial<MarkdownComponents> => ({
   code({ code, language }) {
-    switch (language) {
-      case "mermaid":
-        return <MermaidChart chart={code} />;
-      case "math":
-        return <MathBlock tex={code} />;
-      case "badges": {
-        const badges = parseBadgeBlock(code);
-        if (badges) return <BadgeRow badges={badges} />;
-        break;
-      }
-    }
-    return <CodeBlock code={code} language={language} isCollapsible />;
+    return (
+      renderSpecialFence(language, code, { resolveImageSrc }, { skip: ["align"] }) ?? (
+        <CodeBlock code={code} language={language} isCollapsible />
+      )
+    );
   },
   image({ src, alt }) {
-    if (DANGEROUS_URL_PATTERN.test(src.trim())) {
-      return <span>{alt}</span>;
-    }
-    return (
-      <img
-        alt={alt}
-        className="reader-inline-img"
-        loading="lazy"
-        src={resolveImageSrc ? resolveImageSrc(src) : src}
-      />
-    );
+    return <ReaderImage src={src} alt={alt} resolveImageSrc={resolveImageSrc} />;
   },
 });
 
@@ -77,11 +58,7 @@ export function AlignBlock({
         autolink="gfm"
         components={createNestedComponents(resolveImageSrc)}
         contentWidth="100%"
-        inlinePlugins={[
-          linkedBadgePlugin,
-          inlineMathPlugin,
-          ...createInlineHtmlPlugins(resolveImageSrc),
-        ]}
+        inlinePlugins={createReaderInlinePlugins(resolveImageSrc)}
       >
         {preprocessReaderMarkdown(payload.body)}
       </Markdown>

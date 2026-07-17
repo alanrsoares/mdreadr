@@ -1,15 +1,15 @@
-export type RecentPathDisplay = {
-  /** File name */
-  label: string;
-  /** Parent path when basename collisions need disambiguation */
-  hint?: string;
-};
-
 export type RecentPathMenuLabel = {
   /** SideNav label + collapsed tooltip */
   menuLabel: string;
   /** Full path for screen readers when menu label is abbreviated */
   ariaLabel: string;
+};
+
+type RecentPathDisplay = {
+  /** File name */
+  label: string;
+  /** Parent path when basename collisions need disambiguation */
+  hint?: string;
 };
 
 const splitPath = (path: string): string[] => path.split(/[/\\]/).filter(Boolean);
@@ -26,7 +26,7 @@ function groupBy<T>(items: readonly T[], keyFn: (item: T) => string): Map<string
 }
 
 /** Shorten long directory hints while keeping the distinguishing tail. */
-export function abbreviatePathHint(hint: string, maxLength = 32): string {
+function abbreviatePathHint(hint: string, maxLength = 32): string {
   if (hint.length <= maxLength) return hint;
   const tail = hint.slice(-(maxLength - 1));
   const slash = tail.indexOf("/");
@@ -38,7 +38,7 @@ export function abbreviatePathHint(hint: string, maxLength = 32): string {
  * For each path, compute a basename and optional directory hint.
  * Hints appear only when multiple recents share the same file name.
  */
-export function buildRecentPathDisplays(paths: readonly string[]): Map<string, RecentPathDisplay> {
+function buildRecentPathDisplays(paths: readonly string[]): Map<string, RecentPathDisplay> {
   const entries = paths.map((path) => ({ path, parts: splitPath(path) }));
   const byBasename = groupBy(entries, (entry) => entry.parts.at(-1) ?? entry.path);
   const displays = new Map<string, RecentPathDisplay>();
@@ -75,6 +75,38 @@ export function buildRecentPathDisplays(paths: readonly string[]): Map<string, R
   return displays;
 }
 
+/** Last path segment; tolerant of `/` and `\`. */
+export function pathFileName(path: string): string {
+  return splitPath(path).at(-1) ?? path;
+}
+
+/** Normalize separators and drop a trailing slash. */
+const normalizeDirectory = (path: string): string => path.replace(/\\/g, "/").replace(/\/$/, "");
+
+/**
+ * Replace the user's home directory prefix with `~`.
+ * Falls back to `/home/{user}` and `/Users/{user}` when home is unknown.
+ */
+export function formatDisplayPath(path: string, homeDirectory?: string): string {
+  const normalizedPath = path.replace(/\\/g, "/");
+
+  if (homeDirectory) {
+    const home = normalizeDirectory(homeDirectory);
+    if (normalizedPath === home) return "~";
+    if (normalizedPath.startsWith(`${home}/`)) {
+      return `~${normalizedPath.slice(home.length)}`;
+    }
+    return path;
+  }
+
+  const homeMatch = normalizedPath.match(/^\/(?:home|Users)\/([^/]+)(\/.*)?$/);
+  if (!homeMatch) return path;
+
+  const rest = homeMatch[2] ?? "";
+  return rest.length === 0 ? "~" : `~${rest}`;
+}
+
+/** Collision-aware labels for the Recents sidebar. */
 export function formatRecentMenuLabels(paths: readonly string[]): Map<string, RecentPathMenuLabel> {
   const displays = buildRecentPathDisplays(paths);
   const labels = new Map<string, RecentPathMenuLabel>();
