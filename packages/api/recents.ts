@@ -29,7 +29,24 @@ export const loadRecents = (): ResultAsync<string[], RecentsError> =>
       }
       const raw = await file.json();
       const parsed = RecentsSchema.safeParse(raw);
-      return !parsed.success ? ([] as string[]) : parsed.data.paths;
+      if (!parsed.success) {
+        return [] as string[];
+      }
+      const paths = parsed.data.paths;
+      const existingPaths: string[] = [];
+      for (const p of paths) {
+        if (await Bun.file(p).exists()) {
+          existingPaths.push(p);
+        }
+      }
+      if (existingPaths.length !== paths.length) {
+        await ensureConfigDir();
+        await Bun.write(
+          recentsPath(),
+          JSON.stringify({ paths: existingPaths.slice(0, MAX_RECENTS) }, null, 2),
+        );
+      }
+      return existingPaths;
     })(),
     (error) => ({
       _tag: "RecentsIo",

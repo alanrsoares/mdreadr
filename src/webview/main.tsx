@@ -5,13 +5,12 @@ import "katex/dist/katex.min.css";
 import "./app/tw.css";
 import "./app/index.css";
 
-import { Theme } from "@astryxdesign/core/theme";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AppProviders } from "./app/providers.tsx";
 import { router } from "./app/router.tsx";
-import { mdreadrTheme } from "./app/theme/mdreadr.js";
+import { ColorSchemeProvider } from "./app/theme/ColorSchemeContext.tsx";
 
 const root = document.getElementById("root");
 if (!root) {
@@ -20,10 +19,10 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <Theme theme={mdreadrTheme}>
+    <ColorSchemeProvider>
       <AppProviders>
         <RouterProvider router={router} />
       </AppProviders>
-    </Theme>
+    </ColorSchemeProvider>
   </StrictMode>,
 );

@@ -1,6 +1,7 @@
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { Button } from "@astryxdesign/core/Button";
+import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
 import { Stack } from "@astryxdesign/core/Stack";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
@@ -9,6 +10,7 @@ import type { BlockAnchor } from "@mdreadr/domain";
 import { extractHeadings } from "@mdreadr/domain";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppLogo } from "../components/AppLogo.tsx";
+import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
 import { DocumentView, type DocumentViewMode } from "../components/DocumentView.tsx";
 import { NotesPanel } from "../components/NotesPanel.tsx";
 import { formatDisplayPath, pathFileName } from "../components/path-display.ts";
@@ -293,7 +295,15 @@ export function ReaderPage() {
             />
           }
           endContent={
-            <Button label="Open…" variant="secondary" isLoading={isOpening} onClick={requestPick} />
+            <HStack gap={2} vAlign="center">
+              <ColorSchemeToggle />
+              <Button
+                label="Open…"
+                variant="secondary"
+                isLoading={isOpening}
+                onClick={requestPick}
+              />
+            </HStack>
           }
         />
       }
