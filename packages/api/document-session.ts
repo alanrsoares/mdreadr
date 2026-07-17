@@ -23,6 +23,8 @@ export type DocumentSession = {
   save(path: string, content: string): ResultAsync<void, DocumentSaveError>;
   /** Fired after the watched Document's content changes on disk. */
   onChange(callback: () => void): void;
+  /** Manually trigger change callbacks (e.g., from MCP mutations). */
+  triggerChange(): void;
   /** Stop the active watcher (idempotent). */
   close(): void;
 };
@@ -110,6 +112,13 @@ export function createDocumentSession(deps: {
     },
     onChange(callback) {
       changeCallbacks.push(callback);
+    },
+    triggerChange() {
+      for (const callback of changeCallbacks) {
+        try {
+          callback();
+        } catch {}
+      }
     },
     close() {
       stopWatching();

@@ -1,3 +1,6 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { cors } from "@elysiajs/cors";
 import { match } from "@onrails/pattern";
 import { isErr } from "@onrails/result";
@@ -30,6 +33,7 @@ import {
   toDocumentHttpError,
   writeTextFile,
 } from "./documents.ts";
+import { transport } from "./mcp.ts";
 import { readRecents, toRecentsHttpError } from "./recents.ts";
 import { sessionStore } from "./session.ts";
 
@@ -294,7 +298,9 @@ export const app = new Elysia()
       return { path: result.value };
     },
     { body: PickFileBodySchema },
-  );
+  )
+  .all("/mcp", ({ request }) => transport.handleRequest(request))
+  .all("/mcp/message", ({ request }) => transport.handleRequest(request));
 
 export type App = typeof app;
 
@@ -308,8 +314,24 @@ export function startServer(port = 0): { port: number; url: string } {
   });
 
   const address = listener.server?.port ?? port;
+  const url = `http://127.0.0.1:${address}`;
+
+  // Write MCP discovery config
+  (async () => {
+    try {
+      const configDir = join(homedir(), ".config", "mdreadr");
+      await mkdir(configDir, { recursive: true });
+      await writeFile(
+        join(configDir, "mcp.json"),
+        JSON.stringify({ mcpServers: { mdreadr: { url: `${url}/mcp` } } }, null, 2),
+      );
+    } catch (e) {
+      console.error("Failed to write mcp.json", e);
+    }
+  })();
+
   return {
     port: address,
-    url: `http://127.0.0.1:${address}`,
+    url,
   };
 }

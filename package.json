@@ -30,6 +30,7 @@
     "@elysiajs/cors": "^1.4.2",
     "@elysiajs/eden": "^1.4.9",
     "@heroicons/react": "^2.2.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@onrails/maybe": "^0.2.3",
     "@onrails/pattern": "^0.3.2",
     "@onrails/result": "^0.4.0",
