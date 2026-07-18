@@ -20,7 +20,7 @@ Check off per commit landed, not per file touched. Update this section as work h
 
 - [x] UI bug fix — `ReaderLayout` fixed-px grid tracks → `minmax(0, …)` + `min-w-0` on all three panes (`src/webview/app/ui/layout.tsx`). Typechecked; not yet visually confirmed in the installed app (would require rebuilding `/Applications/mdreadr.app` mid-session).
 - [x] WS-1 — Note taxonomy (`kind: comment|request`). Schema + `createNote` + CONTEXT.md + tests + UI toggle/badge + MCP `add_note` schema. `bun run check` green.
-- [ ] WS-4 — MCP schema fidelity (`author` enum) + `get_document_block`
+- [x] WS-4 — MCP schema fidelity (`author` enum) + `get_document_block`. Typed `author`/`anchor` inputSchemas across all tools + shared `resolveBlockText`/`collectPinnableBlocks` extracted to `@mdreadr/domain`, reused by webview `anchors.ts`. Tests + schema snapshot. `bun run check` green.
 - [ ] WS-2 — Suggestions domain object + routes + MCP `propose_edit` + dual-token guard rail + UI accept/reject
 - [ ] WS-3 — Journal (`seq`-numbered events) + `wait_for_activity` / `get_events` MCP tools
 - [ ] WS-6 — Proxy reconnect (`mcp.json` watch) + resume (`session.jsonl` + catch-up read)

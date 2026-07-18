@@ -40,4 +40,53 @@ describe("MCP Server", () => {
     // synchronously without a transport, but we know it boots up and connects.
     expect(mcpServer).toBeDefined();
   });
+
+  it("exposes typed author and anchor schemas, plus the block-read tool", async () => {
+    const { mcpServer } = await import("./mcp.ts");
+    const listHandler = (
+      mcpServer as unknown as {
+        _requestHandlers: Map<
+          string,
+          (
+            request: unknown,
+            extra: unknown,
+          ) => Promise<{ tools: Array<{ name: string; inputSchema: Record<string, unknown> }> }>
+        >;
+      }
+    )._requestHandlers.get("tools/list");
+    if (!listHandler) throw new Error("tools/list handler not registered");
+
+    const result = await listHandler({ method: "tools/list" }, {});
+    const byName = Object.fromEntries(result.tools.map((tool) => [tool.name, tool]));
+
+    function findTool(name: string) {
+      const tool = byName[name];
+      if (!tool) throw new Error(`Tool not found: ${name}`);
+      return tool;
+    }
+
+    // biome-ignore lint/suspicious/noExplicitAny: reaching into hand-authored JSON Schema shapes for assertions
+    const props = (schema: Record<string, unknown>) => schema.properties as any;
+
+    expect(props(findTool("add_note").inputSchema).author.properties.kind.enum).toEqual([
+      "human",
+      "agent",
+      "system",
+    ]);
+    expect(props(findTool("add_reply").inputSchema).author.properties.kind.enum).toEqual([
+      "human",
+      "agent",
+      "system",
+    ]);
+    expect(props(findTool("add_note").inputSchema).anchor.properties.kind.enum).toEqual([
+      "document",
+      "heading",
+      "paragraph",
+      "code",
+    ]);
+
+    expect(props(findTool("get_document_block").inputSchema).anchor.properties.blockId.type).toBe(
+      "string",
+    );
+  });
 });

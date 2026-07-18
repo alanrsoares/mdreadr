@@ -1,11 +1,13 @@
-import { type BlockNode, type InlineNode, parseMarkdown } from "@astryxdesign/core/Markdown/utils";
+import { parseMarkdown } from "@astryxdesign/core/Markdown/utils";
 import {
   type BlockAnchor,
   blockIdForCode,
   blockIdForHeading,
   blockIdForParagraph,
+  collectPinnableBlocks,
   extractHeadings,
   hashBlockContent,
+  headingPathForLevel,
   type TocEntry,
   truncateAnchorLabel,
 } from "@mdreadr/domain";
@@ -22,85 +24,14 @@ export type AnchorPlan = {
   nextCode(code: string, language?: string): BlockAnchor;
 };
 
-const inlineToText = (nodes: InlineNode[]): string =>
-  nodes
-    .map((node) => {
-      switch (node.type) {
-        case "text":
-          return node.content;
-        case "code":
-          return node.content;
-        case "break":
-          return " ";
-        case "link":
-        case "bold":
-        case "italic":
-        case "strikethrough":
-          return inlineToText(node.children);
-        case "image":
-          return node.alt;
-        case "citation":
-          return node.sourceId;
-        default:
-          return "";
-      }
-    })
-    .join("");
-
 const isPinnableCodeBlock = (language: string | undefined): boolean => !isSpecialFence(language);
-
-function collectPinnableBlocks(
-  blocks: BlockNode[],
-): Array<
-  { kind: "paragraph"; text: string } | { kind: "code"; text: string; language: string | undefined }
-> {
-  const result: Array<
-    | { kind: "paragraph"; text: string }
-    | { kind: "code"; text: string; language: string | undefined }
-  > = [];
-
-  for (const block of blocks) {
-    switch (block.type) {
-      case "paragraph":
-        result.push({ kind: "paragraph", text: inlineToText(block.children) });
-        continue;
-      case "codeblock":
-        if (isPinnableCodeBlock(block.language)) {
-          result.push({ kind: "code", text: block.content, language: block.language });
-        }
-        continue;
-      case "blockquote":
-        result.push(...collectPinnableBlocks(block.children));
-        continue;
-      case "list":
-        for (const item of block.items) {
-          result.push(...collectPinnableBlocks(item.children));
-        }
-        break;
-    }
-  }
-
-  return result;
-}
-
-function headingPathForLevel(
-  stack: { level: number; text: string }[],
-  level: number,
-  text: string,
-): string[] {
-  while (stack.length > 0 && (stack.at(-1)?.level ?? 0) >= level) {
-    stack.pop();
-  }
-  stack.push({ level, text });
-  return stack.map((item) => item.text);
-}
 
 /** Build the Anchor plan for a Document's *prepared* markdown (post-preprocess). */
 export function createAnchorPlan(prepared: string): AnchorPlan {
   const headings = extractHeadings(prepared);
 
   const blocks = parseMarkdown(prepared, { autolink: "gfm" });
-  const pinnable = collectPinnableBlocks(blocks);
+  const pinnable = collectPinnableBlocks(blocks, isPinnableCodeBlock);
 
   const paragraphCounts = new Map<string, number>();
   const codeCounts = new Map<string, number>();

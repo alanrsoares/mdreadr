@@ -2,12 +2,14 @@ import { describe, expect, test } from "bun:test";
 import {
   addReply,
   blockIdForCode,
+  blockIdForHeading,
   blockIdForParagraph,
   CreateNoteBodySchema,
   createNote,
   extractHeadings,
   findNote,
   parseNotesFileJson,
+  resolveBlockText,
   SaveDocumentBodySchema,
   setNoteStatus,
 } from "@mdreadr/domain";
@@ -125,6 +127,52 @@ describe("CreateNoteBodySchema", () => {
   test("rejects an unknown kind", () => {
     const result = CreateNoteBodySchema.safeParse({ ...base, kind: "question" });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("resolveBlockText", () => {
+  const content = [
+    "# Title",
+    "",
+    "Some paragraph text.",
+    "",
+    "## Section",
+    "",
+    "```ts",
+    "console.log(1)",
+    "```",
+  ].join("\n");
+
+  test("returns the whole document for a document anchor", () => {
+    const text = resolveBlockText(content, { kind: "document", blockId: "document-root" });
+    expect(text).toBe(content);
+  });
+
+  test("resolves a paragraph anchor to its text", () => {
+    const blockId = blockIdForParagraph("Some paragraph text.", 0);
+    const text = resolveBlockText(content, { kind: "paragraph", blockId });
+    expect(text).toBe("Some paragraph text.");
+  });
+
+  test("resolves a code anchor to its content", () => {
+    const blockId = blockIdForCode("console.log(1)", "ts", 0);
+    const text = resolveBlockText(content, { kind: "code", blockId });
+    expect(text).toBe("console.log(1)");
+  });
+
+  test("resolves a heading anchor to its section", () => {
+    const headings = extractHeadings(content);
+    const section = headings[1];
+    if (!section) throw new Error("expected a Section heading");
+    const blockId = blockIdForHeading(section);
+    const text = resolveBlockText(content, { kind: "heading", blockId });
+    expect(text).toContain("## Section");
+    expect(text).toContain("console.log(1)");
+  });
+
+  test("returns undefined when the anchor no longer matches", () => {
+    const text = resolveBlockText(content, { kind: "paragraph", blockId: "paragraph-stale" });
+    expect(text).toBeUndefined();
   });
 });
 

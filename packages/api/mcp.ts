@@ -2,10 +2,41 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { isErr } from "@onrails/result";
-import { addReply, createNote, setNoteStatus } from "../domain/index.ts";
+import {
+  addReply,
+  type BlockAnchor,
+  createNote,
+  resolveBlockText,
+  setNoteStatus,
+} from "../domain/index.ts";
 import { documentSession } from "./document-session.ts";
 import { writeTextFile } from "./documents.ts";
 import { sessionStore } from "./session.ts";
+
+const authorInputSchema = {
+  type: "object",
+  description: "Who is acting: a human, an AI agent, or the system itself.",
+  properties: {
+    kind: { type: "string", enum: ["human", "agent", "system"] },
+    agentId: {
+      type: "string",
+      description: "Identifier for the acting agent, if kind is 'agent'.",
+    },
+  },
+  required: ["kind"],
+} as const;
+
+const anchorInputSchema = {
+  type: "object",
+  description: "A reference to one block (or the whole document) in the currently open document.",
+  properties: {
+    kind: { type: "string", enum: ["document", "heading", "paragraph", "code"] },
+    blockId: { type: "string" },
+    headingPath: { type: "array", items: { type: "string" } },
+    label: { type: "string" },
+  },
+  required: ["kind", "blockId"],
+} as const;
 
 export const mcpServer = new Server(
   {
@@ -44,18 +75,12 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            anchor: {
-              type: "object",
-              description: "The block anchor for the note",
-            },
+            anchor: { ...anchorInputSchema, description: "The block anchor for the note" },
             body: {
               type: "string",
               description: "The body content of the note",
             },
-            author: {
-              type: "object",
-              description: "The author of the note",
-            },
+            author: { ...authorInputSchema, description: "The author of the note" },
             kind: {
               type: "string",
               enum: ["comment", "request"],
@@ -78,9 +103,7 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
             body: {
               type: "string",
             },
-            author: {
-              type: "object",
-            },
+            author: authorInputSchema,
           },
           required: ["noteId", "body", "author"],
         },
@@ -113,6 +136,18 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
             },
           },
           required: ["path"],
+        },
+      },
+      {
+        name: "get_document_block",
+        description:
+          "Get the current text of one block in the open document, using a note's anchor. Returns null if the anchored block no longer matches (the document changed since the anchor was captured).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            anchor: anchorInputSchema,
+          },
+          required: ["anchor"],
         },
       },
     ],
@@ -228,6 +263,22 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
         {
           type: "text",
           text: "Saved successfully",
+        },
+      ],
+    };
+  }
+
+  if (request.params.name === "get_document_block") {
+    const args = request.params.arguments as unknown as { anchor: BlockAnchor };
+    const snapshot = sessionStore.snapshot();
+    const text = snapshot.documentContent
+      ? resolveBlockText(snapshot.documentContent, args.anchor)
+      : undefined;
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ text: text ?? null }),
         },
       ],
     };
