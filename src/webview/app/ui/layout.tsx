@@ -1,7 +1,7 @@
 import tw from "@styled-cva/react";
 
 export const ReaderLayout = tw.section(
-  "grid h-full grid-cols-[minmax(0,200px)_minmax(0,1fr)_minmax(0,280px)] overflow-hidden",
+  "grid h-full grid-cols-[minmax(0,200px)_minmax(0,1fr)_auto_var(--notes-col-width,280px)] overflow-hidden",
 );
 
 export const ReaderPanel = tw.aside(

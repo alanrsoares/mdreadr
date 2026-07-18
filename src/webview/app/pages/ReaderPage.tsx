@@ -3,11 +3,14 @@ import { AppShell } from "@astryxdesign/core/AppShell";
 import { Button } from "@astryxdesign/core/Button";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { ResizeHandle, useResizable } from "@astryxdesign/core/Resizable";
 import { Stack } from "@astryxdesign/core/Stack";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import type { BlockAnchor, Suggestion } from "@mdreadr/domain";
 import { applySuggestion, extractHeadings } from "@mdreadr/domain";
+import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppLogo } from "../components/AppLogo.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
@@ -19,7 +22,7 @@ import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
 import { SuggestionsPanel } from "../components/SuggestionsPanel.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
-import { ArrowDownTrayIcon } from "../icons.ts";
+import { ArrowDownTrayIcon, ViewColumnsIcon } from "../icons.ts";
 import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
 import {
   type DraftState,
@@ -76,6 +79,13 @@ function ReaderDocumentTopNavHeading({
 
 export function ReaderPage() {
   const { showError } = useMutationToast();
+  const notesSidebar = useResizable({
+    defaultSize: 280,
+    minSizePx: 220,
+    maxSizePx: 480,
+    collapsible: true,
+    autoSaveId: "mdreadr-notes-sidebar",
+  });
   const [pendingAnchor, setPendingAnchor] = useState<BlockAnchor | null>(null);
   const [documentViewMode, setDocumentViewMode] = useState<DocumentViewMode>("preview");
   const [liveMessage, setLiveMessage] = useState("");
@@ -320,6 +330,15 @@ export function ReaderPage() {
           endContent={
             <HStack gap={2} vAlign="center">
               <ColorSchemeToggle />
+              <IconButton
+                label={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
+                tooltip={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
+                variant={notesSidebar.isCollapsed ? "ghost" : "secondary"}
+                icon={<Icon icon={ViewColumnsIcon} size="sm" />}
+                onClick={() =>
+                  notesSidebar.isCollapsed ? notesSidebar.expand() : notesSidebar.collapse()
+                }
+              />
               <Button
                 label="Open…"
                 variant="secondary"
@@ -344,7 +363,10 @@ export function ReaderPage() {
       <div aria-live="polite" className="sr-only">
         {liveMessage}
       </div>
-      <ReaderLayout aria-label="Document reader">
+      <ReaderLayout
+        aria-label="Document reader"
+        style={{ "--notes-col-width": `${notesSidebar.size}px` } as CSSProperties}
+      >
         <ReaderPanel>
           {documentViewMode === "preview" ? (
             <TocSidebar entries={toc} scrollRootRef={readerMainRef} documentKey={documentPath} />
@@ -417,6 +439,13 @@ export function ReaderPage() {
             </EmptyState>
           )}
         </ReaderMain>
+
+        <ResizeHandle
+          resizable={notesSidebar.props}
+          isReversed
+          hasDivider
+          label="Resize notes sidebar"
+        />
 
         <ReaderNotesAside data-pending={pendingAnchor ? "true" : "false"}>
           <SuggestionsPanel
