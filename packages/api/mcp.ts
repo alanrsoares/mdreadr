@@ -11,7 +11,7 @@ import {
   setNoteStatus,
 } from "../domain/index.ts";
 import { documentSession } from "./document-session.ts";
-import { writeTextFile } from "./documents.ts";
+import { isSaveNotesPathAllowed, writeTextFile } from "./documents.ts";
 import { sessionStore } from "./session.ts";
 
 const authorInputSchema = {
@@ -316,6 +316,20 @@ function registerHandlers(mcpServer: Server) {
 
     if (request.params.name === "save_session_notes") {
       const args = request.params.arguments as { path: string };
+      const documentPath = sessionStore.snapshot().document?.path ?? null;
+      if (!isSaveNotesPathAllowed(args.path, documentPath)) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                error: `Path not allowed: ${args.path}`,
+                code: "PathNotAllowed",
+              }),
+            },
+          ],
+        };
+      }
       const notes = sessionStore.getNotes();
       const content = JSON.stringify({ version: 1, notes }, null, 2);
       const result = await writeTextFile(args.path, content);

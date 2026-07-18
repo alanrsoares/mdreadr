@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { sessionTokens } from "./auth.ts";
 import { app } from "./index.ts";
 import { sessionStore } from "./session.ts";
@@ -284,6 +287,58 @@ describe("MCP Server", () => {
       const events = await callTool("get_events", { sinceSeq });
       expect(events.events).toHaveLength(1);
       expect(events.events[0].entityId).toBe(added.id);
+    });
+  });
+
+  describe("save_session_notes path scoping", () => {
+    async function callSaveSessionNotes(path: string) {
+      const { mcpServer } = await import("./mcp.ts");
+      const handler = (
+        mcpServer as unknown as {
+          _requestHandlers: Map<
+            string,
+            (
+              request: unknown,
+              extra: unknown,
+            ) => Promise<{ content: Array<{ type: string; text: string }> }>
+          >;
+        }
+      )._requestHandlers.get("tools/call");
+      if (!handler) throw new Error("tools/call handler not registered");
+      const result = await handler(
+        { method: "tools/call", params: { name: "save_session_notes", arguments: { path } } },
+        {},
+      );
+      const first = result.content[0];
+      if (!first) throw new Error("expected tool result content");
+      return first.text;
+    }
+
+    let dir: string;
+
+    beforeEach(async () => {
+      dir = await mkdtemp(join(tmpdir(), "mdreadr-save-notes-test-"));
+      sessionStore.setDocument({ path: join(dir, "doc.md") }, "# doc");
+    });
+
+    afterEach(async () => {
+      sessionStore.clearDocument();
+      await rm(dir, { recursive: true, force: true });
+    });
+
+    it("rejects a save path outside the Document's directory and home", async () => {
+      const text = await callSaveSessionNotes("/etc/mdreadr-notes-test.json");
+      expect(JSON.parse(text)).toEqual({
+        error: "Path not allowed: /etc/mdreadr-notes-test.json",
+        code: "PathNotAllowed",
+      });
+    });
+
+    it("saves inside the open Document's directory", async () => {
+      const path = join(dir, "notes.json");
+      const text = await callSaveSessionNotes(path);
+      expect(text).toBe("Saved successfully");
+      expect(await Bun.file(path).exists()).toBe(true);
     });
   });
 });

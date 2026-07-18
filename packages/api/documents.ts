@@ -1,4 +1,5 @@
-import { dirname, resolve } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join, resolve, sep } from "node:path";
 import { ResultAsync } from "@onrails/result";
 import { touchRecent } from "./recents.ts";
 
@@ -54,6 +55,31 @@ export const openDocument = (path: string): ResultAsync<OpenDocumentResult, Docu
 /** Resolve a Document-relative asset reference (e.g. `docs/hero.png`). */
 export const resolveAssetPath = (documentPath: string, src: string): string =>
   resolve(dirname(documentPath), src);
+
+function isWithinRoot(target: string, root: string): boolean {
+  return target === root || target.startsWith(root + sep);
+}
+
+/**
+ * Scopes writes (e.g. `save_session_notes`) to the currently open Document's
+ * directory or common user directories, mirroring the asset-read scoping in
+ * `documentSession.isAssetAllowed` — an agent shouldn't be able to write a file
+ * anywhere the app process can reach.
+ */
+export function isSaveNotesPathAllowed(
+  targetPath: string,
+  documentPath: string | null,
+  home: string = homedir(),
+): boolean {
+  const resolved = resolve(targetPath);
+  const roots = [
+    documentPath ? dirname(resolve(documentPath)) : null,
+    join(home, "Documents"),
+    join(home, "Desktop"),
+    home,
+  ].filter((root): root is string => root !== null);
+  return roots.some((root) => isWithinRoot(resolved, root));
+}
 
 export function toDocumentHttpError(error: DocumentError): {
   error: string;
