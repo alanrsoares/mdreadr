@@ -13,7 +13,7 @@ In-memory edited content of the open Document before the user explicitly saves i
 _Avoid_: buffer, unsaved changes, dirty state
 
 **Note**:
-An anchored feedback Thread on a Document, with a lifecycle status and one or more Replies.
+An anchored feedback Thread on a Document, with a `kind` (`comment` | `request`) distinguishing a question/observation from a change ask on the anchored block, a lifecycle status, and one or more Replies.
 _Avoid_: Comment, annotation, thread (when meaning Note)
 
 **Reply**:

@@ -6,6 +6,7 @@ import { loadNotesFlow, saveNotesFlow } from "./reader-flows.ts";
 const sampleNote: Note = {
   id: "note-1",
   anchor: { kind: "document", blockId: "doc" },
+  kind: "comment",
   status: "open",
   replies: [],
   createdAt: "2024-01-01T00:00:00.000Z",

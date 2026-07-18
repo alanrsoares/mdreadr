@@ -1,4 +1,4 @@
-import type { BlockAnchor, Note, NoteStatus } from "@mdreadr/domain";
+import type { BlockAnchor, Note, NoteKind, NoteStatus } from "@mdreadr/domain";
 import { type UseQueryResult, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 import { formatDisplayPath } from "../components/path-display.ts";
@@ -22,7 +22,7 @@ export type ReaderSession = {
   notes: UseQueryResult<Note[]>;
   open: (path: string) => void;
   pick: () => void;
-  createNote: (input: { anchor: BlockAnchor; body: string }) => Promise<void>;
+  createNote: (input: { anchor: BlockAnchor; body: string; kind?: NoteKind }) => Promise<void>;
   addReply: (noteId: string, body: string) => Promise<void>;
   setStatus: (noteId: string, status: NoteStatus) => Promise<void>;
   save: () => Promise<void>;
@@ -109,7 +109,8 @@ export function useReaderSession(
   });
 
   const createNoteMutation = useMutation({
-    mutationFn: (input: { anchor: BlockAnchor; body: string }) => readerApi.createNote(input),
+    mutationFn: (input: { anchor: BlockAnchor; body: string; kind?: NoteKind }) =>
+      readerApi.createNote(input),
     onSuccess: () => {
       invalidateNotes();
       showSuccess("Note added");

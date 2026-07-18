@@ -3,6 +3,7 @@ import {
   addReply,
   blockIdForCode,
   blockIdForParagraph,
+  CreateNoteBodySchema,
   createNote,
   extractHeadings,
   findNote,
@@ -21,8 +22,20 @@ describe("notes domain", () => {
     });
 
     expect(note.status).toBe("open");
+    expect(note.kind).toBe("comment");
     expect(note.replies).toHaveLength(1);
     expect(note.replies[0]?.body).toBe("Needs review");
+  });
+
+  test("creates an edit-request note when kind is given", () => {
+    const note = createNote({
+      anchor: { kind: "document", blockId: "document-root" },
+      body: "Add a haiku here",
+      author: { kind: "human" },
+      kind: "request",
+    });
+
+    expect(note.kind).toBe("request");
   });
 
   test("adds replies and updates status", () => {
@@ -83,6 +96,35 @@ describe("markdown helpers", () => {
     expect(id.startsWith("code-")).toBe(true);
     expect(blockIdForCode("console.log(1)", "ts", 0)).toBe(id);
     expect(blockIdForCode("console.log(1)", "js", 0)).not.toBe(id);
+  });
+});
+
+describe("CreateNoteBodySchema", () => {
+  const base = {
+    anchor: { kind: "document" as const, blockId: "document-root" },
+    body: "Hello",
+    author: { kind: "human" as const },
+  };
+
+  test("defaults kind to comment when omitted", () => {
+    const result = CreateNoteBodySchema.safeParse(base);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.kind).toBe("comment");
+    }
+  });
+
+  test("accepts an explicit request kind", () => {
+    const result = CreateNoteBodySchema.safeParse({ ...base, kind: "request" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.kind).toBe("request");
+    }
+  });
+
+  test("rejects an unknown kind", () => {
+    const result = CreateNoteBodySchema.safeParse({ ...base, kind: "question" });
+    expect(result.success).toBe(false);
   });
 });
 

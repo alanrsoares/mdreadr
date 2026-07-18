@@ -56,6 +56,12 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "object",
               description: "The author of the note",
             },
+            kind: {
+              type: "string",
+              enum: ["comment", "request"],
+              description:
+                "'comment' for a question/observation, 'request' for a change ask on the anchored block. Defaults to 'comment'.",
+            },
           },
           required: ["anchor", "body", "author"],
         },
@@ -147,6 +153,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       anchor: args.anchor,
       body: args.body,
       author: args.author,
+      kind: args.kind,
     });
     sessionStore.addNote(note);
     documentSession.triggerChange();

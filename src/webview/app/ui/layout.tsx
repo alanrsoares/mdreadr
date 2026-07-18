@@ -62,6 +62,10 @@ export const NoteCard = tw.div(
 
 export const NoteCardHeader = tw.div`flex items-center justify-between gap-2`;
 
+export const NoteKindBadge = tw.span(
+  "rounded-(--radius-inner) bg-(--color-background-muted) px-1.5 py-0.5 text-(--color-text-secondary) text-xs",
+);
+
 export const MutedText = tw.p`m-0 text-(--color-text-secondary)`;
 
 export const NoteMeta = tw.p`my-2 text-(--color-text-secondary)`;

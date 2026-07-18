@@ -2,7 +2,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { Selector } from "@astryxdesign/core/Selector";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
-import type { BlockAnchor, Note, NoteStatus } from "@mdreadr/domain";
+import type { BlockAnchor, Note, NoteKind, NoteStatus } from "@mdreadr/domain";
 import { formatAuthorLabel } from "@mdreadr/domain";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { anchorDisplayLabel } from "../markdown/anchors.ts";
@@ -12,6 +12,7 @@ import {
   NoteAnchorButton,
   NoteCard,
   NoteCardHeader,
+  NoteKindBadge,
   NoteMeta,
   PanelStack,
   ReplyAuthor,
@@ -27,7 +28,7 @@ type NotesPanelProps = {
   isSaving?: boolean;
   isLoadingNotes?: boolean;
   isCreatingNote?: boolean;
-  onCreateNote: (input: { anchor: BlockAnchor; body: string }) => Promise<void>;
+  onCreateNote: (input: { anchor: BlockAnchor; body: string; kind?: NoteKind }) => Promise<void>;
   onAddReply: (noteId: string, body: string) => Promise<void>;
   onUpdateStatus: (noteId: string, status: NoteStatus) => Promise<void>;
   onSaveNotes: () => Promise<void>;
@@ -39,6 +40,11 @@ const statusOptions = [
   { value: "open", label: "Open" },
   { value: "resolved", label: "Resolved" },
   { value: "wontfix", label: "Won't fix" },
+];
+
+const kindOptions = [
+  { value: "comment", label: "Comment" },
+  { value: "request", label: "Edit request" },
 ];
 
 const formatNoteTime = (iso: string): string =>
@@ -61,6 +67,7 @@ export function NotesPanel({
   onScrollToAnchor,
 }: NotesPanelProps) {
   const [draft, setDraft] = useState("");
+  const [draftKind, setDraftKind] = useState<NoteKind>("comment");
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
   const composerRef = useRef<HTMLDivElement>(null);
@@ -101,6 +108,18 @@ export function NotesPanel({
             <MutedText>
               New note on <strong>{anchorDisplayLabel(pendingAnchor)}</strong>
             </MutedText>
+            <Selector
+              label="Kind"
+              isLabelHidden
+              size="sm"
+              options={kindOptions}
+              value={draftKind}
+              onChange={(value) => {
+                if (value === "comment" || value === "request") {
+                  setDraftKind(value);
+                }
+              }}
+            />
             <TextArea
               label="New note"
               isLabelHidden
@@ -120,7 +139,11 @@ export function NotesPanel({
                   void onCreateNote({
                     anchor: pendingAnchor,
                     body: draft.trim(),
-                  }).then(() => setDraft(""));
+                    kind: draftKind,
+                  }).then(() => {
+                    setDraft("");
+                    setDraftKind("comment");
+                  });
                 }}
               />
             </div>
@@ -184,6 +207,7 @@ function NoteCardItem({
     >
       <NoteCardHeader>
         <NoteAnchorLink anchor={note.anchor} onClick={onScrollToAnchor} />
+        {note.kind === "request" ? <NoteKindBadge>Edit request</NoteKindBadge> : null}
         <Selector
           label="Status"
           isLabelHidden

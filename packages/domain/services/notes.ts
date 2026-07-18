@@ -1,6 +1,14 @@
 import { match } from "@onrails/pattern";
 import { err, ok, type Result } from "@onrails/result";
-import type { Author, BlockAnchor, Note, NoteStatus, NotesFile, Reply } from "../schemas/index.ts";
+import type {
+  Author,
+  BlockAnchor,
+  Note,
+  NoteKind,
+  NoteStatus,
+  NotesFile,
+  Reply,
+} from "../schemas/index.ts";
 import { NotesFileSchema } from "../schemas/index.ts";
 
 export type NotesDomainError =
@@ -11,7 +19,12 @@ export const newId = (): string => crypto.randomUUID();
 
 export const nowIso = (): string => new Date().toISOString();
 
-export function createNote(input: { anchor: BlockAnchor; body: string; author: Author }): Note {
+export function createNote(input: {
+  anchor: BlockAnchor;
+  body: string;
+  author: Author;
+  kind?: NoteKind;
+}): Note {
   const timestamp = nowIso();
   const reply: Reply = {
     id: newId(),
@@ -23,6 +36,7 @@ export function createNote(input: { anchor: BlockAnchor; body: string; author: A
   return {
     id: newId(),
     anchor: input.anchor,
+    kind: input.kind ?? "comment",
     status: "open",
     replies: [reply],
     createdAt: timestamp,

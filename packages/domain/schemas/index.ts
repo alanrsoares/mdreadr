@@ -31,9 +31,12 @@ export const BlockAnchorSchema = z.object({
 
 export const NoteStatusSchema = z.enum(["open", "resolved", "wontfix"]);
 
+export const NoteKindSchema = z.enum(["comment", "request"]);
+
 export const NoteSchema = z.object({
   id: z.string().min(1),
   anchor: BlockAnchorSchema,
+  kind: NoteKindSchema,
   status: NoteStatusSchema,
   replies: z.array(ReplySchema),
   createdAt: z.iso.datetime(),
@@ -54,6 +57,7 @@ export const CreateNoteBodySchema = z.object({
   anchor: BlockAnchorSchema,
   body: z.string().min(1),
   author: AuthorSchema,
+  kind: NoteKindSchema.default("comment"),
 });
 
 export const AddReplyBodySchema = z.object({
@@ -91,5 +95,6 @@ export type Author = z.infer<typeof AuthorSchema>;
 export type Reply = z.infer<typeof ReplySchema>;
 export type BlockAnchor = z.infer<typeof BlockAnchorSchema>;
 export type NoteStatus = z.infer<typeof NoteStatusSchema>;
+export type NoteKind = z.infer<typeof NoteKindSchema>;
 export type Note = z.infer<typeof NoteSchema>;
 export type NotesFile = z.infer<typeof NotesFileSchema>;

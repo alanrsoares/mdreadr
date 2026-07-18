@@ -163,6 +163,7 @@ describe("mdreadr api", () => {
         {
           id: "note-1",
           anchor: { kind: "document" as const, blockId: "doc" },
+          kind: "comment" as const,
           status: "open" as const,
           replies: [
             {

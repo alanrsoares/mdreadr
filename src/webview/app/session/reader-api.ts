@@ -1,4 +1,4 @@
-import type { BlockAnchor, DocumentRef, Note, NoteStatus } from "@mdreadr/domain";
+import type { BlockAnchor, DocumentRef, Note, NoteKind, NoteStatus } from "@mdreadr/domain";
 import { api } from "../treaty.ts";
 
 export type SessionSnapshot = {
@@ -18,7 +18,7 @@ export type ReaderApi = {
     filters?: string[];
     defaultPath?: string;
   }): Promise<string | null>;
-  createNote(input: { anchor: BlockAnchor; body: string }): Promise<void>;
+  createNote(input: { anchor: BlockAnchor; body: string; kind?: NoteKind }): Promise<void>;
   addReply(noteId: string, body: string): Promise<Note>;
   setNoteStatus(noteId: string, status: NoteStatus): Promise<Note>;
   saveNotes(input: { path: string; notes: Note[]; document?: DocumentRef }): Promise<void>;
@@ -114,6 +114,7 @@ export function createTreatyReaderApi(): ReaderApi {
           anchor: input.anchor,
           body: input.body,
           author: { kind: "human" },
+          kind: input.kind ?? "comment",
         }),
       );
     },
