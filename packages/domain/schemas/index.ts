@@ -90,6 +90,33 @@ export const PickFileBodySchema = z.object({
   filters: z.array(z.string()).optional(),
 });
 
+// Mirrors impeccable's accept_requested -> variants_ready/carbonize_required -> completed
+// split: "accepted" only means the human clicked Accept and it landed in the Draft, not on
+// disk yet. "completed" is reserved for after the human's own explicit save.
+export const SuggestionStatusSchema = z.enum(["pending", "accepted", "completed", "rejected"]);
+
+export const SuggestionSchema = z.object({
+  id: z.string().min(1),
+  anchor: BlockAnchorSchema,
+  replacementText: z.string().min(1),
+  noteId: z.string().optional(),
+  author: AuthorSchema,
+  status: SuggestionStatusSchema,
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
+export const CreateSuggestionBodySchema = z.object({
+  anchor: BlockAnchorSchema,
+  replacementText: z.string().min(1),
+  noteId: z.string().optional(),
+  author: AuthorSchema,
+});
+
+export const UpdateSuggestionStatusBodySchema = z.object({
+  status: z.enum(["accepted", "rejected"]),
+});
+
 export type DocumentRef = z.infer<typeof DocumentRefSchema>;
 export type Author = z.infer<typeof AuthorSchema>;
 export type Reply = z.infer<typeof ReplySchema>;
@@ -98,3 +125,5 @@ export type NoteStatus = z.infer<typeof NoteStatusSchema>;
 export type NoteKind = z.infer<typeof NoteKindSchema>;
 export type Note = z.infer<typeof NoteSchema>;
 export type NotesFile = z.infer<typeof NotesFileSchema>;
+export type SuggestionStatus = z.infer<typeof SuggestionStatusSchema>;
+export type Suggestion = z.infer<typeof SuggestionSchema>;

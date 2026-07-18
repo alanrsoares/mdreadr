@@ -35,3 +35,7 @@ _Avoid_: Draft notes, cache
 **Notes file**:
 A versioned JSON file the user explicitly saves or opens to persist Session Notes outside the app session.
 _Avoid_: Sidecar, notes sidecar
+
+**Suggestion**:
+An agent-proposed replacement for the text at an Anchor, shown inline pending human Accept/Reject. Accepting applies it through the normal Draft/save path; it is never written to disk on its own.
+_Avoid_: patch, diff, auto-edit

@@ -1,19 +1,23 @@
 import { describe, expect, test } from "bun:test";
 import {
   addReply,
+  applySuggestion,
   blockIdForCode,
   blockIdForHeading,
   blockIdForParagraph,
   CreateNoteBodySchema,
   createNote,
+  createSuggestion,
   extractHeadings,
   findNote,
+  findSuggestion,
   parseNotesFileJson,
   resolveBlockText,
   SaveDocumentBodySchema,
   setNoteStatus,
+  setSuggestionStatus,
 } from "@mdreadr/domain";
-import { isOk } from "@onrails/result";
+import { isErr, isOk } from "@onrails/result";
 
 describe("notes domain", () => {
   test("creates a note with an opening reply", () => {
@@ -190,5 +194,71 @@ describe("SaveDocumentBodySchema", () => {
   test("rejects a missing content field", () => {
     const result = SaveDocumentBodySchema.safeParse({ path: "/tmp/doc.md" });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("suggestions domain", () => {
+  test("createSuggestion starts pending", () => {
+    const suggestion = createSuggestion({
+      anchor: { kind: "document", blockId: "document-root" },
+      replacementText: "new text",
+      author: { kind: "agent" },
+    });
+    expect(suggestion.status).toBe("pending");
+    expect(suggestion.replacementText).toBe("new text");
+  });
+
+  test("setSuggestionStatus updates status and updatedAt", () => {
+    const suggestion = createSuggestion({
+      anchor: { kind: "document", blockId: "document-root" },
+      replacementText: "new text",
+      author: { kind: "agent" },
+    });
+    const updated = setSuggestionStatus(suggestion, "accepted");
+    expect(updated.status).toBe("accepted");
+    expect(updated.id).toBe(suggestion.id);
+  });
+
+  test("findSuggestion returns ok for a known id and err otherwise", () => {
+    const suggestion = createSuggestion({
+      anchor: { kind: "document", blockId: "document-root" },
+      replacementText: "new text",
+      author: { kind: "agent" },
+    });
+    const found = findSuggestion([suggestion], suggestion.id);
+    expect(isOk(found) && found.value).toEqual(suggestion);
+
+    const missing = findSuggestion([suggestion], "does-not-exist");
+    expect(isErr(missing) && missing.error).toEqual({
+      _tag: "SuggestionNotFound",
+      id: "does-not-exist",
+    });
+  });
+
+  test("applySuggestion replaces the whole document for a document anchor", () => {
+    const result = applySuggestion(
+      "old content",
+      { kind: "document", blockId: "document-root" },
+      "new content",
+    );
+    expect(result).toBe("new content");
+  });
+
+  test("applySuggestion splices a block anchor's current text", () => {
+    const content = "Intro paragraph.\n\n# Title\n\noriginal paragraph\n";
+    const heading = extractHeadings(content)[0];
+    if (!heading) throw new Error("expected a Title heading");
+    const blockId = blockIdForHeading(heading);
+    const result = applySuggestion(content, { kind: "heading", blockId }, "# New Title\n");
+    expect(result).toBe("Intro paragraph.\n\n# New Title\n");
+  });
+
+  test("applySuggestion returns undefined when the anchor no longer matches", () => {
+    const result = applySuggestion(
+      "# Title\n",
+      { kind: "paragraph", blockId: "paragraph-stale" },
+      "x",
+    );
+    expect(result).toBeUndefined();
   });
 });

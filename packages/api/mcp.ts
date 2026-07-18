@@ -6,6 +6,7 @@ import {
   addReply,
   type BlockAnchor,
   createNote,
+  createSuggestion,
   resolveBlockText,
   setNoteStatus,
 } from "../domain/index.ts";
@@ -150,6 +151,30 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["anchor"],
         },
       },
+      {
+        name: "propose_edit",
+        description:
+          "Propose a replacement for the text at a block anchor. Never writes the document: the human must explicitly accept it in-app, which applies it to their in-progress Draft, and it only reaches disk once they save.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            anchor: anchorInputSchema,
+            replacementText: {
+              type: "string",
+              description: "The proposed replacement text for the anchored block.",
+            },
+            noteId: {
+              type: "string",
+              description: "The note/request this suggestion answers, if any.",
+            },
+            author: {
+              ...authorInputSchema,
+              description: "The author of the suggestion. Defaults to kind: 'agent'.",
+            },
+          },
+          required: ["anchor", "replacementText"],
+        },
+      },
     ],
   };
 });
@@ -279,6 +304,31 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
         {
           type: "text",
           text: JSON.stringify({ text: text ?? null }),
+        },
+      ],
+    };
+  }
+
+  if (request.params.name === "propose_edit") {
+    const args = request.params.arguments as unknown as {
+      anchor: BlockAnchor;
+      replacementText: string;
+      noteId?: string;
+      author?: Parameters<typeof createSuggestion>[0]["author"];
+    };
+    const suggestion = createSuggestion({
+      anchor: args.anchor,
+      replacementText: args.replacementText,
+      noteId: args.noteId,
+      author: args.author ?? { kind: "agent" },
+    });
+    sessionStore.addSuggestion(suggestion);
+    documentSession.triggerChange();
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(suggestion),
         },
       ],
     };

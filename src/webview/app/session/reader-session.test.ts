@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { DocumentRef, Note } from "@mdreadr/domain";
+import type { DocumentRef, Note, Suggestion } from "@mdreadr/domain";
 import { apiErrorMessage, type ReaderApi, unwrap } from "./reader-api.ts";
 import { loadNotesFlow, saveNotesFlow } from "./reader-flows.ts";
 
@@ -26,7 +26,13 @@ function createInMemoryReaderApi() {
 
   const api: ReaderApi = {
     async getSession() {
-      return { document: null, documentContent: null, notes: [], homeDirectory: "/home/test" };
+      return {
+        document: null,
+        documentContent: null,
+        notes: [],
+        suggestions: [],
+        homeDirectory: "/home/test",
+      };
     },
     async getRecents() {
       return [];
@@ -46,6 +52,12 @@ function createInMemoryReaderApi() {
       throw new Error("not exercised by these tests");
     },
     async setNoteStatus() {
+      throw new Error("not exercised by these tests");
+    },
+    async getSuggestions() {
+      return [];
+    },
+    async setSuggestionStatus(): Promise<Suggestion> {
       throw new Error("not exercised by these tests");
     },
     async saveNotes(input) {

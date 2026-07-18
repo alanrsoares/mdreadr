@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "bun:test";
+import { sessionTokens } from "./auth.ts";
 import { app } from "./index.ts";
 import { sessionStore } from "./session.ts";
 
@@ -6,9 +7,35 @@ describe("MCP Server", () => {
   beforeEach(() => {
     sessionStore.clearDocument();
     sessionStore.setNotes([]);
+    sessionStore.setSuggestions([]);
   });
 
   it("exposes /mcp POST endpoint for initialization", async () => {
+    const response = await app.handle(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+          Authorization: `Bearer ${sessionTokens.agentToken}`,
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2024-11-05",
+            capabilities: {},
+            clientInfo: { name: "test", version: "1.0.0" },
+          },
+        }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+  });
+
+  it("401s /mcp without the agent token", async () => {
     const response = await app.handle(
       new Request("http://localhost/mcp", {
         method: "POST",
@@ -28,8 +55,7 @@ describe("MCP Server", () => {
         }),
       }),
     );
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    expect(response.status).toBe(401);
   });
 
   // Because the actual JSON-RPC over SSE is tricky to mock without a client,
@@ -88,5 +114,44 @@ describe("MCP Server", () => {
     expect(props(findTool("get_document_block").inputSchema).anchor.properties.blockId.type).toBe(
       "string",
     );
+
+    expect(findTool("propose_edit").inputSchema.required).toEqual(["anchor", "replacementText"]);
+  });
+
+  it("propose_edit adds a pending Suggestion to the session", async () => {
+    const { mcpServer } = await import("./mcp.ts");
+    const callHandler = (
+      mcpServer as unknown as {
+        _requestHandlers: Map<
+          string,
+          (
+            request: unknown,
+            extra: unknown,
+          ) => Promise<{ content: Array<{ type: string; text: string }> }>
+        >;
+      }
+    )._requestHandlers.get("tools/call");
+    if (!callHandler) throw new Error("tools/call handler not registered");
+
+    const result = await callHandler(
+      {
+        method: "tools/call",
+        params: {
+          name: "propose_edit",
+          arguments: {
+            anchor: { kind: "document", blockId: "document-root" },
+            replacementText: "new text",
+          },
+        },
+      },
+      {},
+    );
+
+    const first = result.content[0];
+    if (!first) throw new Error("expected tool result content");
+    const suggestion = JSON.parse(first.text);
+    expect(suggestion.status).toBe("pending");
+    expect(suggestion.author).toEqual({ kind: "agent" });
+    expect(sessionStore.getSuggestions()).toHaveLength(1);
   });
 });

@@ -9,14 +9,20 @@ import { NOTES_SCHEMA_VERSION } from "../../shared/constants.ts";
 import {
   addReply,
   createNote,
+  createSuggestion,
   findNote,
+  findSuggestion,
   type NotesDomainError,
   parseNotesFileJson,
+  resolveBlockText,
+  type SuggestionDomainError,
   setNoteStatus,
+  setSuggestionStatus,
 } from "../domain/index.ts";
 import {
   AddReplyBodySchema,
   CreateNoteBodySchema,
+  CreateSuggestionBodySchema,
   LoadNotesBodySchema,
   NotesFileSchema,
   OpenDocumentBodySchema,
@@ -24,7 +30,9 @@ import {
   SaveDocumentBodySchema,
   SaveNotesBodySchema,
   UpdateNoteStatusBodySchema,
+  UpdateSuggestionStatusBodySchema,
 } from "../domain/schemas/index.ts";
+import { isAgentAuthorized, isWebviewAuthorized, sessionTokens } from "./auth.ts";
 import { documentSession } from "./document-session.ts";
 import {
   pickNativePath,
@@ -44,6 +52,27 @@ function domainError(error: NotesDomainError): { error: string; code: string } {
     case "NoteNotFound":
       return { error: `Note not found: ${error.id}`, code: error._tag };
   }
+}
+
+function suggestionDomainError(error: SuggestionDomainError): { error: string; code: string } {
+  return { error: `Suggestion not found: ${error.id}`, code: error._tag };
+}
+
+const unauthorized = { error: "Unauthorized", code: "Unauthorized" } as const;
+
+/** Only the webview may write to disk or read arbitrary paths (/documents/save, /notes/load). */
+function isWebviewRequest(request: Request): boolean {
+  return isWebviewAuthorized(request);
+}
+
+/** Only the MCP transport entry points require the agent token. */
+function isAgentRequest(request: Request): boolean {
+  return isAgentAuthorized(request);
+}
+
+/** Suggestions are read/actioned by the webview and proposed by the agent — either token works. */
+function isAgentOrWebviewRequest(request: Request): boolean {
+  return isAgentAuthorized(request) || isWebviewAuthorized(request);
 }
 
 export const app = new Elysia()
@@ -130,7 +159,12 @@ export const app = new Elysia()
   })
   .post(
     "/documents/save",
-    async ({ body, set }) => {
+    async ({ body, request, set }) => {
+      if (!isWebviewRequest(request)) {
+        set.status = 401;
+        return unauthorized;
+      }
+
       const parsed = SaveDocumentBodySchema.safeParse(body);
       if (!parsed.success) {
         set.status = 400;
@@ -149,6 +183,16 @@ export const app = new Elysia()
             return { error: error.message, code: "WriteFailed" };
           })
           .exhaustive();
+      }
+
+      // A Suggestion accepted into the Draft only becomes "completed" once its
+      // replacementText has actually landed on disk at its anchor.
+      for (const suggestion of sessionStore.getSuggestions()) {
+        if (suggestion.status !== "accepted") continue;
+        const resolved = resolveBlockText(parsed.data.content, suggestion.anchor);
+        if (resolved === suggestion.replacementText) {
+          sessionStore.replaceSuggestion(setSuggestionStatus(suggestion, "completed"));
+        }
       }
 
       return { path: parsed.data.path };
@@ -246,7 +290,12 @@ export const app = new Elysia()
   )
   .post(
     "/notes/load",
-    async ({ body, set }) => {
+    async ({ body, request, set }) => {
+      if (!isWebviewRequest(request)) {
+        set.status = 401;
+        return unauthorized;
+      }
+
       const parsed = LoadNotesBodySchema.safeParse(body);
       if (!parsed.success) {
         set.status = 400;
@@ -280,6 +329,64 @@ export const app = new Elysia()
     },
     { body: LoadNotesBodySchema },
   )
+  .get("/suggestions", ({ request, set }) => {
+    if (!isAgentOrWebviewRequest(request)) {
+      set.status = 401;
+      return unauthorized;
+    }
+    return { suggestions: sessionStore.getSuggestions() };
+  })
+  .post(
+    "/suggestions",
+    ({ body, request, set }) => {
+      if (!isAgentOrWebviewRequest(request)) {
+        set.status = 401;
+        return unauthorized;
+      }
+
+      const parsed = CreateSuggestionBodySchema.safeParse(body);
+      if (!parsed.success) {
+        set.status = 400;
+        return { error: parsed.error.message, code: "ValidationError" };
+      }
+
+      const suggestion = createSuggestion(parsed.data);
+      sessionStore.addSuggestion(suggestion);
+      return { suggestion };
+    },
+    { body: CreateSuggestionBodySchema },
+  )
+  .patch(
+    "/suggestions/:id/status",
+    ({ body, params, request, set }) => {
+      if (!isAgentOrWebviewRequest(request)) {
+        set.status = 401;
+        return unauthorized;
+      }
+
+      const parsed = UpdateSuggestionStatusBodySchema.safeParse(body);
+      if (!parsed.success) {
+        set.status = 400;
+        return { error: parsed.error.message, code: "ValidationError" };
+      }
+
+      const found = findSuggestion(sessionStore.getSuggestions(), params.id);
+      if (isErr(found)) {
+        set.status = 404;
+        return suggestionDomainError(found.error);
+      }
+
+      if (parsed.data.status === "accepted" && !sessionStore.snapshot().document) {
+        set.status = 403;
+        return { error: "No Document is open", code: "DocumentNotOpen" };
+      }
+
+      const updated = setSuggestionStatus(found.value, parsed.data.status);
+      sessionStore.replaceSuggestion(updated);
+      return { suggestion: updated };
+    },
+    { body: UpdateSuggestionStatusBodySchema },
+  )
   .post(
     "/dialogs/pick",
     async ({ body, set }) => {
@@ -299,15 +406,79 @@ export const app = new Elysia()
     },
     { body: PickFileBodySchema },
   )
-  .all("/mcp", ({ request }) => transport.handleRequest(request))
-  .all("/mcp/message", ({ request }) => transport.handleRequest(request));
+  .all("/mcp", async ({ request }) => {
+    if (!isAgentRequest(request)) {
+      return new Response(JSON.stringify(unauthorized), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (request.method === "POST") {
+      try {
+        const cloned = request.clone();
+        const body = (await cloned.json()) as unknown as
+          | Array<{ method?: string }>
+          | { method?: string };
+        const isInit = Array.isArray(body)
+          ? body.some((m) => m.method === "initialize")
+          : body.method === "initialize";
+        if (isInit) {
+          const t = transport as unknown as {
+            _initialized: boolean;
+            sessionId: string | undefined;
+          };
+          t._initialized = false;
+          t.sessionId = undefined;
+        }
+      } catch (_e) {
+        // ignore
+      }
+    }
+    return transport.handleRequest(request);
+  })
+  .all("/mcp/message", async ({ request }) => {
+    if (!isAgentRequest(request)) {
+      return new Response(JSON.stringify(unauthorized), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (request.method === "POST") {
+      try {
+        const cloned = request.clone();
+        const body = (await cloned.json()) as unknown as
+          | Array<{ method?: string }>
+          | { method?: string };
+        const isInit = Array.isArray(body)
+          ? body.some((m) => m.method === "initialize")
+          : body.method === "initialize";
+        if (isInit) {
+          const t = transport as unknown as {
+            _initialized: boolean;
+            sessionId: string | undefined;
+          };
+          t._initialized = false;
+          t.sessionId = undefined;
+        }
+      } catch (_e) {
+        // ignore
+      }
+    }
+    return transport.handleRequest(request);
+  });
 
 export type App = typeof app;
 
 export { documentSession } from "./document-session.ts";
 export { sessionStore } from "./session.ts";
 
-export function startServer(port = 0): { port: number; url: string } {
+export function startServer(port = 0): {
+  port: number;
+  url: string;
+  webviewToken: string;
+} {
   const listener = app.listen({
     hostname: "127.0.0.1",
     port,
@@ -316,14 +487,24 @@ export function startServer(port = 0): { port: number; url: string } {
   const address = listener.server?.port ?? port;
   const url = `http://127.0.0.1:${address}`;
 
-  // Write MCP discovery config
+  // Write MCP discovery config, including the per-launch agent token every
+  // MCP-facing route (/mcp, /mcp/message) requires. The webview token is
+  // deliberately never written to disk — see packages/api/auth.ts.
   (async () => {
     try {
       const configDir = join(homedir(), ".config", "mdreadr");
       await mkdir(configDir, { recursive: true });
       await writeFile(
         join(configDir, "mcp.json"),
-        JSON.stringify({ mcpServers: { mdreadr: { url: `${url}/mcp` } } }, null, 2),
+        JSON.stringify(
+          {
+            mcpServers: {
+              mdreadr: { url: `${url}/mcp`, token: sessionTokens.agentToken },
+            },
+          },
+          null,
+          2,
+        ),
       );
     } catch (e) {
       console.error("Failed to write mcp.json", e);
@@ -333,5 +514,6 @@ export function startServer(port = 0): { port: number; url: string } {
   return {
     port: address,
     url,
+    webviewToken: sessionTokens.webviewToken,
   };
 }

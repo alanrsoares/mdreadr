@@ -1,4 +1,4 @@
-import type { BlockAnchor, Note, NoteKind, NoteStatus } from "@mdreadr/domain";
+import type { BlockAnchor, Note, NoteKind, NoteStatus, Suggestion } from "@mdreadr/domain";
 import { type UseQueryResult, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 import { formatDisplayPath } from "../components/path-display.ts";
@@ -14,17 +14,20 @@ export type ReaderSessionCallbacks = {
   onNotesSaved?: () => void;
   onNotesLoaded?: () => void;
   onDocumentSaved?: () => void;
+  onSuggestionStatusChanged?: (suggestion: Suggestion) => void;
 };
 
 export type ReaderSession = {
   session: UseQueryResult<SessionSnapshot>;
   recents: UseQueryResult<string[]>;
   notes: UseQueryResult<Note[]>;
+  suggestions: UseQueryResult<Suggestion[]>;
   open: (path: string) => void;
   pick: () => void;
   createNote: (input: { anchor: BlockAnchor; body: string; kind?: NoteKind }) => Promise<void>;
   addReply: (noteId: string, body: string) => Promise<void>;
   setStatus: (noteId: string, status: NoteStatus) => Promise<void>;
+  setSuggestionStatus: (suggestionId: string, status: "accepted" | "rejected") => Promise<void>;
   save: () => Promise<void>;
   load: () => Promise<void>;
   saveDocument: (path: string, content: string) => Promise<void>;
@@ -58,6 +61,11 @@ export function useReaderSession(
     queryFn: () => readerApi.getNotes(),
   });
 
+  const suggestions = useQuery({
+    queryKey: ["suggestions"],
+    queryFn: () => readerApi.getSuggestions(),
+  });
+
   useEffect(() => {
     if (session.isError) {
       showError("Load session", session.error);
@@ -80,6 +88,10 @@ export function useReaderSession(
 
   const invalidateNotes = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["notes"] });
+  }, [queryClient]);
+
+  const invalidateSuggestions = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["suggestions"] });
   }, [queryClient]);
 
   const openDocumentMutation = useMutation({
@@ -145,6 +157,18 @@ export function useReaderSession(
     },
   });
 
+  const setSuggestionStatusMutation = useMutation({
+    mutationFn: (input: { suggestionId: string; status: "accepted" | "rejected" }) =>
+      readerApi.setSuggestionStatus(input.suggestionId, input.status),
+    onSuccess: (suggestion) => {
+      invalidateSuggestions();
+      callbacks.onSuggestionStatusChanged?.(suggestion);
+    },
+    onError: (error) => {
+      showError("Update suggestion", error);
+    },
+  });
+
   const saveNotesMutation = useMutation({
     mutationFn: () =>
       saveNotesFlow(readerApi, {
@@ -195,6 +219,7 @@ export function useReaderSession(
     session,
     recents,
     notes,
+    suggestions,
     open: (path) => openDocumentMutation.mutate(path),
     pick: () => pickDocumentMutation.mutate(),
     createNote: async (input) => {
@@ -205,6 +230,9 @@ export function useReaderSession(
     },
     setStatus: async (noteId, status) => {
       await updateStatusMutation.mutateAsync({ noteId, status });
+    },
+    setSuggestionStatus: async (suggestionId, status) => {
+      await setSuggestionStatusMutation.mutateAsync({ suggestionId, status });
     },
     save: async () => {
       await saveNotesMutation.mutateAsync();

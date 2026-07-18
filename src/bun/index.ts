@@ -151,7 +151,7 @@ async function openArgvDocument(): Promise<void> {
   }
 }
 
-const { url: apiBase } = startServer(0);
+const { url: apiBase, webviewToken } = startServer(0);
 console.log(`mdreadr API listening on ${apiBase}`);
 
 // If we have a pending open-url from startup, handle it before creating the window
@@ -182,7 +182,7 @@ const viewUrl = await getMainViewUrl();
 const mainWindow = new BrowserWindow({
   title: APP_NAME,
   url: viewUrl,
-  preload: `window.__MDREADR_API__ = ${JSON.stringify(apiBase)};`,
+  preload: `window.__MDREADR_API__ = ${JSON.stringify(apiBase)}; window.__MDREADR_WEBVIEW_TOKEN__ = ${JSON.stringify(webviewToken)};`,
   frame: {
     width: 1280,
     height: 840,

@@ -1,10 +1,18 @@
-import type { BlockAnchor, DocumentRef, Note, NoteKind, NoteStatus } from "@mdreadr/domain";
+import type {
+  BlockAnchor,
+  DocumentRef,
+  Note,
+  NoteKind,
+  NoteStatus,
+  Suggestion,
+} from "@mdreadr/domain";
 import { api } from "../treaty.ts";
 
 export type SessionSnapshot = {
   document: DocumentRef | null;
   documentContent: string | null;
   notes: Note[];
+  suggestions: Suggestion[];
   homeDirectory: string;
 };
 
@@ -21,6 +29,8 @@ export type ReaderApi = {
   createNote(input: { anchor: BlockAnchor; body: string; kind?: NoteKind }): Promise<void>;
   addReply(noteId: string, body: string): Promise<Note>;
   setNoteStatus(noteId: string, status: NoteStatus): Promise<Note>;
+  getSuggestions(): Promise<Suggestion[]>;
+  setSuggestionStatus(suggestionId: string, status: "accepted" | "rejected"): Promise<Suggestion>;
   saveNotes(input: { path: string; notes: Note[]; document?: DocumentRef }): Promise<void>;
   loadNotes(path: string): Promise<{ notes: Note[]; document?: DocumentRef | null }>;
   saveDocument(path: string, content: string): Promise<void>;
@@ -132,6 +142,16 @@ export function createTreatyReaderApi(): ReaderApi {
       const data = unwrap(await api.notes({ id: noteId }).status.patch({ status }));
       if (!data || "error" in data) throw new Error("Failed to update note status");
       return data.note;
+    },
+    async getSuggestions() {
+      const data = unwrap(await api.suggestions.get());
+      if (!data || "error" in data) throw new Error("Failed to load suggestions");
+      return data.suggestions;
+    },
+    async setSuggestionStatus(suggestionId, status) {
+      const data = unwrap(await api.suggestions({ id: suggestionId }).status.patch({ status }));
+      if (!data || "error" in data) throw new Error("Failed to update suggestion status");
+      return data.suggestion;
     },
     async saveNotes(input) {
       unwrap(

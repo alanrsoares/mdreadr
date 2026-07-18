@@ -6,8 +6,8 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { Stack } from "@astryxdesign/core/Stack";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
-import type { BlockAnchor } from "@mdreadr/domain";
-import { extractHeadings } from "@mdreadr/domain";
+import type { BlockAnchor, Suggestion } from "@mdreadr/domain";
+import { applySuggestion, extractHeadings } from "@mdreadr/domain";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppLogo } from "../components/AppLogo.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
@@ -16,6 +16,7 @@ import { NotesPanel } from "../components/NotesPanel.tsx";
 import { formatDisplayPath, pathFileName } from "../components/path-display.ts";
 import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
 import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
+import { SuggestionsPanel } from "../components/SuggestionsPanel.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
 import { ArrowDownTrayIcon } from "../icons.ts";
@@ -258,6 +259,7 @@ export function ReaderPage() {
   }, [content, dirty, showError]);
 
   const notes = reader.notes.data ?? [];
+  const suggestions = reader.suggestions.data ?? [];
   const toc = useMemo(() => extractHeadings(content), [content]);
   const isOpening = reader.isOpening;
 
@@ -280,6 +282,27 @@ export function ReaderPage() {
       jump();
     },
     [documentViewMode, showError],
+  );
+
+  const onAcceptSuggestion = useCallback(
+    async (suggestion: Suggestion) => {
+      if (!documentPath) return;
+      const spliced = applySuggestion(editorValue, suggestion.anchor, suggestion.replacementText);
+      if (spliced === undefined) {
+        showError("Accept suggestion", "Could not locate that text in the document anymore.");
+        return;
+      }
+      setDraft(editDraft(documentPath, spliced, content));
+      await reader.setSuggestionStatus(suggestion.id, "accepted");
+    },
+    [documentPath, editorValue, content, reader, showError],
+  );
+
+  const onRejectSuggestion = useCallback(
+    async (suggestion: Suggestion) => {
+      await reader.setSuggestionStatus(suggestion.id, "rejected");
+    },
+    [reader],
   );
 
   return (
@@ -396,6 +419,12 @@ export function ReaderPage() {
         </ReaderMain>
 
         <ReaderNotesAside data-pending={pendingAnchor ? "true" : "false"}>
+          <SuggestionsPanel
+            suggestions={suggestions}
+            onAccept={onAcceptSuggestion}
+            onReject={onRejectSuggestion}
+            onScrollToAnchor={onScrollToAnchor}
+          />
           <NotesPanel
             notes={notes}
             pendingAnchor={pendingAnchor}

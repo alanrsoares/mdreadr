@@ -9,6 +9,20 @@ export function getApiBase(): string {
   return fromQuery ? fromQuery : "http://127.0.0.1:3000";
 }
 
-export const api = treaty<App>(getApiBase());
+/**
+ * Per-launch token required by /documents/save, /notes/load, and /suggestions*
+ * (packages/api/auth.ts). Injected via Electrobun preload, same seam as
+ * `__MDREADR_API__` — never written to disk, unlike the MCP agent token.
+ */
+export function getWebviewToken(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return (window as Window & { __MDREADR_WEBVIEW_TOKEN__?: string }).__MDREADR_WEBVIEW_TOKEN__;
+}
+
+const webviewToken = getWebviewToken();
+
+export const api = treaty<App>(getApiBase(), {
+  headers: webviewToken ? { Authorization: `Bearer ${webviewToken}` } : undefined,
+});
 
 export type ApiClient = typeof api;

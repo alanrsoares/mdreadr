@@ -1,10 +1,11 @@
 import { homedir } from "node:os";
-import type { DocumentRef, Note } from "../domain/index.ts";
+import type { DocumentRef, Note, Suggestion } from "../domain/index.ts";
 
 export type SessionSnapshot = {
   document: DocumentRef | null;
   documentContent: string | null;
   notes: Note[];
+  suggestions: Suggestion[];
   homeDirectory: string;
 };
 
@@ -12,12 +13,14 @@ export class SessionStore {
   private document: DocumentRef | null = null;
   private documentContent: string | null = null;
   private notes: Note[] = [];
+  private suggestions: Suggestion[] = [];
 
   snapshot(): SessionSnapshot {
     return {
       document: this.document,
       documentContent: this.documentContent,
       notes: [...this.notes],
+      suggestions: [...this.suggestions],
       homeDirectory: process.env.HOME ?? homedir(),
     };
   }
@@ -46,6 +49,24 @@ export class SessionStore {
 
   addNote(note: Note): void {
     this.notes = [...this.notes, note];
+  }
+
+  getSuggestions(): Suggestion[] {
+    return [...this.suggestions];
+  }
+
+  setSuggestions(suggestions: Suggestion[]): void {
+    this.suggestions = [...suggestions];
+  }
+
+  addSuggestion(suggestion: Suggestion): void {
+    this.suggestions = [...this.suggestions, suggestion];
+  }
+
+  replaceSuggestion(suggestion: Suggestion): void {
+    this.suggestions = this.suggestions.map((item) =>
+      item.id === suggestion.id ? suggestion : item,
+    );
   }
 }
 
