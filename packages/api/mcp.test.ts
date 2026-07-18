@@ -154,4 +154,80 @@ describe("MCP Server", () => {
     expect(suggestion.author).toEqual({ kind: "agent" });
     expect(sessionStore.getSuggestions()).toHaveLength(1);
   });
+
+  describe("journal / wait_for_activity", () => {
+    async function callTool(name: string, args: Record<string, unknown>) {
+      const { mcpServer } = await import("./mcp.ts");
+      const handler = (
+        mcpServer as unknown as {
+          _requestHandlers: Map<
+            string,
+            (
+              request: unknown,
+              extra: unknown,
+            ) => Promise<{ content: Array<{ type: string; text: string }> }>
+          >;
+        }
+      )._requestHandlers.get("tools/call");
+      if (!handler) throw new Error("tools/call handler not registered");
+      const result = await handler({ method: "tools/call", params: { name, arguments: args } }, {});
+      const first = result.content[0];
+      if (!first) throw new Error("expected tool result content");
+      return JSON.parse(first.text);
+    }
+
+    async function currentMaxSeq() {
+      const { events } = await callTool("get_events", { sinceSeq: 0 });
+      return events.reduce((max: number, event: { seq: number }) => Math.max(max, event.seq), 0);
+    }
+
+    it("wait_for_activity with no activity times out with empty events", async () => {
+      const sinceSeq = await currentMaxSeq();
+      const result = await callTool("wait_for_activity", { sinceSeq, timeoutMs: 50 });
+      expect(result.events).toEqual([]);
+    });
+
+    it("adding a note while wait_for_activity is pending resolves it immediately", async () => {
+      const sinceSeq = await currentMaxSeq();
+      const pending = callTool("wait_for_activity", { sinceSeq, timeoutMs: 5000 });
+
+      await callTool("add_note", {
+        anchor: { kind: "document", blockId: "document-root" },
+        body: "hello",
+        author: { kind: "agent" },
+      });
+
+      const result = await pending;
+      expect(result.events).toHaveLength(1);
+      expect(result.events[0].type).toBe("note_added");
+    });
+
+    it("two concurrent waiters both resolve", async () => {
+      const sinceSeq = await currentMaxSeq();
+      const first = callTool("wait_for_activity", { sinceSeq, timeoutMs: 5000 });
+      const second = callTool("wait_for_activity", { sinceSeq, timeoutMs: 5000 });
+
+      await callTool("add_note", {
+        anchor: { kind: "document", blockId: "document-root" },
+        body: "hello",
+        author: { kind: "agent" },
+      });
+
+      const [firstResult, secondResult] = await Promise.all([first, second]);
+      expect(firstResult.events).toHaveLength(1);
+      expect(secondResult.events).toHaveLength(1);
+    });
+
+    it("get_events is a non-blocking catch-up read", async () => {
+      const sinceSeq = await currentMaxSeq();
+      const added = await callTool("add_note", {
+        anchor: { kind: "document", blockId: "document-root" },
+        body: "hello",
+        author: { kind: "agent" },
+      });
+      const events = await callTool("get_events", { sinceSeq });
+      expect(events.events).toHaveLength(1);
+      expect(events.events[0].entityId).toBe(added.id);
+    });
+  });
 });

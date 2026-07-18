@@ -191,7 +191,7 @@ export const app = new Elysia()
         if (suggestion.status !== "accepted") continue;
         const resolved = resolveBlockText(parsed.data.content, suggestion.anchor);
         if (resolved === suggestion.replacementText) {
-          sessionStore.replaceSuggestion(setSuggestionStatus(suggestion, "completed"));
+          sessionStore.suggestionStatusChanged(setSuggestionStatus(suggestion, "completed"));
         }
       }
 
@@ -236,7 +236,7 @@ export const app = new Elysia()
       }
 
       const updated = addReply(found.value, parsed.data);
-      sessionStore.replaceNote(updated);
+      sessionStore.noteReplied(updated);
       return { note: updated };
     },
     { body: AddReplyBodySchema },
@@ -257,7 +257,7 @@ export const app = new Elysia()
       }
 
       const updated = setNoteStatus(found.value, parsed.data.status);
-      sessionStore.replaceNote(updated);
+      sessionStore.noteStatusChanged(updated);
       return { note: updated };
     },
     { body: UpdateNoteStatusBodySchema },
@@ -382,7 +382,7 @@ export const app = new Elysia()
       }
 
       const updated = setSuggestionStatus(found.value, parsed.data.status);
-      sessionStore.replaceSuggestion(updated);
+      sessionStore.suggestionStatusChanged(updated);
       return { suggestion: updated };
     },
     { body: UpdateSuggestionStatusBodySchema },

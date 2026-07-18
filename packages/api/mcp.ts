@@ -175,6 +175,40 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["anchor", "replacementText"],
         },
       },
+      {
+        name: "wait_for_activity",
+        description:
+          "Long-poll for session activity (notes, replies, status changes, suggestions) newer than sinceSeq. Resolves immediately if activity already happened, otherwise waits up to timeoutMs (default 25000) before resolving with an empty events list. Call again with the highest seq seen to keep watching.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            sinceSeq: {
+              type: "number",
+              description: "The highest journal seq already seen. Use 0 to catch everything.",
+            },
+            timeoutMs: {
+              type: "number",
+              description: "Max time to wait before resolving with no events. Defaults to 25000.",
+            },
+          },
+          required: ["sinceSeq"],
+        },
+      },
+      {
+        name: "get_events",
+        description:
+          "Non-blocking catch-up read of journal entries newer than sinceSeq. Use this to resume after a reconnect instead of waiting.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            sinceSeq: {
+              type: "number",
+              description: "The highest journal seq already seen. Use 0 to catch everything.",
+            },
+          },
+          required: ["sinceSeq"],
+        },
+      },
     ],
   };
 });
@@ -240,7 +274,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       body: args.body,
       author: args.author,
     });
-    sessionStore.replaceNote(updatedNote);
+    sessionStore.noteReplied(updatedNote);
     documentSession.triggerChange();
     return {
       content: [
@@ -263,7 +297,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       throw new Error(`Note not found: ${args.noteId}`);
     }
     const updatedNote = setNoteStatus(note, args.status);
-    sessionStore.replaceNote(updatedNote);
+    sessionStore.noteStatusChanged(updatedNote);
     documentSession.triggerChange();
     return {
       content: [
@@ -329,6 +363,35 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
         {
           type: "text",
           text: JSON.stringify(suggestion),
+        },
+      ],
+    };
+  }
+
+  if (request.params.name === "wait_for_activity") {
+    const args = request.params.arguments as unknown as {
+      sinceSeq: number;
+      timeoutMs?: number;
+    };
+    const events = await sessionStore.waitForActivity(args.sinceSeq, args.timeoutMs ?? 25000);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ events }),
+        },
+      ],
+    };
+  }
+
+  if (request.params.name === "get_events") {
+    const args = request.params.arguments as unknown as { sinceSeq: number };
+    const events = sessionStore.getEvents(args.sinceSeq);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ events }),
         },
       ],
     };
