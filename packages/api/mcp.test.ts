@@ -35,6 +35,62 @@ describe("MCP Server", () => {
     expect(response.headers.get("content-type")).toContain("text/event-stream");
   });
 
+  it("gives concurrent initialize calls independent, non-clobbered sessions", async () => {
+    function initialize(id: number) {
+      return app.handle(
+        new Request("http://localhost/mcp", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json, text/event-stream",
+            Authorization: `Bearer ${sessionTokens.agentToken}`,
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id,
+            method: "initialize",
+            params: {
+              protocolVersion: "2024-11-05",
+              capabilities: {},
+              clientInfo: { name: `test-${id}`, version: "1.0.0" },
+            },
+          }),
+        }),
+      );
+    }
+
+    const [responseA, responseB] = await Promise.all([initialize(1), initialize(2)]);
+    expect(responseA.status).toBe(200);
+    expect(responseB.status).toBe(200);
+    const sessionIdA = responseA.headers.get("mcp-session-id");
+    const sessionIdB = responseB.headers.get("mcp-session-id");
+    expect(sessionIdA).toBeTruthy();
+    expect(sessionIdB).toBeTruthy();
+    expect(sessionIdA).not.toBe(sessionIdB);
+
+    function listTools(sessionId: string) {
+      return app.handle(
+        new Request("http://localhost/mcp", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json, text/event-stream",
+            Authorization: `Bearer ${sessionTokens.agentToken}`,
+            "mcp-session-id": sessionId,
+          },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list", params: {} }),
+        }),
+      );
+    }
+
+    const [listA, listB] = await Promise.all([
+      listTools(sessionIdA as string),
+      listTools(sessionIdB as string),
+    ]);
+    expect(listA.status).toBe(200);
+    expect(listB.status).toBe(200);
+  });
+
   it("401s /mcp without the agent token", async () => {
     const response = await app.handle(
       new Request("http://localhost/mcp", {

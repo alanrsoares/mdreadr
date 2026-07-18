@@ -41,7 +41,7 @@ import {
   toDocumentHttpError,
   writeTextFile,
 } from "./documents.ts";
-import { transport } from "./mcp.ts";
+import { handleMcpRequest } from "./mcp.ts";
 import { readRecents, toRecentsHttpError } from "./recents.ts";
 import { sessionStore } from "./session.ts";
 
@@ -413,29 +413,7 @@ export const app = new Elysia()
         headers: { "Content-Type": "application/json" },
       });
     }
-
-    if (request.method === "POST") {
-      try {
-        const cloned = request.clone();
-        const body = (await cloned.json()) as unknown as
-          | Array<{ method?: string }>
-          | { method?: string };
-        const isInit = Array.isArray(body)
-          ? body.some((m) => m.method === "initialize")
-          : body.method === "initialize";
-        if (isInit) {
-          const t = transport as unknown as {
-            _initialized: boolean;
-            sessionId: string | undefined;
-          };
-          t._initialized = false;
-          t.sessionId = undefined;
-        }
-      } catch (_e) {
-        // ignore
-      }
-    }
-    return transport.handleRequest(request);
+    return handleMcpRequest(request);
   })
   .all("/mcp/message", async ({ request }) => {
     if (!isAgentRequest(request)) {
@@ -444,29 +422,7 @@ export const app = new Elysia()
         headers: { "Content-Type": "application/json" },
       });
     }
-
-    if (request.method === "POST") {
-      try {
-        const cloned = request.clone();
-        const body = (await cloned.json()) as unknown as
-          | Array<{ method?: string }>
-          | { method?: string };
-        const isInit = Array.isArray(body)
-          ? body.some((m) => m.method === "initialize")
-          : body.method === "initialize";
-        if (isInit) {
-          const t = transport as unknown as {
-            _initialized: boolean;
-            sessionId: string | undefined;
-          };
-          t._initialized = false;
-          t.sessionId = undefined;
-        }
-      } catch (_e) {
-        // ignore
-      }
-    }
-    return transport.handleRequest(request);
+    return handleMcpRequest(request);
   });
 
 export type App = typeof app;
