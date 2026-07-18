@@ -1,5 +1,10 @@
 import { err, ok, type Result } from "@onrails/result";
-import type { Author, BlockAnchor, Suggestion, SuggestionStatus } from "../schemas/index.ts";
+import type {
+  BlockAnchor,
+  CreateSuggestionInput,
+  Suggestion,
+  SuggestionStatus,
+} from "../schemas/index.ts";
 import { resolveBlockText } from "./anchors.ts";
 import { newId, nowIso } from "./notes.ts";
 
@@ -13,12 +18,7 @@ export function findSuggestion(
   return !suggestion ? err({ _tag: "SuggestionNotFound", id }) : ok(suggestion);
 }
 
-export function createSuggestion(input: {
-  anchor: BlockAnchor;
-  replacementText: string;
-  noteId?: string;
-  author: Author;
-}): Suggestion {
+export function createSuggestion(input: CreateSuggestionInput): Suggestion {
   const timestamp = nowIso();
   return {
     id: newId(),

@@ -41,13 +41,9 @@ const createNestedComponents = (
   },
 });
 
-export function AlignBlock({
-  code,
-  resolveImageSrc,
-}: {
-  code: string;
-  resolveImageSrc?: ImageSrcResolver;
-}) {
+export type AlignBlockProps = { code: string; resolveImageSrc?: ImageSrcResolver };
+
+export function AlignBlock({ code, resolveImageSrc }: AlignBlockProps) {
   const payload = decodeAlignPayload(code);
 
   return payload === null ? (

@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
+import type { PickFileInput } from "@mdreadr/domain";
 import { ResultAsync } from "@onrails/result";
 import { touchRecent } from "./recents.ts";
 
@@ -194,10 +195,12 @@ async function macFileSelection(script: string): Promise<string | null> {
   return path;
 }
 
+type ZenityFileSelectionOptions = { save?: boolean; filename?: string };
+
 async function zenityFileSelection(
   title: string,
   filters: string[],
-  options?: { save?: boolean; filename?: string },
+  options?: ZenityFileSelectionOptions,
 ): Promise<string | null> {
   const args = ["--file-selection", `--title=${title}`];
 
@@ -220,11 +223,9 @@ async function zenityFileSelection(
   return path;
 }
 
-export const pickNativePath = (input: {
-  mode: "open" | "save";
-  defaultPath?: string;
-  filters?: string[];
-}): ResultAsync<string | null, { _tag: "DialogFailed"; message: string }> =>
+export const pickNativePath = (
+  input: PickFileInput,
+): ResultAsync<string | null, { _tag: "DialogFailed"; message: string }> =>
   ResultAsync.fromPromise(
     (async () => {
       const isMac = process.platform === "darwin";

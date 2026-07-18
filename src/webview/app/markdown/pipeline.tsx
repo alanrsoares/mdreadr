@@ -13,6 +13,7 @@ export type { ImageSrcResolver };
 
 type SpecialFenceContext = { resolveImageSrc?: ImageSrcResolver };
 type SpecialFenceRenderer = (code: string, ctx: SpecialFenceContext) => ReactNode | null;
+type RenderSpecialFenceOptions = { skip?: readonly string[] };
 
 // Registration order/list is the single source of truth for "special".
 const SPECIAL_FENCES: Record<string, SpecialFenceRenderer> = {
@@ -38,12 +39,20 @@ export function renderSpecialFence(
   // Internal-only: fence languages to treat as not-special. Used by the
   // align-block nested renderer so an `align` fence nested inside another
   // align body renders as plain code instead of recursing into AlignBlock.
-  options?: { skip?: readonly string[] },
+  options?: RenderSpecialFenceOptions,
 ): ReactNode | null {
   if (language == null || options?.skip?.includes(language)) return null;
   const renderer = SPECIAL_FENCES[language];
   return renderer ? renderer(code, ctx) : null;
 }
+
+type ReaderImageProps = {
+  src: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  resolveImageSrc?: ImageSrcResolver;
+};
 
 /** Single sanitize+resolve image renderer used by block, inline-HTML, and nested renderers. */
 export function ReaderImage({
@@ -52,13 +61,7 @@ export function ReaderImage({
   width,
   height,
   resolveImageSrc,
-}: {
-  src: string;
-  alt: string;
-  width?: number;
-  height?: number;
-  resolveImageSrc?: ImageSrcResolver;
-}): ReactNode {
+}: ReaderImageProps): ReactNode {
   if (DANGEROUS_URL_PATTERN.test(src.trim())) {
     return <span>{alt}</span>;
   }

@@ -12,6 +12,12 @@ export type PinnableBlock =
   | { kind: "paragraph"; text: string }
   | { kind: "code"; text: string; language: string | undefined };
 
+export type HeadingStackEntry = { level: number; text: string };
+
+export type HeadingPathResult = { stack: HeadingStackEntry[]; path: string[] };
+
+type ResolveBlockTextOptions = { isPinnableCode?: (language: string | undefined) => boolean };
+
 export const inlineToText = (nodes: InlineNode[]): string =>
   nodes
     .map((node) => {
@@ -74,15 +80,16 @@ export function collectPinnableBlocks(
 }
 
 export function headingPathForLevel(
-  stack: { level: number; text: string }[],
+  stack: HeadingStackEntry[],
   level: number,
   text: string,
-): string[] {
-  while (stack.length > 0 && (stack.at(-1)?.level ?? 0) >= level) {
-    stack.pop();
+): HeadingPathResult {
+  let next = stack;
+  while (next.length > 0 && (next.at(-1)?.level ?? 0) >= level) {
+    next = next.slice(0, -1);
   }
-  stack.push({ level, text });
-  return stack.map((item) => item.text);
+  next = [...next, { level, text }];
+  return { stack: next, path: next.map((item) => item.text) };
 }
 
 function findHeadingSection(
@@ -131,7 +138,7 @@ function findHeadingSection(
 export function resolveBlockText(
   content: string,
   anchor: BlockAnchor,
-  options?: { isPinnableCode?: (language: string | undefined) => boolean },
+  options?: ResolveBlockTextOptions,
 ): string | undefined {
   if (anchor.kind === "document") return content;
 

@@ -67,7 +67,8 @@ export function createAnchorPlan(prepared: string): AnchorPlan {
       headingStack = [];
     },
     nextHeading(level, text) {
-      const headingPath = headingPathForLevel(headingStack, level, text);
+      const { stack, path: headingPath } = headingPathForLevel(headingStack, level, text);
+      headingStack = stack;
       const entry = headings[headingIndex];
       headingIndex += 1;
       const blockId = entry ? blockIdForHeading(entry) : `heading-${headingIndex}`;

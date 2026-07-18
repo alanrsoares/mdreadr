@@ -1,10 +1,10 @@
 import { match } from "@onrails/pattern";
 import { err, ok, type Result } from "@onrails/result";
 import type {
+  AddReplyInput,
   Author,
-  BlockAnchor,
+  CreateNoteInput,
   Note,
-  NoteKind,
   NoteStatus,
   NotesFile,
   Reply,
@@ -19,12 +19,7 @@ export const newId = (): string => crypto.randomUUID();
 
 export const nowIso = (): string => new Date().toISOString();
 
-export function createNote(input: {
-  anchor: BlockAnchor;
-  body: string;
-  author: Author;
-  kind?: NoteKind;
-}): Note {
+export function createNote(input: CreateNoteInput): Note {
   const timestamp = nowIso();
   const reply: Reply = {
     id: newId(),
@@ -44,7 +39,7 @@ export function createNote(input: {
   };
 }
 
-export function addReply(note: Note, input: { body: string; author: Author }): Note {
+export function addReply(note: Note, input: AddReplyInput): Note {
   const timestamp = nowIso();
   const reply: Reply = {
     id: newId(),

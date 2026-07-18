@@ -37,17 +37,14 @@ function textFromChildren(children: ReactNode): string {
 const blockClasses = (notedBlockIds: ReadonlySet<string>, blockId: string): string =>
   notedBlockIds.has(blockId) ? "reader-block-has-note" : "";
 
-function PinParagraph({
-  children,
-  onPinBlock,
-  plan,
-  notedBlockIds,
-}: {
+type PinParagraphProps = {
   children: ReactNode;
   onPinBlock?: (anchor: BlockAnchor) => void;
   plan: AnchorPlan;
   notedBlockIds: ReadonlySet<string>;
-}) {
+};
+
+function PinParagraph({ children, onPinBlock, plan, notedBlockIds }: PinParagraphProps) {
   const text = textFromChildren(children);
   const anchor = plan.nextParagraph(text);
   const blockId = anchor.blockId;
@@ -62,6 +59,15 @@ function PinParagraph({
   );
 }
 
+type PinCodeBlockProps = {
+  code: string;
+  language?: string;
+  onPinBlock?: (anchor: BlockAnchor) => void;
+  plan: AnchorPlan;
+  notedBlockIds: ReadonlySet<string>;
+  resolveImageSrc?: ImageSrcResolver;
+};
+
 function PinCodeBlock({
   code,
   language,
@@ -69,14 +75,7 @@ function PinCodeBlock({
   plan,
   notedBlockIds,
   resolveImageSrc,
-}: {
-  code: string;
-  language?: string;
-  onPinBlock?: (anchor: BlockAnchor) => void;
-  plan: AnchorPlan;
-  notedBlockIds: ReadonlySet<string>;
-  resolveImageSrc?: ImageSrcResolver;
-}) {
+}: PinCodeBlockProps) {
   const special = renderSpecialFence(language, code, { resolveImageSrc });
   if (special !== null) return special;
 

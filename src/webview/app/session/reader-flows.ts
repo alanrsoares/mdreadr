@@ -6,10 +6,12 @@ export type LoadNotesOutcome =
   | { kind: "loaded"; documentPath: string | null }
   | { kind: "cancelled" };
 
+export type SaveNotesFlowInput = { notes: Note[]; document?: DocumentRef };
+
 /** Pick a target path (cancel → cancelled), then persist Session Notes as a Notes file. */
 export async function saveNotesFlow(
   api: ReaderApi,
-  input: { notes: Note[]; document?: DocumentRef },
+  input: SaveNotesFlowInput,
 ): Promise<SaveNotesOutcome> {
   const path = await api.pickPath({ mode: "save", defaultPath: "notes.json" });
   if (!path) return { kind: "cancelled" };

@@ -29,14 +29,16 @@ export type DocumentSession = {
   close(): void;
 };
 
-export function createDocumentSession(deps: {
+export type CreateDocumentSessionDeps = {
   store: SessionStore;
   watch?: WatchFn;
   writeFile?: (
     path: string,
     content: string,
   ) => ResultAsync<void, { _tag: "WriteFailed"; message: string }>;
-}): DocumentSession {
+};
+
+export function createDocumentSession(deps: CreateDocumentSessionDeps): DocumentSession {
   const watchFn = deps.watch ?? watch;
   const writeFile = deps.writeFile ?? writeTextFile;
   const { store } = deps;

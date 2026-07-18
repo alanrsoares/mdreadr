@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { DocumentRef, Note, Suggestion } from "@mdreadr/domain";
-import { apiErrorMessage, type ReaderApi, unwrap } from "./reader-api.ts";
+import { apiErrorMessage, type LoadNotesResult, type ReaderApi, unwrap } from "./reader-api.ts";
 import { loadNotesFlow, saveNotesFlow } from "./reader-flows.ts";
 
 const sampleNote: Note = {
@@ -79,7 +79,7 @@ function createInMemoryReaderApi() {
     pushPick: (path: string | null) => pickQueue.push(path),
     getSaveNotesCallCount: () => saveNotesCallCount,
     getSavedInput: () => savedInput,
-    setLoadNotesResult: (result: { notes: Note[]; document?: DocumentRef | null }) => {
+    setLoadNotesResult: (result: LoadNotesResult) => {
       loadNotesResult = result;
     },
     getLastSaveDocumentCall: () => lastSaveDocumentCall,

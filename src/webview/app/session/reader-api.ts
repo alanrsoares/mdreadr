@@ -1,9 +1,10 @@
 import type {
-  BlockAnchor,
+  CreateNoteRequest,
   DocumentRef,
   Note,
-  NoteKind,
   NoteStatus,
+  PickFileInput,
+  SaveNotesInput,
   Suggestion,
 } from "@mdreadr/domain";
 import { api } from "../treaty.ts";
@@ -16,23 +17,23 @@ export type SessionSnapshot = {
   homeDirectory: string;
 };
 
+export type OpenDocumentResult = { path: string; content: string };
+export type LoadNotesResult = { notes: Note[]; document?: DocumentRef | null };
+export type ApiResult<T> = { data: T | null; error: unknown };
+
 export type ReaderApi = {
   getSession(): Promise<SessionSnapshot>;
   getRecents(): Promise<string[]>;
   getNotes(): Promise<Note[]>;
-  openDocument(path: string): Promise<{ path: string; content: string }>;
-  pickPath(input: {
-    mode: "open" | "save";
-    filters?: string[];
-    defaultPath?: string;
-  }): Promise<string | null>;
-  createNote(input: { anchor: BlockAnchor; body: string; kind?: NoteKind }): Promise<void>;
+  openDocument(path: string): Promise<OpenDocumentResult>;
+  pickPath(input: PickFileInput): Promise<string | null>;
+  createNote(input: CreateNoteRequest): Promise<void>;
   addReply(noteId: string, body: string): Promise<Note>;
   setNoteStatus(noteId: string, status: NoteStatus): Promise<Note>;
   getSuggestions(): Promise<Suggestion[]>;
   setSuggestionStatus(suggestionId: string, status: "accepted" | "rejected"): Promise<Suggestion>;
-  saveNotes(input: { path: string; notes: Note[]; document?: DocumentRef }): Promise<void>;
-  loadNotes(path: string): Promise<{ notes: Note[]; document?: DocumentRef | null }>;
+  saveNotes(input: SaveNotesInput): Promise<void>;
+  loadNotes(path: string): Promise<LoadNotesResult>;
   saveDocument(path: string, content: string): Promise<void>;
   log(message: string): void; // fire-and-forget diagnostics
 };
@@ -66,7 +67,7 @@ export function apiErrorMessage(error: unknown): string {
 }
 
 /** Unwrap an Eden Treaty `{ data, error }` result: throws a normalized Error on `error`. */
-export function unwrap<T>(res: { data: T | null; error: unknown }): T {
+export function unwrap<T>(res: ApiResult<T>): T {
   if (res.error) throw new Error(apiErrorMessage(res.error));
   return res.data as T;
 }

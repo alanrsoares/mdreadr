@@ -2,7 +2,19 @@
   "$schema": "https://biomejs.dev/schemas/2.5.3/schema.json",
   "plugins": [
     "./node_modules/@styled-cva/biome-plugin/rules/normalize-tw-classes.grit",
-    "./node_modules/@styled-cva/biome-plugin/rules/multiline-long-tw.grit"
+    "./node_modules/@styled-cva/biome-plugin/rules/multiline-long-tw.grit",
+    "./biome/plugins/no-promise-result.grit",
+    "./biome/plugins/no-inline-struct-type.grit"
+  ],
+  "overrides": [
+    {
+      "includes": ["**", "!**/*.test.ts", "!**/*.spec.ts", "!scripts/**"],
+      "plugins": [
+        "./biome/plugins/no-unsafe-json-parse-cast.grit",
+        "./biome/plugins/prefer-immutable-arrays.grit",
+        "./biome/plugins/prefer-immutable-objects.grit"
+      ]
+    }
   ],
   "vcs": {
     "enabled": true,

@@ -235,9 +235,11 @@ describe("MCP Server", () => {
       return JSON.parse(first.text);
     }
 
+    type SeqEvent = { seq: number };
+
     async function currentMaxSeq() {
       const { events } = await callTool("get_events", { sinceSeq: 0 });
-      return events.reduce((max: number, event: { seq: number }) => Math.max(max, event.seq), 0);
+      return events.reduce((max: number, event: SeqEvent) => Math.max(max, event.seq), 0);
     }
 
     it("wait_for_activity with no activity times out with empty events", async () => {

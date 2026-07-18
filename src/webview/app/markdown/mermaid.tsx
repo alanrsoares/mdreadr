@@ -17,7 +17,9 @@ function mermaidTheme(): "dark" | "neutral" {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "neutral";
 }
 
-export function MermaidChart({ chart }: { chart: string }) {
+type MermaidChartProps = { chart: string };
+
+export function MermaidChart({ chart }: MermaidChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const modalContainerRef = useRef<HTMLDivElement>(null);
 

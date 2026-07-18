@@ -127,3 +127,13 @@ export type Note = z.infer<typeof NoteSchema>;
 export type NotesFile = z.infer<typeof NotesFileSchema>;
 export type SuggestionStatus = z.infer<typeof SuggestionStatusSchema>;
 export type Suggestion = z.infer<typeof SuggestionSchema>;
+
+export type CreateNoteInput = z.input<typeof CreateNoteBodySchema>;
+export type AddReplyInput = z.infer<typeof AddReplyBodySchema>;
+export type SaveNotesInput = z.infer<typeof SaveNotesBodySchema>;
+export type SaveDocumentInput = z.infer<typeof SaveDocumentBodySchema>;
+export type PickFileInput = z.infer<typeof PickFileBodySchema>;
+export type CreateSuggestionInput = z.infer<typeof CreateSuggestionBodySchema>;
+
+/** Client-side note creation request; the server attaches `author`. */
+export type CreateNoteRequest = Omit<CreateNoteInput, "author">;

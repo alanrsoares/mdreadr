@@ -1,11 +1,14 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
 
 export type SessionTokens = {
   agentToken: string;
   webviewToken: string;
 };
+
+const persistedTokenSchema = z.object({ token: z.string().optional() });
 
 const configDir = join(homedir(), ".config", "mdreadr");
 const agentTokenPath = join(configDir, "agent-token.json");
@@ -20,7 +23,7 @@ async function persistNewAgentToken(): Promise<string> {
 async function loadOrCreateAgentToken(): Promise<string> {
   try {
     const raw = await readFile(agentTokenPath, "utf8");
-    const token = (JSON.parse(raw) as { token?: string }).token;
+    const token = persistedTokenSchema.parse(JSON.parse(raw)).token;
     if (token) return token;
   } catch {}
   return persistNewAgentToken();

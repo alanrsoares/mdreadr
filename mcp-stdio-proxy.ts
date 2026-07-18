@@ -3,9 +3,19 @@ import fs from "node:fs/promises";
 import { homedir } from "node:os";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
 
 export type McpConfig = { url: string; token?: string };
-export type JournalEntry = { seq: number; ts: string; type: string; entityId: string };
+
+const journalEntrySchema = z.object({
+  seq: z.number(),
+  ts: z.string(),
+  type: z.string(),
+  entityId: z.string(),
+});
+export type JournalEntry = z.infer<typeof journalEntrySchema>;
+
+const journalPayloadSchema = z.object({ events: z.array(journalEntrySchema).optional() });
 
 const DEFAULT_URL = "http://127.0.0.1:50932/mcp";
 
@@ -36,7 +46,7 @@ export async function loadPersistedMaxSeq(journalPath: string): Promise<number> 
     let max = 0;
     for (const line of raw.split("\n")) {
       if (!line.trim()) continue;
-      const entry = JSON.parse(line) as JournalEntry;
+      const entry = journalEntrySchema.parse(JSON.parse(line));
       if (entry.seq > max) max = entry.seq;
     }
     return max;
@@ -81,7 +91,7 @@ async function main() {
     const text = response.result?.content?.[0]?.text;
     if (!text) return;
     try {
-      const parsed = JSON.parse(text) as { events?: JournalEntry[] };
+      const parsed = journalPayloadSchema.parse(JSON.parse(text));
       const fresh = mergeNewJournalEntries(lastSeq, parsed.events ?? []);
       if (fresh.length > 0) {
         await appendJournalEntries(journalPath, fresh);

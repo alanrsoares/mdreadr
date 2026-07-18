@@ -41,13 +41,15 @@ import { readerPageContainer } from "./reader-page-container.ts";
 
 const readerApi = createTreatyReaderApi();
 
+type ReaderDocumentTopNavHeadingProps = {
+  documentPath?: string;
+  homeDirectory?: string;
+};
+
 function ReaderDocumentTopNavHeading({
   documentPath,
   homeDirectory,
-}: {
-  documentPath?: string;
-  homeDirectory?: string;
-}) {
+}: ReaderDocumentTopNavHeadingProps) {
   const anchorRef = useRef<HTMLDivElement>(null);
 
   if (!documentPath) {

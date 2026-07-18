@@ -2,7 +2,9 @@ import type { MarkdownInlinePlugin } from "@astryxdesign/core/Markdown";
 import katex from "katex";
 import { useEffect, useRef } from "react";
 
-export function MathBlock({ tex }: { tex: string }) {
+type MathProps = { tex: string };
+
+export function MathBlock({ tex }: MathProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -18,7 +20,7 @@ export function MathBlock({ tex }: { tex: string }) {
   return <div ref={containerRef} className="reader-math-block" />;
 }
 
-function InlineMath({ tex }: { tex: string }) {
+function InlineMath({ tex }: MathProps) {
   const containerRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {

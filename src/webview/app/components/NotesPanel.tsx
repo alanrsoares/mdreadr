@@ -2,7 +2,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { Selector } from "@astryxdesign/core/Selector";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
-import type { BlockAnchor, Note, NoteKind, NoteStatus } from "@mdreadr/domain";
+import type { BlockAnchor, CreateNoteRequest, Note, NoteStatus } from "@mdreadr/domain";
 import { formatAuthorLabel } from "@mdreadr/domain";
 import { useContainer, useStoreValues } from "@re-reduced/react";
 import { useEffect, useMemo, useRef } from "react";
@@ -30,7 +30,7 @@ type NotesPanelProps = {
   isSaving?: boolean;
   isLoadingNotes?: boolean;
   isCreatingNote?: boolean;
-  onCreateNote: (input: { anchor: BlockAnchor; body: string; kind?: NoteKind }) => Promise<void>;
+  onCreateNote: (input: CreateNoteRequest) => Promise<void>;
   onAddReply: (noteId: string, body: string) => Promise<void>;
   onUpdateStatus: (noteId: string, status: NoteStatus) => Promise<void>;
   onSaveNotes: () => Promise<void>;
@@ -176,6 +176,19 @@ export function NotesPanel({
   );
 }
 
+type NoteCardItemProps = {
+  note: Note;
+  enterDelayMs: number;
+  replyDraft: string;
+  isReplyOpen: boolean;
+  onToggleReply: () => void;
+  onReplyDraftChange: (value: string) => void;
+  onReplySubmitted: () => void;
+  onAddReply: (body: string) => Promise<void>;
+  onUpdateStatus: (status: NoteStatus) => Promise<void>;
+  onScrollToAnchor: () => void;
+};
+
 function NoteCardItem({
   note,
   enterDelayMs,
@@ -187,18 +200,7 @@ function NoteCardItem({
   onAddReply,
   onUpdateStatus,
   onScrollToAnchor,
-}: {
-  note: Note;
-  enterDelayMs: number;
-  replyDraft: string;
-  isReplyOpen: boolean;
-  onToggleReply: () => void;
-  onReplyDraftChange: (value: string) => void;
-  onReplySubmitted: () => void;
-  onAddReply: (body: string) => Promise<void>;
-  onUpdateStatus: (status: NoteStatus) => Promise<void>;
-  onScrollToAnchor: () => void;
-}) {
+}: NoteCardItemProps) {
   return (
     <NoteCard
       $status={note.status}
@@ -262,7 +264,9 @@ function NoteCardItem({
   );
 }
 
-function NoteAnchorLink({ anchor, onClick }: { anchor: BlockAnchor; onClick: () => void }) {
+type NoteAnchorLinkProps = { anchor: BlockAnchor; onClick: () => void };
+
+function NoteAnchorLink({ anchor, onClick }: NoteAnchorLinkProps) {
   const label = anchorDisplayLabel(anchor);
 
   return (

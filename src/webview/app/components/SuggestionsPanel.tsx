@@ -55,17 +55,14 @@ export function SuggestionsPanel({
   );
 }
 
-function SuggestionCard({
-  suggestion,
-  onAccept,
-  onReject,
-  onScrollToAnchor,
-}: {
+type SuggestionCardProps = {
   suggestion: Suggestion;
   onAccept: () => Promise<void>;
   onReject: () => Promise<void>;
   onScrollToAnchor: () => void;
-}) {
+};
+
+function SuggestionCard({ suggestion, onAccept, onReject, onScrollToAnchor }: SuggestionCardProps) {
   const label = anchorDisplayLabel(suggestion.anchor);
 
   return (
