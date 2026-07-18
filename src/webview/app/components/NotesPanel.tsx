@@ -4,7 +4,8 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import type { BlockAnchor, Note, NoteKind, NoteStatus } from "@mdreadr/domain";
 import { formatAuthorLabel } from "@mdreadr/domain";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContainer, useStoreValues } from "@re-reduced/react";
+import { useEffect, useMemo, useRef } from "react";
 import { anchorDisplayLabel } from "../markdown/anchors.ts";
 import {
   ButtonRow,
@@ -21,6 +22,7 @@ import {
   ReplyList,
   ReplyStack,
 } from "../ui/layout.tsx";
+import { notesPanelContainer } from "./notes-panel-container.ts";
 
 type NotesPanelProps = {
   notes: Note[];
@@ -66,10 +68,8 @@ export function NotesPanel({
   onLoadNotes,
   onScrollToAnchor,
 }: NotesPanelProps) {
-  const [draft, setDraft] = useState("");
-  const [draftKind, setDraftKind] = useState<NoteKind>("comment");
-  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
-  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
+  const store = useContainer(notesPanelContainer);
+  const { draft, draftKind, replyDrafts, expandedReplies, canSubmitNote } = useStoreValues(store);
   const composerRef = useRef<HTMLDivElement>(null);
 
   const sortedNotes = useMemo(
@@ -116,7 +116,7 @@ export function NotesPanel({
               value={draftKind}
               onChange={(value) => {
                 if (value === "comment" || value === "request") {
-                  setDraftKind(value);
+                  store.actions.draftKindChanged(value);
                 }
               }}
             />
@@ -125,7 +125,7 @@ export function NotesPanel({
               isLabelHidden
               hasAutoFocus
               value={draft}
-              onChange={setDraft}
+              onChange={store.actions.draftChanged}
               placeholder="Start a thread…"
               rows={4}
             />
@@ -133,7 +133,7 @@ export function NotesPanel({
               <Button
                 label="Add note"
                 variant="primary"
-                isDisabled={draft.trim().length === 0}
+                isDisabled={!canSubmitNote}
                 isLoading={isCreatingNote}
                 onClick={() => {
                   void onCreateNote({
@@ -141,8 +141,7 @@ export function NotesPanel({
                     body: draft.trim(),
                     kind: draftKind,
                   }).then(() => {
-                    setDraft("");
-                    setDraftKind("comment");
+                    store.actions.noteSubmitted();
                   });
                 }}
               />
@@ -163,12 +162,11 @@ export function NotesPanel({
           enterDelayMs={Math.min(index, 6) * 40}
           replyDraft={replyDrafts[note.id] ?? ""}
           isReplyOpen={expandedReplies[note.id] ?? false}
-          onToggleReply={() =>
-            setExpandedReplies((current) => ({ ...current, [note.id]: !current[note.id] }))
-          }
+          onToggleReply={() => store.actions.replyToggled(note.id)}
           onReplyDraftChange={(value) =>
-            setReplyDrafts((current) => ({ ...current, [note.id]: value }))
+            store.actions.replyDraftChanged({ noteId: note.id, value })
           }
+          onReplySubmitted={() => store.actions.replySubmitted(note.id)}
           onAddReply={(body) => onAddReply(note.id, body)}
           onUpdateStatus={(status) => onUpdateStatus(note.id, status)}
           onScrollToAnchor={() => onScrollToAnchor(note.anchor.blockId)}
@@ -185,6 +183,7 @@ function NoteCardItem({
   isReplyOpen,
   onToggleReply,
   onReplyDraftChange,
+  onReplySubmitted,
   onAddReply,
   onUpdateStatus,
   onScrollToAnchor,
@@ -195,6 +194,7 @@ function NoteCardItem({
   isReplyOpen: boolean;
   onToggleReply: () => void;
   onReplyDraftChange: (value: string) => void;
+  onReplySubmitted: () => void;
   onAddReply: (body: string) => Promise<void>;
   onUpdateStatus: (status: NoteStatus) => Promise<void>;
   onScrollToAnchor: () => void;
@@ -249,7 +249,7 @@ function NoteCardItem({
             variant="secondary"
             isDisabled={replyDraft.trim().length === 0}
             onClick={() => {
-              void onAddReply(replyDraft.trim()).then(() => onReplyDraftChange(""));
+              void onAddReply(replyDraft.trim()).then(onReplySubmitted);
             }}
           />
         </ReplyStack>

@@ -32,7 +32,7 @@ import {
   UpdateNoteStatusBodySchema,
   UpdateSuggestionStatusBodySchema,
 } from "../domain/schemas/index.ts";
-import { isAgentAuthorized, isWebviewAuthorized, sessionTokens } from "./auth.ts";
+import { isAgentAuthorized, isWebviewAuthorized, revokeAgentToken, sessionTokens } from "./auth.ts";
 import { documentSession } from "./document-session.ts";
 import {
   pickNativePath,
@@ -406,6 +406,26 @@ export const app = new Elysia()
     },
     { body: PickFileBodySchema },
   )
+  .get("/mcp/connection", ({ request, set }) => {
+    if (!isWebviewRequest(request)) {
+      set.status = 401;
+      return unauthorized;
+    }
+    return {
+      url: `${new URL(request.url).origin}/mcp`,
+      token: sessionTokens.agentToken,
+    };
+  })
+  .post("/mcp/connection/revoke", async ({ request, set }) => {
+    if (!isWebviewRequest(request)) {
+      set.status = 401;
+      return unauthorized;
+    }
+    const origin = new URL(request.url).origin;
+    const token = await revokeAgentToken();
+    await writeMcpConfigFile(origin);
+    return { url: `${origin}/mcp`, token };
+  })
   .all("/mcp", async ({ request }) => {
     if (!isAgentRequest(request)) {
       return new Response(JSON.stringify(unauthorized), {
@@ -430,42 +450,52 @@ export type App = typeof app;
 export { documentSession } from "./document-session.ts";
 export { sessionStore } from "./session.ts";
 
-export function startServer(port = 0): {
+// Stable so MCP client configs (URL + persisted agent token, see auth.ts)
+// keep working across restarts without the user having to reconfigure them.
+// Falls back to a random port if something else is already bound to it.
+const DEFAULT_PORT = Number(process.env.MDREADR_PORT) || 47813;
+
+async function writeMcpConfigFile(origin: string): Promise<void> {
+  try {
+    const configDir = join(homedir(), ".config", "mdreadr");
+    await mkdir(configDir, { recursive: true });
+    await writeFile(
+      join(configDir, "mcp.json"),
+      JSON.stringify(
+        {
+          mcpServers: {
+            mdreadr: { url: `${origin}/mcp`, token: sessionTokens.agentToken },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+  } catch (e) {
+    console.error("Failed to write mcp.json", e);
+  }
+}
+
+export function startServer(port = DEFAULT_PORT): {
   port: number;
   url: string;
   webviewToken: string;
 } {
-  const listener = app.listen({
-    hostname: "127.0.0.1",
-    port,
-  });
+  let listener: ReturnType<typeof app.listen>;
+  try {
+    listener = app.listen({ hostname: "127.0.0.1", port });
+  } catch (e) {
+    if (port === 0) throw e;
+    console.error(`Port ${port} unavailable, falling back to a random port`, e);
+    listener = app.listen({ hostname: "127.0.0.1", port: 0 });
+  }
 
   const address = listener.server?.port ?? port;
   const url = `http://127.0.0.1:${address}`;
 
-  // Write MCP discovery config, including the per-launch agent token every
-  // MCP-facing route (/mcp, /mcp/message) requires. The webview token is
-  // deliberately never written to disk — see packages/api/auth.ts.
-  (async () => {
-    try {
-      const configDir = join(homedir(), ".config", "mdreadr");
-      await mkdir(configDir, { recursive: true });
-      await writeFile(
-        join(configDir, "mcp.json"),
-        JSON.stringify(
-          {
-            mcpServers: {
-              mdreadr: { url: `${url}/mcp`, token: sessionTokens.agentToken },
-            },
-          },
-          null,
-          2,
-        ),
-      );
-    } catch (e) {
-      console.error("Failed to write mcp.json", e);
-    }
-  })();
+  // Write MCP discovery config for the stdio proxy / external tooling.
+  // The webview token is deliberately never written to disk — see auth.ts.
+  void writeMcpConfigFile(url);
 
   return {
     port: address,

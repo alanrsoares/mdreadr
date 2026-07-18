@@ -8,13 +8,15 @@ import { ResizeHandle, useResizable } from "@astryxdesign/core/Resizable";
 import { Stack } from "@astryxdesign/core/Stack";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
-import type { BlockAnchor, Suggestion } from "@mdreadr/domain";
+import type { Suggestion } from "@mdreadr/domain";
 import { applySuggestion, extractHeadings } from "@mdreadr/domain";
+import { useContainer, useStoreValues } from "@re-reduced/react";
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppLogo } from "../components/AppLogo.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
-import { DocumentView, type DocumentViewMode } from "../components/DocumentView.tsx";
+import { DocumentView } from "../components/DocumentView.tsx";
+import { McpSettingsDialog } from "../components/McpSettingsDialog.tsx";
 import { NotesPanel } from "../components/NotesPanel.tsx";
 import { formatDisplayPath, pathFileName } from "../components/path-display.ts";
 import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
@@ -22,16 +24,9 @@ import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
 import { SuggestionsPanel } from "../components/SuggestionsPanel.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
-import { ArrowDownTrayIcon, ViewColumnsIcon } from "../icons.ts";
+import { ArrowDownTrayIcon, Cog6ToothIcon, ViewColumnsIcon } from "../icons.ts";
 import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
-import {
-  type DraftState,
-  discardDraft,
-  draftSaved,
-  editDraft,
-  emptyDraft,
-  isDirty,
-} from "../session/document-draft.ts";
+import { isDirty } from "../session/document-draft.ts";
 import { createTreatyReaderApi } from "../session/reader-api.ts";
 import { useReaderSession } from "../session/useReaderSession.ts";
 import {
@@ -42,6 +37,7 @@ import {
   ReaderNotesAside,
   ReaderPanel,
 } from "../ui/layout.tsx";
+import { readerPageContainer } from "./reader-page-container.ts";
 
 const readerApi = createTreatyReaderApi();
 
@@ -86,40 +82,38 @@ export function ReaderPage() {
     collapsible: true,
     autoSaveId: "mdreadr-notes-sidebar",
   });
-  const [pendingAnchor, setPendingAnchor] = useState<BlockAnchor | null>(null);
-  const [documentViewMode, setDocumentViewMode] = useState<DocumentViewMode>("preview");
-  const [liveMessage, setLiveMessage] = useState("");
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [draft, setDraft] = useState<DraftState>(emptyDraft);
-  const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false);
+  const store = useContainer(readerPageContainer);
+  const { pendingAnchor, documentViewMode, liveMessage, isDragOver, draft, isDiscardDialogOpen } =
+    useStoreValues(store);
   const readerMainRef = useRef<HTMLElement>(null);
   const dragDepthRef = useRef(0);
   const pendingActionRef = useRef<(() => void) | null>(null);
+  const [isMcpSettingsOpen, setIsMcpSettingsOpen] = useState(false);
 
   const reader = useReaderSession(readerApi, {
     onOpened: (path) => {
-      setPendingAnchor(null);
-      setLiveMessage(`Opened ${pathFileName(path)}`);
+      store.actions.pendingAnchorChanged(null);
+      store.actions.liveMessageChanged(`Opened ${pathFileName(path)}`);
     },
     onNoteCreated: () => {
-      setPendingAnchor(null);
-      setLiveMessage("Note added");
+      store.actions.pendingAnchorChanged(null);
+      store.actions.liveMessageChanged("Note added");
     },
     onReplyAdded: () => {
-      setLiveMessage("Reply added");
+      store.actions.liveMessageChanged("Reply added");
     },
     onStatusChanged: (status) => {
-      setLiveMessage(`Note marked ${status ?? "updated"}`);
+      store.actions.liveMessageChanged(`Note marked ${status ?? "updated"}`);
     },
     onNotesSaved: () => {
-      setLiveMessage("Notes saved");
+      store.actions.liveMessageChanged("Notes saved");
     },
     onNotesLoaded: () => {
-      setLiveMessage("Notes loaded");
+      store.actions.liveMessageChanged("Notes loaded");
     },
     onDocumentSaved: () => {
-      setDraft(draftSaved);
-      setLiveMessage("Document saved");
+      store.actions.draftMarkedSaved();
+      store.actions.liveMessageChanged("Document saved");
     },
   });
 
@@ -132,12 +126,12 @@ export function ReaderPage() {
     (action: () => void) => {
       if (dirty) {
         pendingActionRef.current = action;
-        setIsDiscardDialogOpen(true);
+        store.actions.discardDialogOpenChanged(true);
         return;
       }
       action();
     },
-    [dirty],
+    [dirty, store],
   );
 
   const requestOpen = useCallback(
@@ -150,9 +144,9 @@ export function ReaderPage() {
   const onEditorChange = useCallback(
     (text: string) => {
       if (!documentPath) return;
-      setDraft(editDraft(documentPath, text, content));
+      store.actions.draftEdited({ path: documentPath, text, savedContent: content });
     },
-    [documentPath, content],
+    [documentPath, content, store],
   );
 
   const saveDraft = useCallback(async () => {
@@ -164,7 +158,7 @@ export function ReaderPage() {
     (event: React.DragEvent) => {
       event.preventDefault();
       dragDepthRef.current = 0;
-      setIsDragOver(false);
+      store.actions.dragOverChanged(false);
 
       const file = event.dataTransfer.files.item(0);
       if (!file) return;
@@ -182,24 +176,30 @@ export function ReaderPage() {
         );
       }
     },
-    [requestOpen, showError],
+    [requestOpen, showError, store],
   );
 
-  const onDragEnter = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    if (!event.dataTransfer.types.includes("Files")) return;
-    dragDepthRef.current += 1;
-    setIsDragOver(true);
-  }, []);
+  const onDragEnter = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      if (!event.dataTransfer.types.includes("Files")) return;
+      dragDepthRef.current += 1;
+      store.actions.dragOverChanged(true);
+    },
+    [store],
+  );
 
-  const onDragLeave = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    if (!event.dataTransfer.types.includes("Files")) return;
-    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-    if (dragDepthRef.current === 0) {
-      setIsDragOver(false);
-    }
-  }, []);
+  const onDragLeave = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      if (!event.dataTransfer.types.includes("Files")) return;
+      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+      if (dragDepthRef.current === 0) {
+        store.actions.dragOverChanged(false);
+      }
+    },
+    [store],
+  );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -282,7 +282,7 @@ export function ReaderPage() {
       };
 
       if (documentViewMode !== "preview") {
-        setDocumentViewMode("preview");
+        store.actions.documentViewModeChanged("preview");
         window.requestAnimationFrame(() => {
           window.requestAnimationFrame(jump);
         });
@@ -291,7 +291,7 @@ export function ReaderPage() {
 
       jump();
     },
-    [documentViewMode, showError],
+    [documentViewMode, showError, store],
   );
 
   const onAcceptSuggestion = useCallback(
@@ -302,10 +302,10 @@ export function ReaderPage() {
         showError("Accept suggestion", "Could not locate that text in the document anymore.");
         return;
       }
-      setDraft(editDraft(documentPath, spliced, content));
+      store.actions.draftEdited({ path: documentPath, text: spliced, savedContent: content });
       await reader.setSuggestionStatus(suggestion.id, "accepted");
     },
-    [documentPath, editorValue, content, reader, showError],
+    [documentPath, editorValue, content, reader, showError, store],
   );
 
   const onRejectSuggestion = useCallback(
@@ -330,6 +330,13 @@ export function ReaderPage() {
           endContent={
             <HStack gap={2} vAlign="center">
               <ColorSchemeToggle />
+              <IconButton
+                label="MCP settings"
+                tooltip="MCP settings"
+                variant="ghost"
+                icon={<Icon icon={Cog6ToothIcon} size="sm" />}
+                onClick={() => setIsMcpSettingsOpen(true)}
+              />
               <IconButton
                 label={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
                 tooltip={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
@@ -402,11 +409,13 @@ export function ReaderPage() {
                 documentPath={documentPath}
                 notes={notes}
                 viewMode={documentViewMode}
-                onViewModeChange={setDocumentViewMode}
+                onViewModeChange={store.actions.documentViewModeChanged}
                 onPinBlock={(anchor) => {
-                  setPendingAnchor(anchor);
+                  store.actions.pendingAnchorChanged(anchor);
                   flashAnchor(anchor.blockId, "reader-block-pin-flash");
-                  setLiveMessage(`Pinning note to ${anchor.label ?? anchor.kind}`);
+                  store.actions.liveMessageChanged(
+                    `Pinning note to ${anchor.label ?? anchor.kind}`,
+                  );
                 }}
                 editorValue={editorValue}
                 onEditorChange={onEditorChange}
@@ -483,7 +492,7 @@ export function ReaderPage() {
       <AlertDialog
         isOpen={isDiscardDialogOpen}
         onOpenChange={(open) => {
-          setIsDiscardDialogOpen(open);
+          store.actions.discardDialogOpenChanged(open);
           if (!open) {
             pendingActionRef.current = null;
           }
@@ -493,13 +502,15 @@ export function ReaderPage() {
         cancelLabel="Keep editing"
         actionLabel="Discard"
         onAction={() => {
-          setDraft(discardDraft);
-          setIsDiscardDialogOpen(false);
+          store.actions.draftDiscarded();
+          store.actions.discardDialogOpenChanged(false);
           const pending = pendingActionRef.current;
           pendingActionRef.current = null;
           pending?.();
         }}
       />
+
+      <McpSettingsDialog isOpen={isMcpSettingsOpen} onOpenChange={setIsMcpSettingsOpen} />
     </AppShell>
   );
 }

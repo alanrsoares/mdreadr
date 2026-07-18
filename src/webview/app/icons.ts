@@ -1,12 +1,17 @@
 export {
   ArrowDownTrayIcon,
+  ArrowPathIcon,
   CodeBracketIcon,
+  Cog6ToothIcon,
+  CommandLineIcon,
   ComputerDesktopIcon,
   DocumentTextIcon,
   EyeIcon,
+  KeyIcon,
   MapPinIcon,
   MoonIcon,
   PencilSquareIcon,
+  ShieldCheckIcon,
   SunIcon,
   ViewColumnsIcon,
 } from "@heroicons/react/24/outline";

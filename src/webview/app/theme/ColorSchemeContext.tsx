@@ -1,43 +1,34 @@
 import { Theme } from "@astryxdesign/core/theme";
-import { createContext, type ReactNode, useContext, useState } from "react";
+import { createContainerContext, useWatch } from "@re-reduced/react";
+import type { ReactNode } from "react";
+import { colorSchemeContainer, persistColorScheme } from "./color-scheme-container.ts";
 import { mdreadrTheme } from "./mdreadr.js";
 
-export type ColorScheme = "light" | "dark" | "system";
+export type { ColorScheme } from "./color-scheme-container.ts";
 
-interface ColorSchemeContextType {
-  colorScheme: ColorScheme;
-  setColorScheme: (scheme: ColorScheme) => void;
-}
-
-const ColorSchemeContext = createContext<ColorSchemeContextType | undefined>(undefined);
+const ColorSchemeStore = createContainerContext(colorSchemeContainer);
 
 export function ColorSchemeProvider({ children }: { children: ReactNode }) {
-  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(() => {
-    const saved = localStorage.getItem("mdreadr-color-scheme");
-    if (saved === "light" || saved === "dark" || saved === "system") {
-      return saved;
-    }
-    return "system";
-  });
+  return (
+    <ColorSchemeStore.Provider>
+      <ColorSchemeThemed>{children}</ColorSchemeThemed>
+    </ColorSchemeStore.Provider>
+  );
+}
 
-  const setColorScheme = (scheme: ColorScheme) => {
-    setColorSchemeState(scheme);
-    localStorage.setItem("mdreadr-color-scheme", scheme);
-  };
+function ColorSchemeThemed({ children }: { children: ReactNode }) {
+  const store = ColorSchemeStore.use();
+  const colorScheme = ColorSchemeStore.useSelect((s) => s.colorScheme.value);
+  useWatch(store, (s) => s.colorScheme.value, persistColorScheme);
 
   return (
-    <ColorSchemeContext.Provider value={{ colorScheme, setColorScheme }}>
-      <Theme theme={mdreadrTheme} mode={colorScheme}>
-        {children}
-      </Theme>
-    </ColorSchemeContext.Provider>
+    <Theme theme={mdreadrTheme} mode={colorScheme}>
+      {children}
+    </Theme>
   );
 }
 
 export function useColorScheme() {
-  const context = useContext(ColorSchemeContext);
-  if (!context) {
-    throw new Error("useColorScheme must be used within a ColorSchemeProvider");
-  }
-  return context;
+  const { colorScheme, colorSchemeChanged } = ColorSchemeStore.useContainer();
+  return { colorScheme, setColorScheme: colorSchemeChanged };
 }

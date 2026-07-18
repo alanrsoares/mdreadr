@@ -15,6 +15,7 @@
         "@onrails/maybe": "^0.2.3",
         "@onrails/pattern": "^0.3.2",
         "@onrails/result": "^0.4.0",
+        "@re-reduced/react": "0.3.1",
         "@styled-cva/react": "^0.7.1",
         "@tailwindcss/vite": "^4.3.2",
         "@tanstack/react-query": "^5.101.2",
@@ -254,6 +255,14 @@
     "@onrails/result": ["@onrails/result@0.4.0", "", {}, "sha512-DFdaC5pyLa8WRGg6dF8W3RbckVB2SmSpNTXtCbuFj2FqkcmWpIzJJvAfvrRcpXwVDhpxstxKkAipTRmaBoJHLQ=="],
 
     "@oxc-project/types": ["@oxc-project/types@0.139.0", "", {}, "sha512-r9gHphtCs+1M7J0pw6Sn/hh/Wpa/iQrOOkrNAlVLF/gHq+/CJmHIWKKUUhdWjcD6CIa8idarspCsASiXCXvFUw=="],
+
+    "@preact/signals-core": ["@preact/signals-core@1.14.4", "", {}, "sha512-HNB6HYeYKhQbJ1aKl+YRjrS4+QWHLKX6qKoUsfS/m0vqzsVaEBiZiaKbG/e+NKk2ch5ALQr/ihWaMHxiCuuWHA=="],
+
+    "@re-reduced/core": ["@re-reduced/core@0.3.2", "", { "dependencies": { "@re-reduced/signals": "^0.2.0" }, "peerDependencies": { "typescript": ">=6" } }, "sha512-zCW69z4jXhTdcCjhr6xFFOiPfUCKyURC/Aqmi54yBor/wQZLWFxO/t5UeOniKo2EMac7jhbk1xUrNK7UdIX0dQ=="],
+
+    "@re-reduced/react": ["@re-reduced/react@0.3.1", "", { "dependencies": { "@re-reduced/core": "^0.3.2" }, "peerDependencies": { "react": ">=18", "typescript": ">=6" } }, "sha512-4njwQFzafDNtmlk2wmQpoLH7oDPCwBUtTz36NSncDa8AmkpftezJQj9qKe3tPrbezqVtRFC1uc/5heEHFjxITQ=="],
+
+    "@re-reduced/signals": ["@re-reduced/signals@0.2.0", "", { "dependencies": { "@preact/signals-core": "^1.14.3" }, "peerDependencies": { "typescript": ">=6" } }, "sha512-6OPNF2xFk0KEFuH7MkqfnEbH38P3R7LSdVaI+GiNMbHrCGdGM9PHufFdt5KUt0nPIMj6PBuWfpx4Khz+u8BXyQ=="],
 
     "@resvg/resvg-js": ["@resvg/resvg-js@2.6.2", "", { "optionalDependencies": { "@resvg/resvg-js-android-arm-eabi": "2.6.2", "@resvg/resvg-js-android-arm64": "2.6.2", "@resvg/resvg-js-darwin-arm64": "2.6.2", "@resvg/resvg-js-darwin-x64": "2.6.2", "@resvg/resvg-js-linux-arm-gnueabihf": "2.6.2", "@resvg/resvg-js-linux-arm64-gnu": "2.6.2", "@resvg/resvg-js-linux-arm64-musl": "2.6.2", "@resvg/resvg-js-linux-x64-gnu": "2.6.2", "@resvg/resvg-js-linux-x64-musl": "2.6.2", "@resvg/resvg-js-win32-arm64-msvc": "2.6.2", "@resvg/resvg-js-win32-ia32-msvc": "2.6.2", "@resvg/resvg-js-win32-x64-msvc": "2.6.2" } }, "sha512-xBaJish5OeGmniDj9cW5PRa/PtmuVU3ziqrbr5xJj901ZDN4TosrVaNZpEiLZAxdfnhAe7uQ7QFWfjPe9d9K2Q=="],
 

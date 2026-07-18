@@ -8,22 +8,14 @@ import {
   useSideNavCollapse,
 } from "@astryxdesign/core/SideNav";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContainer, useStoreValues, useWatch } from "@re-reduced/react";
+import { useMemo, useRef } from "react";
 import { DocumentTextIcon } from "../icons.ts";
 import { formatDisplayPath, formatRecentMenuLabels, pathFileName } from "./path-display.ts";
-
-const RECENTS_SIDEBAR_COLLAPSED_KEY = "mdreadr-recents-sidebar-collapsed";
-
-function readCollapsedPreference(): boolean {
-  try {
-    const stored = localStorage.getItem(RECENTS_SIDEBAR_COLLAPSED_KEY);
-    if (stored === "true") return true;
-    if (stored === "false") return false;
-  } catch {
-    // ignore storage errors
-  }
-  return true;
-}
+import {
+  persistCollapsedPreference,
+  recentsSidebarContainer,
+} from "./recents-sidebar-container.ts";
 
 type RecentsSidebarOpenActionProps = {
   onPickDocument: () => void;
@@ -98,26 +90,20 @@ export function RecentsSidebar({
   onPickDocument,
   isOpening = false,
 }: RecentsSidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(readCollapsedPreference);
+  const store = useContainer(recentsSidebarContainer);
+  const { isCollapsed } = useStoreValues(store);
+  useWatch(store, (s) => s.isCollapsed.value, persistCollapsedPreference);
   const menuLabels = useMemo(() => formatRecentMenuLabels(paths), [paths]);
   const displayPaths = useMemo(
     () => new Map(paths.map((path) => [path, formatDisplayPath(path, homeDirectory)])),
     [paths, homeDirectory],
   );
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(RECENTS_SIDEBAR_COLLAPSED_KEY, String(isCollapsed));
-    } catch {
-      // ignore storage errors
-    }
-  }, [isCollapsed]);
-
   return (
     <SideNav
       collapsible={{
         isCollapsed,
-        onCollapsedChange: setIsCollapsed,
+        onCollapsedChange: store.actions.collapsedChanged,
       }}
       resizable={{
         autoSaveId: "mdreadr-recents-sidebar",

@@ -151,7 +151,7 @@ async function openArgvDocument(): Promise<void> {
   }
 }
 
-const { url: apiBase, webviewToken } = startServer(0);
+const { url: apiBase, webviewToken } = startServer();
 console.log(`mdreadr API listening on ${apiBase}`);
 
 // If we have a pending open-url from startup, handle it before creating the window
@@ -204,7 +204,7 @@ mainWindow.on("close", () => {
 
 mainWindow.webview.on("dom-ready", () => {
   console.log("mdreadr webview ready");
-  if (viewUrl.startsWith("http://localhost")) {
+  if (process.env.MDREADR_DEVTOOLS === "1") {
     mainWindow.webview.openDevTools();
   }
 });
