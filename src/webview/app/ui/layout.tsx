@@ -1,17 +1,19 @@
 import tw from "@styled-cva/react";
 
-export const ReaderLayout = tw.section`grid h-full grid-cols-[200px_minmax(0,1fr)_280px] overflow-hidden`;
+export const ReaderLayout = tw.section(
+  "grid h-full grid-cols-[minmax(0,200px)_minmax(0,1fr)_minmax(0,280px)] overflow-hidden",
+);
 
 export const ReaderPanel = tw.aside(
-  "overflow-auto border-[var(--color-border)] border-r bg-[var(--color-background-surface)]",
+  "min-w-0 overflow-auto border-[var(--color-border)] border-r bg-[var(--color-background-surface)]",
 );
 
 export const ReaderMain = tw.main(
-  "relative overflow-auto border-[var(--color-border)] border-r bg-[var(--reader-well-bg)]",
+  "relative min-w-0 overflow-auto border-[var(--color-border)] border-r bg-[var(--reader-well-bg)]",
 );
 
 export const ReaderNotesAside = tw.aside(
-  "overflow-auto border-[var(--color-border)] border-l bg-[var(--color-background-surface)] transition-[box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] data-[pending=true]:shadow-[inset_3px_0_0_0_var(--color-text-accent)]",
+  "min-w-0 overflow-auto border-[var(--color-border)] border-l bg-[var(--color-background-surface)] transition-[box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] data-[pending=true]:shadow-[inset_3px_0_0_0_var(--color-text-accent)]",
 );
 
 export const ReaderContent = tw.div`mx-auto w-full max-w-[820px]`;
