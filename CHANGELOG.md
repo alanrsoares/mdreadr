@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.0](https://github.com/alanrsoares/mdreadr/compare/v0.2.1...v0.3.0) (2026-07-19)
+
+
+### Features
+
+* improved mcp tooling + linux installer ([16f7f94](https://github.com/alanrsoares/mdreadr/commit/16f7f941fdb666aae5ea0b43e10872eb4a3285f3))
+* linux installer ([6ccbdee](https://github.com/alanrsoares/mdreadr/commit/6ccbdeed4e4eef003b38cb3def1022acefc67eb0))
+* **mcp:** show connected MCP clients in the app ([8c1ec04](https://github.com/alanrsoares/mdreadr/commit/8c1ec04ba6d61bc4930b9a4b64dd84192fd19871))
+* **mcp:** show connected MCP clients in the app ([957d8e2](https://github.com/alanrsoares/mdreadr/commit/957d8e21f2c580ae332e12df810a753bbeb415b9))
+
 ## [0.2.1](https://github.com/alanrsoares/mdreadr/compare/v0.2.0...v0.2.1) (2026-07-19)
 
 
