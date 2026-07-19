@@ -13,6 +13,7 @@ import { VStack } from "@astryxdesign/core/VStack";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowPathIcon, CodeBracketIcon, CommandLineIcon, ShieldCheckIcon } from "../icons.ts";
 import { unwrap } from "../session/reader-api.ts";
+import { useMcpClients } from "../session/useMcpClients.ts";
 import { api } from "../treaty.ts";
 
 type McpSettingsDialogProps = {
@@ -49,6 +50,9 @@ export function McpSettingsDialog({ isOpen, onOpenChange }: McpSettingsDialogPro
     },
     enabled: isOpen,
   });
+
+  const clients = useMcpClients();
+  const connectedCount = clients.data?.count ?? 0;
 
   const revoke = useMutation({
     mutationFn: async () => {
@@ -107,6 +111,44 @@ export function McpSettingsDialog({ isOpen, onOpenChange }: McpSettingsDialogPro
                 icon={<Icon icon={ShieldCheckIcon} size="xsm" />}
               />
             </HStack>
+          </Section>
+
+          <Section padding={5} dividers={["bottom"]}>
+            <VStack gap={3}>
+              <HStack gap={2} vAlign="center" hAlign="between">
+                <HStack gap={2} vAlign="center">
+                  <StatusDot
+                    variant={connectedCount > 0 ? "success" : "neutral"}
+                    label={connectedCount > 0 ? "Clients connected" : "No clients connected"}
+                    isPulsing={connectedCount > 0}
+                  />
+                  <Text type="label">Connected clients</Text>
+                </HStack>
+                <Badge
+                  variant={connectedCount > 0 ? "success" : "neutral"}
+                  label={String(connectedCount)}
+                />
+              </HStack>
+              {connectedCount === 0 ? (
+                <Text type="body" color="secondary">
+                  No MCP clients are connected right now.
+                </Text>
+              ) : (
+                <VStack gap={2}>
+                  {clients.data?.clients.map((client) => (
+                    <HStack key={client.id} gap={2} vAlign="center" hAlign="between">
+                      <Text type="body" weight="medium">
+                        {client.name ?? "Unknown client"}
+                        {client.version ? ` v${client.version}` : ""}
+                      </Text>
+                      <Text type="supporting" color="secondary">
+                        since {new Date(client.connectedAt).toLocaleTimeString()}
+                      </Text>
+                    </HStack>
+                  ))}
+                </VStack>
+              )}
+            </VStack>
           </Section>
 
           <Section padding={5} dividers={["bottom"]}>

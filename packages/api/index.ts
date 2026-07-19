@@ -41,7 +41,12 @@ import {
   toDocumentHttpError,
   writeTextFile,
 } from "./documents.ts";
-import { DEFAULT_WAIT_TIMEOUT_MS, handleMcpRequest, MAX_WAIT_TIMEOUT_MS } from "./mcp.ts";
+import {
+  DEFAULT_WAIT_TIMEOUT_MS,
+  getConnectedClients,
+  handleMcpRequest,
+  MAX_WAIT_TIMEOUT_MS,
+} from "./mcp.ts";
 import { readRecents, toRecentsHttpError } from "./recents.ts";
 import { sessionStore } from "./session.ts";
 
@@ -441,6 +446,14 @@ export const app = new Elysia()
       url: `${new URL(request.url).origin}/mcp`,
       token: sessionTokens.agentToken,
     };
+  })
+  .get("/mcp/clients", ({ request, set }) => {
+    if (!isWebviewRequest(request)) {
+      set.status = 401;
+      return unauthorized;
+    }
+    const clients = getConnectedClients();
+    return { clients, count: clients.length };
   })
   .post("/mcp/connection/revoke", async ({ request, set }) => {
     if (!isWebviewRequest(request)) {
