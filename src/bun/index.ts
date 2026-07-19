@@ -4,6 +4,7 @@ import { ApplicationMenu, app, BrowserWindow } from "electrobun/bun";
 import { toDocumentHttpError } from "../../packages/api/documents.ts";
 import { documentSession, startServer } from "../../packages/api/index.ts";
 import { APP_NAME } from "../../shared/constants.ts";
+import { installCliCommand } from "./installCli.ts";
 
 let activeApiBase: string | null = null;
 let activeMainWindow: BrowserWindow | null = null;
@@ -118,10 +119,19 @@ function buildApplicationMenu(): void {
     return;
   }
 
+  ApplicationMenu.on("application-menu-clicked", (event) => {
+    const action = (event as { data?: { action?: string } })?.data?.action;
+    if (action === "install-cli") {
+      installCliCommand();
+    }
+  });
+
   ApplicationMenu.setApplicationMenu([
     {
       submenu: [
         { label: `About ${APP_NAME}`, role: "about" },
+        { type: "separator" },
+        { label: `Install '${APP_NAME}' Command in PATH`, action: "install-cli" },
         { type: "separator" },
         { label: "Quit", role: "quit", accelerator: "q" },
       ],
