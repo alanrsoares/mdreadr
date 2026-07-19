@@ -76,9 +76,7 @@ function buildRecentPathDisplays(paths: readonly string[]): Map<string, RecentPa
 }
 
 /** Last path segment; tolerant of `/` and `\`. */
-export function pathFileName(path: string): string {
-  return splitPath(path).at(-1) ?? path;
-}
+export const pathFileName = (path: string): string => splitPath(path).at(-1) ?? path;
 
 /** Normalize separators and drop a trailing slash. */
 const normalizeDirectory = (path: string): string => path.replace(/\\/g, "/").replace(/\/$/, "");

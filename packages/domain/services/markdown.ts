@@ -46,9 +46,8 @@ export function hashBlockContent(text: string): string {
   return (hash >>> 0).toString(36);
 }
 
-export function blockIdForParagraph(text: string, occurrence: number): string {
-  return `paragraph-${hashBlockContent(text)}-${occurrence}`;
-}
+export const blockIdForParagraph = (text: string, occurrence: number): string =>
+  `paragraph-${hashBlockContent(text)}-${occurrence}`;
 
 export function blockIdForCode(
   code: string,
@@ -61,6 +60,5 @@ export function blockIdForCode(
 
 export function truncateAnchorLabel(text: string, maxLength = 72): string {
   const singleLine = text.replace(/\s+/g, " ").trim();
-  if (singleLine.length <= maxLength) return singleLine;
-  return `${singleLine.slice(0, maxLength - 1)}…`;
+  return singleLine.length <= maxLength ? singleLine : `${singleLine.slice(0, maxLength - 1)}…`;
 }

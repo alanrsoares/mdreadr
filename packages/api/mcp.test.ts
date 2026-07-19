@@ -38,9 +38,33 @@ describe("MCP Server", () => {
     expect(response.headers.get("content-type")).toContain("text/event-stream");
   });
 
+  it("handles initialization when client sends Accept: application/json without text/event-stream", async () => {
+    const response = await app.handle(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${sessionTokens.agentToken}`,
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2024-11-05",
+            capabilities: {},
+            clientInfo: { name: "test", version: "1.0.0" },
+          },
+        }),
+      }),
+    );
+    expect(response.status).toBe(200);
+  });
+
   it("gives concurrent initialize calls independent, non-clobbered sessions", async () => {
-    function initialize(id: number) {
-      return app.handle(
+    const initialize = (id: number) =>
+      app.handle(
         new Request("http://localhost/mcp", {
           method: "POST",
           headers: {
@@ -60,7 +84,6 @@ describe("MCP Server", () => {
           }),
         }),
       );
-    }
 
     const [responseA, responseB] = await Promise.all([initialize(1), initialize(2)]);
     expect(responseA.status).toBe(200);
@@ -71,8 +94,8 @@ describe("MCP Server", () => {
     expect(sessionIdB).toBeTruthy();
     expect(sessionIdA).not.toBe(sessionIdB);
 
-    function listTools(sessionId: string) {
-      return app.handle(
+    const listTools = (sessionId: string) =>
+      app.handle(
         new Request("http://localhost/mcp", {
           method: "POST",
           headers: {
@@ -84,7 +107,6 @@ describe("MCP Server", () => {
           body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list", params: {} }),
         }),
       );
-    }
 
     const [listA, listB] = await Promise.all([
       listTools(sessionIdA as string),
@@ -289,6 +311,88 @@ describe("MCP Server", () => {
       const events = await callTool("get_events", { sinceSeq });
       expect(events.events).toHaveLength(1);
       expect(events.events[0].entityId).toBe(added.id);
+    });
+  });
+
+  describe("compact note payloads", () => {
+    async function callTool(name: string, args: Record<string, unknown>) {
+      const { mcpServer } = await import("./mcp.ts");
+      const handler = (
+        mcpServer as unknown as {
+          _requestHandlers: Map<
+            string,
+            (
+              request: unknown,
+              extra: unknown,
+            ) => Promise<{ content: Array<{ type: string; text: string }> }>
+          >;
+        }
+      )._requestHandlers.get("tools/call");
+      if (!handler) throw new Error("tools/call handler not registered");
+      const result = await handler({ method: "tools/call", params: { name, arguments: args } }, {});
+      const first = result.content[0];
+      if (!first) throw new Error("expected tool result content");
+      return JSON.parse(first.text);
+    }
+
+    it("add_note returns a terse ack and get_session_notes returns summaries", async () => {
+      const added = await callTool("add_note", {
+        anchor: { kind: "document", blockId: "document-root", label: "whole doc" },
+        body: "x".repeat(200),
+        author: { kind: "human" },
+        kind: "request",
+      });
+      expect(added.id).toBeTruthy();
+      expect(added.replies).toBeUndefined();
+
+      const { notes } = await callTool("get_session_notes", {});
+      expect(notes).toHaveLength(1);
+      expect(notes[0].anchor).toBe("whole doc");
+      expect(notes[0].replies).toBe(1);
+      expect(notes[0].lastReply.preview.endsWith("…")).toBe(true);
+      expect(notes[0].lastReply.preview.length).toBe(141);
+
+      const verbose = await callTool("get_session_notes", { verbose: true });
+      expect(verbose.notes[0].replies[0].body).toHaveLength(200);
+    });
+
+    it("get_note returns the full thread and add_reply returns a terse ack", async () => {
+      const added = await callTool("add_note", {
+        anchor: { kind: "document", blockId: "document-root" },
+        body: "hello",
+        author: { kind: "human" },
+      });
+
+      const ack = await callTool("add_reply", {
+        noteId: added.id,
+        body: "a reply",
+        author: { kind: "agent" },
+      });
+      expect(ack).toEqual({
+        noteId: added.id,
+        replyId: expect.any(String),
+        replies: 2,
+        updatedAt: expect.any(String),
+      });
+
+      const note = await callTool("get_note", { noteId: added.id });
+      expect(note.replies).toHaveLength(2);
+      expect(note.replies[1].body).toBe("a reply");
+    });
+
+    it("set_note_status returns a terse ack", async () => {
+      const added = await callTool("add_note", {
+        anchor: { kind: "document", blockId: "document-root" },
+        body: "hello",
+        author: { kind: "human" },
+      });
+
+      const ack = await callTool("set_note_status", { noteId: added.id, status: "resolved" });
+      expect(ack).toEqual({
+        noteId: added.id,
+        status: "resolved",
+        updatedAt: expect.any(String),
+      });
     });
   });
 

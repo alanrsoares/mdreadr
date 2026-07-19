@@ -49,14 +49,11 @@ export async function revokeAgentToken(): Promise<string> {
 
 export function bearerToken(request: Request): string | null {
   const header = request.headers.get("authorization");
-  if (!header?.startsWith("Bearer ")) return null;
-  return header.slice("Bearer ".length);
+  return !header?.startsWith("Bearer ") ? null : header.slice("Bearer ".length);
 }
 
-export function isAgentAuthorized(request: Request): boolean {
-  return bearerToken(request) === sessionTokens.agentToken;
-}
+export const isAgentAuthorized = (request: Request): boolean =>
+  bearerToken(request) === sessionTokens.agentToken;
 
-export function isWebviewAuthorized(request: Request): boolean {
-  return bearerToken(request) === sessionTokens.webviewToken;
-}
+export const isWebviewAuthorized = (request: Request): boolean =>
+  bearerToken(request) === sessionTokens.webviewToken;

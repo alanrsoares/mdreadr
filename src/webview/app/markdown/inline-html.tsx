@@ -80,10 +80,9 @@ const createImgPlugin = (resolveImageSrc?: ImageSrcResolver): MarkdownInlinePlug
   pattern: IMG_PATTERN,
   render(match, key) {
     const parsed = parseImgTag(match[1] ?? "");
-    if (!parsed) {
-      return <span key={key}>{match[0]}</span>;
-    }
-    return (
+    return !parsed ? (
+      <span key={key}>{match[0]}</span>
+    ) : (
       <ReaderImage
         key={key}
         src={parsed.src}

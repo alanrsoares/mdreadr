@@ -5,33 +5,29 @@ import { join } from "node:path";
 import { sessionTokens } from "../../packages/api/auth.ts";
 import { app, sessionStore, startServer } from "../../packages/api/index.ts";
 
-function authHeaders(token?: string): Record<string, string> {
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+const authHeaders = (token?: string): Record<string, string> =>
+  token ? { Authorization: `Bearer ${token}` } : {};
 
-function post(url: string, path: string, body: unknown, token?: string) {
-  return app.handle(
+const post = (url: string, path: string, body: unknown, token?: string) =>
+  app.handle(
     new Request(`${url}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders(token) },
       body: JSON.stringify(body),
     }),
   );
-}
 
-function patch(url: string, path: string, body: unknown, token?: string) {
-  return app.handle(
+const patch = (url: string, path: string, body: unknown, token?: string) =>
+  app.handle(
     new Request(`${url}${path}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...authHeaders(token) },
       body: JSON.stringify(body),
     }),
   );
-}
 
-function get(url: string, path: string, token?: string) {
-  return app.handle(new Request(`${url}${path}`, { headers: authHeaders(token) }));
-}
+const get = (url: string, path: string, token?: string) =>
+  app.handle(new Request(`${url}${path}`, { headers: authHeaders(token) }));
 
 describe("mdreadr api", () => {
   test("health and notes roundtrip", async () => {
@@ -57,6 +53,78 @@ describe("mdreadr api", () => {
     const notes = await app.handle(new Request(`${url}/notes`));
     const json = await notes?.json();
     expect(json.notes).toHaveLength(1);
+  });
+
+  describe("/events + /events/wait", () => {
+    afterEach(() => {
+      sessionStore.setNotes([]);
+    });
+
+    type SeqEvent = { seq: number };
+    type EventsBody = { events: SeqEvent[] };
+
+    async function currentMaxSeq(url: string): Promise<number> {
+      const response = await get(url, "/events?sinceSeq=0");
+      if (!response) throw new Error("expected /events response");
+      const { events } = (await response.json()) as EventsBody;
+      return events.reduce((max, event) => Math.max(max, event.seq), 0);
+    }
+
+    test("/events returns journal entries newer than sinceSeq", async () => {
+      const { url } = startServer(0);
+      const sinceSeq = await currentMaxSeq(url);
+
+      await post(url, "/notes", {
+        anchor: { kind: "document", blockId: "document-root" },
+        body: "Review this",
+        author: { kind: "human" },
+      });
+
+      const response = await get(url, `/events?sinceSeq=${sinceSeq}`);
+      expect(response?.status).toBe(200);
+      const json = await response?.json();
+      expect(json.events).toHaveLength(1);
+      expect(json.events[0].type).toBe("note_added");
+    });
+
+    test("/events 400s on a non-numeric sinceSeq", async () => {
+      const { url } = startServer(0);
+
+      const response = await get(url, "/events?sinceSeq=nope");
+
+      expect(response?.status).toBe(400);
+      const json = await response?.json();
+      expect(json.code).toBe("ValidationError");
+    });
+
+    test("/events/wait resolves as soon as activity lands", async () => {
+      const { url } = startServer(0);
+      const sinceSeq = await currentMaxSeq(url);
+
+      const pending = get(url, `/events/wait?sinceSeq=${sinceSeq}&timeoutMs=5000`);
+      await post(url, "/notes", {
+        anchor: { kind: "document", blockId: "document-root" },
+        body: "Review this",
+        author: { kind: "human" },
+      });
+
+      const response = await pending;
+      expect(response?.status).toBe(200);
+      const json = await response?.json();
+      expect(json.events).toHaveLength(1);
+      expect(json.events[0].type).toBe("note_added");
+    });
+
+    test("/events/wait times out with empty events when nothing happens", async () => {
+      const { url } = startServer(0);
+      const sinceSeq = await currentMaxSeq(url);
+
+      const response = await get(url, `/events/wait?sinceSeq=${sinceSeq}&timeoutMs=50`);
+
+      expect(response?.status).toBe(200);
+      const json = await response?.json();
+      expect(json.events).toEqual([]);
+    });
   });
 
   describe("/documents/asset", () => {
