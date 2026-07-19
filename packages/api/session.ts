@@ -120,22 +120,20 @@ export class SessionStore {
    */
   waitForActivity(sinceSeq: number, timeoutMs: number): Promise<JournalEntry[]> {
     const alreadyAvailable = this.getEvents(sinceSeq);
-    if (alreadyAvailable.length > 0) {
-      return Promise.resolve(alreadyAvailable);
-    }
-
-    return new Promise((resolve) => {
-      const waiter: Waiter = {
-        sinceSeq,
-        resolve: (entries) => {
-          clearTimeout(timer);
-          this.waiters = this.waiters.filter((item) => item !== waiter);
-          resolve(entries);
-        },
-      };
-      const timer = setTimeout(() => waiter.resolve([]), timeoutMs);
-      this.waiters.push(waiter);
-    });
+    return alreadyAvailable.length > 0
+      ? Promise.resolve(alreadyAvailable)
+      : new Promise((resolve) => {
+          const waiter: Waiter = {
+            sinceSeq,
+            resolve: (entries) => {
+              clearTimeout(timer);
+              this.waiters = this.waiters.filter((item) => item !== waiter);
+              resolve(entries);
+            },
+          };
+          const timer = setTimeout(() => waiter.resolve([]), timeoutMs);
+          this.waiters.push(waiter);
+        });
   }
 
   private appendEvent(type: JournalEventType, entityId: string): void {

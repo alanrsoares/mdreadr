@@ -57,9 +57,8 @@ export const openDocument = (path: string): ResultAsync<OpenDocumentResult, Docu
 export const resolveAssetPath = (documentPath: string, src: string): string =>
   resolve(dirname(documentPath), src);
 
-function isWithinRoot(target: string, root: string): boolean {
-  return target === root || target.startsWith(root + sep);
-}
+const isWithinRoot = (target: string, root: string): boolean =>
+  target === root || target.startsWith(root + sep);
 
 /**
  * Scopes writes (e.g. `save_session_notes`) to the currently open Document's
@@ -152,11 +151,9 @@ export function toAppleScriptTypeList(patterns: string[] | undefined): string | 
     .map((pattern) => pattern.replace(/^\*\./, ""))
     .filter((extension) => extension.length > 0 && extension !== "*");
 
-  if (extensions.length === 0) {
-    return null;
-  }
-
-  return `{${extensions.map((extension) => `"${escapeAppleScriptString(extension)}"`).join(", ")}}`;
+  return extensions.length === 0
+    ? null
+    : `{${extensions.map((extension) => `"${escapeAppleScriptString(extension)}"`).join(", ")}}`;
 }
 
 export function escapeAppleScriptString(value: string): string {
@@ -188,11 +185,7 @@ async function macFileSelection(script: string): Promise<string | null> {
   const path = (await new Response(proc.stdout).text()).trim();
   const exitCode = await proc.exited;
 
-  if (exitCode !== 0 || path.length === 0) {
-    return null;
-  }
-
-  return path;
+  return exitCode !== 0 || path.length === 0 ? null : path;
 }
 
 type ZenityFileSelectionOptions = { save?: boolean; filename?: string };
@@ -216,11 +209,7 @@ async function zenityFileSelection(
   const path = (await new Response(proc.stdout).text()).trim();
   const exitCode = await proc.exited;
 
-  if (exitCode !== 0 || path.length === 0) {
-    return null;
-  }
-
-  return path;
+  return exitCode !== 0 || path.length === 0 ? null : path;
 }
 
 export const pickNativePath = (
@@ -238,14 +227,12 @@ export const pickNativePath = (
 
       const filename = input.defaultPath ?? "notes.json";
 
-      if (isMac) {
-        return macFileSelection(buildMacSaveScript("Save file", filename));
-      }
-
-      return zenityFileSelection("Save file", toZenityFileFilters(input.filters ?? ["*.json"]), {
-        save: true,
-        filename,
-      });
+      return isMac
+        ? macFileSelection(buildMacSaveScript("Save file", filename))
+        : zenityFileSelection("Save file", toZenityFileFilters(input.filters ?? ["*.json"]), {
+            save: true,
+            filename,
+          });
     })(),
     (error) => ({
       _tag: "DialogFailed",

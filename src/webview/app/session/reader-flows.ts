@@ -30,6 +30,5 @@ export async function loadNotesFlow(api: ReaderApi): Promise<LoadNotesOutcome> {
 }
 
 /** Pick a Document (cancel → null). */
-export async function pickDocumentFlow(api: ReaderApi): Promise<string | null> {
-  return api.pickPath({ mode: "open", filters: ["*.md"] });
-}
+export const pickDocumentFlow = async (api: ReaderApi): Promise<string | null> =>
+  api.pickPath({ mode: "open", filters: ["*.md"] });

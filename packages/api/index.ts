@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { cors } from "@elysiajs/cors";
@@ -41,7 +41,7 @@ import {
   toDocumentHttpError,
   writeTextFile,
 } from "./documents.ts";
-import { handleMcpRequest } from "./mcp.ts";
+import { DEFAULT_WAIT_TIMEOUT_MS, handleMcpRequest, MAX_WAIT_TIMEOUT_MS } from "./mcp.ts";
 import { readRecents, toRecentsHttpError } from "./recents.ts";
 import { sessionStore } from "./session.ts";
 
@@ -54,26 +54,22 @@ function domainError(error: NotesDomainError): { error: string; code: string } {
   }
 }
 
-function suggestionDomainError(error: SuggestionDomainError): { error: string; code: string } {
-  return { error: `Suggestion not found: ${error.id}`, code: error._tag };
-}
+const suggestionDomainError = (error: SuggestionDomainError): { error: string; code: string } => ({
+  error: `Suggestion not found: ${error.id}`,
+  code: error._tag,
+});
 
 const unauthorized = { error: "Unauthorized", code: "Unauthorized" } as const;
 
 /** Only the webview may write to disk or read arbitrary paths (/documents/save, /notes/load). */
-function isWebviewRequest(request: Request): boolean {
-  return isWebviewAuthorized(request);
-}
+const isWebviewRequest = (request: Request): boolean => isWebviewAuthorized(request);
 
 /** Only the MCP transport entry points require the agent token. */
-function isAgentRequest(request: Request): boolean {
-  return isAgentAuthorized(request);
-}
+const isAgentRequest = (request: Request): boolean => isAgentAuthorized(request);
 
 /** Suggestions are read/actioned by the webview and proposed by the agent — either token works. */
-function isAgentOrWebviewRequest(request: Request): boolean {
-  return isAgentAuthorized(request) || isWebviewAuthorized(request);
-}
+const isAgentOrWebviewRequest = (request: Request): boolean =>
+  isAgentAuthorized(request) || isWebviewAuthorized(request);
 
 export const app = new Elysia()
   .use(
@@ -95,6 +91,36 @@ export const app = new Elysia()
     return { ok: true };
   })
   .get("/session", () => sessionStore.snapshot())
+  .get("/events", ({ query, set }) => {
+    const sinceSeq = query.sinceSeq === undefined ? 0 : Number(query.sinceSeq);
+    if (!Number.isFinite(sinceSeq) || sinceSeq < 0) {
+      set.status = 400;
+      return { error: "sinceSeq must be a non-negative number", code: "ValidationError" };
+    }
+    return { events: sessionStore.getEvents(sinceSeq) };
+  })
+  // Long-poll twin of the MCP wait_for_activity tool: blocks until session
+  // activity newer than sinceSeq lands (or timeoutMs elapses), so a detached
+  // watcher process can park on it and exit the moment something happens.
+  // Journal metadata only, loopback-only server — unauthenticated like /notes.
+  .get("/events/wait", async ({ query, set }) => {
+    const sinceSeq = query.sinceSeq === undefined ? 0 : Number(query.sinceSeq);
+    if (!Number.isFinite(sinceSeq) || sinceSeq < 0) {
+      set.status = 400;
+      return { error: "sinceSeq must be a non-negative number", code: "ValidationError" };
+    }
+    const requestedTimeoutMs =
+      query.timeoutMs === undefined ? DEFAULT_WAIT_TIMEOUT_MS : Number(query.timeoutMs);
+    if (!Number.isFinite(requestedTimeoutMs) || requestedTimeoutMs < 0) {
+      set.status = 400;
+      return { error: "timeoutMs must be a non-negative number", code: "ValidationError" };
+    }
+    const events = await sessionStore.waitForActivity(
+      sinceSeq,
+      Math.min(requestedTimeoutMs, MAX_WAIT_TIMEOUT_MS),
+    );
+    return { events };
+  })
   .get("/documents/recent", async ({ set }) => {
     const result = await readRecents();
     if (isErr(result)) {
@@ -426,24 +452,22 @@ export const app = new Elysia()
     await writeMcpConfigFile(origin);
     return { url: `${origin}/mcp`, token };
   })
-  .all("/mcp", async ({ request }) => {
-    if (!isAgentRequest(request)) {
-      return new Response(JSON.stringify(unauthorized), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    return handleMcpRequest(request);
-  })
-  .all("/mcp/message", async ({ request }) => {
-    if (!isAgentRequest(request)) {
-      return new Response(JSON.stringify(unauthorized), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    return handleMcpRequest(request);
-  });
+  .all("/mcp", async ({ request }) =>
+    !isAgentRequest(request)
+      ? new Response(JSON.stringify(unauthorized), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        })
+      : handleMcpRequest(request),
+  )
+  .all("/mcp/message", async ({ request }) =>
+    !isAgentRequest(request)
+      ? new Response(JSON.stringify(unauthorized), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        })
+      : handleMcpRequest(request),
+  );
 
 export type App = typeof app;
 
@@ -473,6 +497,28 @@ async function writeMcpConfigFile(origin: string): Promise<void> {
     );
   } catch (e) {
     console.error("Failed to write mcp.json", e);
+  }
+
+  try {
+    const agyConfigPath = join(homedir(), ".gemini", "antigravity-cli", "mcp_config.json");
+    let agyConfig: { mcpServers?: Record<string, unknown> } = {};
+    try {
+      const existing = await readFile(agyConfigPath, "utf8");
+      agyConfig = JSON.parse(existing);
+    } catch {}
+
+    if (!agyConfig.mcpServers) agyConfig.mcpServers = {};
+    agyConfig.mcpServers.mdreadr = {
+      type: "http",
+      url: `${origin}/mcp`,
+      headers: {
+        Authorization: `Bearer ${sessionTokens.agentToken}`,
+      },
+    };
+
+    await writeFile(agyConfigPath, JSON.stringify(agyConfig, null, 2));
+  } catch (e) {
+    console.error("Failed to write Antigravity mcp_config.json", e);
   }
 }
 
