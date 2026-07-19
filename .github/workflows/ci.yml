@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Lint + typecheck + test
+        run: bun run check
+
+      # Webview production bundle gate: catches Vite/module-resolution issues
+      # that lint, typecheck, and tests all miss, without needing the
+      # Electrobun native packaging step (that's release.yml's job).
+      - name: Webview production bundle
+        run: bun run theme:build && bun run vite build
