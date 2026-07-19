@@ -7,6 +7,7 @@ import {
   type BlockAnchor,
   createNote,
   createSuggestion,
+  nowIso,
   resolveBlockText,
   setNoteStatus,
 } from "../domain/index.ts";
@@ -423,7 +424,53 @@ function registerHandlers(mcpServer: Server) {
 /** Test-only entry point: handlers registered but never connected to a transport. */
 export const mcpServer = createMcpServer();
 
-type McpSession = { server: Server; transport: WebStandardStreamableHTTPServerTransport };
+type McpSession = {
+  server: Server;
+  transport: WebStandardStreamableHTTPServerTransport;
+  connectedAt: string;
+  lastSeenAt: number;
+};
+
+/**
+ * How long a session may go without a routed request before it is treated as
+ * gone. Streamable-HTTP clients rarely send an explicit DELETE on disconnect
+ * (the SDK only does so via `terminateSession()`), and the transport gives no
+ * disconnect callback — so "connected" means "made a request within this
+ * window". mdreadr agents long-poll `wait_for_activity` at <=25s, staying live.
+ */
+const CLIENT_STALE_MS = 60_000;
+
+/** A live MCP client session, as surfaced to the webview status indicator. */
+export type ConnectedClient = {
+  id: string;
+  name: string | null;
+  version: string | null;
+  connectedAt: string;
+};
+
+/**
+ * Active MCP client sessions, newest first. Prunes sessions idle longer than
+ * `CLIENT_STALE_MS` as a side effect, then reads clientInfo captured at `initialize`.
+ */
+export function getConnectedClients(): ConnectedClient[] {
+  const cutoff = Date.now() - CLIENT_STALE_MS;
+  for (const [id, session] of sessions) {
+    if (session.lastSeenAt < cutoff) {
+      sessions.delete(id);
+    }
+  }
+  return [...sessions.entries()]
+    .map(([id, session]) => {
+      const info = session.server.getClientVersion();
+      return {
+        id,
+        name: info?.name ?? null,
+        version: info?.version ?? null,
+        connectedAt: session.connectedAt,
+      };
+    })
+    .sort((a, b) => b.connectedAt.localeCompare(a.connectedAt));
+}
 
 /**
  * The SDK's Server/transport pair is single-session (Server.connect() throws if
@@ -439,13 +486,13 @@ function createSession(): McpSession {
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: () => crypto.randomUUID(),
     onsessioninitialized: (sessionId) => {
-      sessions.set(sessionId, session);
+      sessions.set(sessionId, { ...session, connectedAt: nowIso(), lastSeenAt: Date.now() });
     },
     onsessionclosed: (sessionId) => {
       sessions.delete(sessionId);
     },
   });
-  session = { server, transport };
+  session = { server, transport, connectedAt: nowIso(), lastSeenAt: Date.now() };
   server.connect(transport).catch(console.error);
   return session;
 }
@@ -461,6 +508,7 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
         headers: { "Content-Type": "application/json" },
       });
     }
+    existing.lastSeenAt = Date.now();
     return existing.transport.handleRequest(request);
   }
   const { transport } = createSession();

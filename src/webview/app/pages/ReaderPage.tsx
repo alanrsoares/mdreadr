@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppLogo } from "../components/AppLogo.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
 import { DocumentView } from "../components/DocumentView.tsx";
+import { McpClientsIndicator } from "../components/McpClientsIndicator.tsx";
 import { McpSettingsDialog } from "../components/McpSettingsDialog.tsx";
 import { NotesPanel } from "../components/NotesPanel.tsx";
 import { formatDisplayPath, pathFileName } from "../components/path-display.ts";
@@ -332,6 +333,7 @@ export function ReaderPage() {
           endContent={
             <HStack gap={2} vAlign="center">
               <ColorSchemeToggle />
+              <McpClientsIndicator />
               <IconButton
                 label="MCP settings"
                 tooltip="MCP settings"

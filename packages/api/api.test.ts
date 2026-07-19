@@ -462,4 +462,25 @@ describe("mdreadr api", () => {
       }
     });
   });
+
+  describe("/mcp/clients", () => {
+    test("401s without the webview token", async () => {
+      const { url } = startServer(0);
+
+      const response = await get(url, "/mcp/clients");
+
+      expect(response?.status).toBe(401);
+    });
+
+    test("reports the connected client list with the webview token", async () => {
+      const { url } = startServer(0);
+
+      const response = await get(url, "/mcp/clients", sessionTokens.webviewToken);
+
+      expect(response?.status).toBe(200);
+      const json = await response?.json();
+      expect(Array.isArray(json.clients)).toBe(true);
+      expect(json.count).toBe(json.clients.length);
+    });
+  });
 });
