@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/alanrsoares/mdreadr/compare/v0.2.0...v0.2.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* **ci:** build theme before typecheck ([62cf8ac](https://github.com/alanrsoares/mdreadr/commit/62cf8ac5260618eeb0f89b0b13737c5107e0d33c))
+
 ## [0.2.0](https://github.com/alanrsoares/mdreadr/compare/v0.1.1...v0.2.0) (2026-07-19)
 
 
