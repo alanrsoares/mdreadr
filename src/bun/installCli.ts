@@ -14,11 +14,35 @@ function resolveAppBundlePath(): string | null {
 }
 
 export async function installCliCommand(): Promise<void> {
+  if (process.platform === "linux") {
+    const launcherPath = resolve(PATHS.RESOURCES_FOLDER, "..", "bin", "launcher");
+    const script = `#!/bin/sh\nexport GDK_BACKEND=x11\nexport WEBKIT_DISABLE_DMABUF_RENDERER=1\nexec "${launcherPath}" "$@"\n`;
+    const userBinDir = join(process.env.HOME || "~", ".local", "bin");
+    const userBinPath = join(userBinDir, "mdreadr");
+
+    try {
+      mkdirSync(userBinDir, { recursive: true });
+      writeFileSync(userBinPath, script, { mode: 0o755 });
+      Utils.showNotification({
+        title: APP_NAME,
+        body: `Installed '${APP_NAME}' command to ${userBinPath}`,
+      });
+    } catch (e) {
+      await Utils.showMessageBox({
+        type: "error",
+        title: "Install failed",
+        message: `Could not install the '${APP_NAME}' command to ${userBinPath}.`,
+        detail: e instanceof Error ? e.message : String(e),
+      });
+    }
+    return;
+  }
+
   if (process.platform !== "darwin") {
     await Utils.showMessageBox({
       type: "error",
       title: "Not supported",
-      message: `Installing the '${APP_NAME}' command is currently only supported on macOS.`,
+      message: `Installing the '${APP_NAME}' command is only supported on macOS and Linux.`,
     });
     return;
   }

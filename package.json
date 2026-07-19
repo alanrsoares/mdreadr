@@ -11,6 +11,7 @@
     "dev:hmr": "concurrently \"bun run hmr\" \"bun run start\"",
     "build": "bun run theme:build && vite build && electrobun build --env=stable",
     "install:mac": "rm -rf /Applications/mdreadr.app && cp -R build/stable-macos-arm64/mdreadr.app /Applications/",
+    "install:linux": "rm -rf /tmp/mdreadr-install && mkdir -p /tmp/mdreadr-install && tar -xzf artifacts/stable-linux-x64-mdreadr-Setup.tar.gz -C /tmp/mdreadr-install && /tmp/mdreadr-install/installer && sed -i 's|Exec=\"|Exec=env GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 \"|g' ~/.local/share/applications/mdreadr.desktop && mkdir -p ~/.local/bin && printf '#!/bin/sh\\nexport GDK_BACKEND=x11\\nexport WEBKIT_DISABLE_DMABUF_RENDERER=1\\nexec \"'\"$HOME\"'/.local/share/dev.mdreadr.app/stable/app/bin/launcher\" \"$@\"\\n' > ~/.local/bin/mdreadr && chmod +x ~/.local/bin/mdreadr",
     "icons:build": "bun run scripts/build-icons.ts",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

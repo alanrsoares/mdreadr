@@ -7,6 +7,7 @@ import {
   type BlockAnchor,
   createNote,
   createSuggestion,
+  type Note,
   resolveBlockText,
   setNoteStatus,
 } from "../domain/index.ts";
