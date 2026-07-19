@@ -72,110 +72,106 @@ export function unwrap<T>(res: ApiResult<T>): T {
   return res.data as T;
 }
 
-function readPaths(value: unknown): string[] {
-  return typeof value === "object" &&
-    value !== null &&
-    "paths" in value &&
-    Array.isArray((value as { paths: unknown }).paths)
+const readPaths = (value: unknown): string[] =>
+  typeof value === "object" &&
+  value !== null &&
+  "paths" in value &&
+  Array.isArray((value as { paths: unknown }).paths)
     ? (value as { paths: string[] }).paths
     : [];
-}
 
-function readOptionalPath(value: unknown): string | null {
-  return typeof value === "object" &&
-    value !== null &&
-    "path" in value &&
-    ((value as { path: unknown }).path === null ||
-      typeof (value as { path: unknown }).path === "string")
+const readOptionalPath = (value: unknown): string | null =>
+  typeof value === "object" &&
+  value !== null &&
+  "path" in value &&
+  ((value as { path: unknown }).path === null ||
+    typeof (value as { path: unknown }).path === "string")
     ? (value as { path: string | null }).path
     : null;
-}
 
-export function createTreatyReaderApi(): ReaderApi {
-  return {
-    async getSession() {
-      return unwrap(await api.session.get());
-    },
-    async getRecents() {
-      const data = unwrap(await api.documents.recent.get());
-      return readPaths(data);
-    },
-    async getNotes() {
-      const data = unwrap(await api.notes.get());
-      return data?.notes ?? [];
-    },
-    async openDocument(path) {
-      const data = unwrap(await api.documents.open.post({ path }));
-      if (!data || "error" in data) throw new Error("Failed to open document");
-      return data;
-    },
-    async pickPath(input) {
-      const data = unwrap(
-        await api.dialogs.pick.post({
-          mode: input.mode,
-          filters: input.filters,
-          defaultPath: input.defaultPath,
-        }),
-      );
-      return readOptionalPath(data);
-    },
-    async createNote(input) {
-      unwrap(
-        await api.notes.post({
-          anchor: input.anchor,
-          body: input.body,
-          author: { kind: "human" },
-          kind: input.kind ?? "comment",
-        }),
-      );
-    },
-    async addReply(noteId, body) {
-      const data = unwrap(
-        await api.notes({ id: noteId }).replies.post({
-          body,
-          author: { kind: "human" },
-        }),
-      );
-      if (!data || "error" in data) throw new Error("Failed to add reply");
-      return data.note;
-    },
-    async setNoteStatus(noteId, status) {
-      const data = unwrap(await api.notes({ id: noteId }).status.patch({ status }));
-      if (!data || "error" in data) throw new Error("Failed to update note status");
-      return data.note;
-    },
-    async getSuggestions() {
-      const data = unwrap(await api.suggestions.get());
-      if (!data || "error" in data) throw new Error("Failed to load suggestions");
-      return data.suggestions;
-    },
-    async setSuggestionStatus(suggestionId, status) {
-      const data = unwrap(await api.suggestions({ id: suggestionId }).status.patch({ status }));
-      if (!data || "error" in data) throw new Error("Failed to update suggestion status");
-      return data.suggestion;
-    },
-    async saveNotes(input) {
-      unwrap(
-        await api.notes.save.post({
-          path: input.path,
-          notes: input.notes,
-          document: input.document,
-        }),
-      );
-    },
-    async loadNotes(path) {
-      const data = unwrap(await api.notes.load.post({ path }));
-      if (!data || "error" in data) throw new Error("Failed to load notes");
-      return {
-        notes: data.notes,
-        document: "document" in data ? (data.document ?? null) : null,
-      };
-    },
-    async saveDocument(path, content) {
-      unwrap(await api.documents.save.post({ path, content }));
-    },
-    log(message) {
-      void api.log.post({ message }).catch(() => {});
-    },
-  };
-}
+export const createTreatyReaderApi = (): ReaderApi => ({
+  async getSession() {
+    return unwrap(await api.session.get());
+  },
+  async getRecents() {
+    const data = unwrap(await api.documents.recent.get());
+    return readPaths(data);
+  },
+  async getNotes() {
+    const data = unwrap(await api.notes.get());
+    return data?.notes ?? [];
+  },
+  async openDocument(path) {
+    const data = unwrap(await api.documents.open.post({ path }));
+    if (!data || "error" in data) throw new Error("Failed to open document");
+    return data;
+  },
+  async pickPath(input) {
+    const data = unwrap(
+      await api.dialogs.pick.post({
+        mode: input.mode,
+        filters: input.filters,
+        defaultPath: input.defaultPath,
+      }),
+    );
+    return readOptionalPath(data);
+  },
+  async createNote(input) {
+    unwrap(
+      await api.notes.post({
+        anchor: input.anchor,
+        body: input.body,
+        author: { kind: "human" },
+        kind: input.kind ?? "comment",
+      }),
+    );
+  },
+  async addReply(noteId, body) {
+    const data = unwrap(
+      await api.notes({ id: noteId }).replies.post({
+        body,
+        author: { kind: "human" },
+      }),
+    );
+    if (!data || "error" in data) throw new Error("Failed to add reply");
+    return data.note;
+  },
+  async setNoteStatus(noteId, status) {
+    const data = unwrap(await api.notes({ id: noteId }).status.patch({ status }));
+    if (!data || "error" in data) throw new Error("Failed to update note status");
+    return data.note;
+  },
+  async getSuggestions() {
+    const data = unwrap(await api.suggestions.get());
+    if (!data || "error" in data) throw new Error("Failed to load suggestions");
+    return data.suggestions;
+  },
+  async setSuggestionStatus(suggestionId, status) {
+    const data = unwrap(await api.suggestions({ id: suggestionId }).status.patch({ status }));
+    if (!data || "error" in data) throw new Error("Failed to update suggestion status");
+    return data.suggestion;
+  },
+  async saveNotes(input) {
+    unwrap(
+      await api.notes.save.post({
+        path: input.path,
+        notes: input.notes,
+        document: input.document,
+      }),
+    );
+  },
+  async loadNotes(path) {
+    const data = unwrap(await api.notes.load.post({ path }));
+    if (!data || "error" in data) throw new Error("Failed to load notes");
+    return {
+      notes: data.notes,
+      document: "document" in data ? (data.document ?? null) : null,
+    };
+  },
+  async saveDocument(path, content) {
+    unwrap(await api.documents.save.post({ path, content }));
+  },
+  log(message) {
+    void api.log.post({ message }).catch(() => {});
+  },
+});

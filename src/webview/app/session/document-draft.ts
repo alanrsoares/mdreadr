@@ -8,22 +8,15 @@ export type DraftState = {
 export const emptyDraft: DraftState = { path: null, text: null };
 
 /** Record an edit to the Draft for `path`. Typing back the saved content un-dirties it. */
-export function editDraft(path: string, text: string, savedContent: string): DraftState {
-  if (text === savedContent) return { path, text: null };
-  return { path, text };
-}
+export const editDraft = (path: string, text: string, savedContent: string): DraftState =>
+  text === savedContent ? { path, text: null } : { path, text };
 
 /** True only when the Draft belongs to `path` and has unsaved edits. */
-export function isDirty(state: DraftState, path: string | undefined): boolean {
-  return state.path === path && state.text !== null;
-}
+export const isDirty = (state: DraftState, path: string | undefined): boolean =>
+  state.path === path && state.text !== null;
 
 /** Discard the Draft entirely. */
-export function discardDraft(_state: DraftState): DraftState {
-  return emptyDraft;
-}
+export const discardDraft = (_state: DraftState): DraftState => emptyDraft;
 
 /** Mark the Draft as saved: keep its path, clear its edits. */
-export function draftSaved(state: DraftState): DraftState {
-  return { path: state.path, text: null };
-}
+export const draftSaved = (state: DraftState): DraftState => ({ path: state.path, text: null });

@@ -27,9 +27,8 @@ const SPECIAL_FENCES: Record<string, SpecialFenceRenderer> = {
 };
 
 /** Fence languages with dedicated renderers (align, mermaid, math, badges). */
-export function isSpecialFence(language: string | undefined): boolean {
-  return language != null && language in SPECIAL_FENCES;
-}
+export const isSpecialFence = (language: string | undefined): boolean =>
+  language != null && language in SPECIAL_FENCES;
 
 /** Render a special fence, or null when `language` is not special / payload invalid. */
 export function renderSpecialFence(
@@ -78,8 +77,10 @@ export function ReaderImage({
 }
 
 /** All reader inline plugins (linked badges, inline math, inline HTML) in canonical order. */
-export function createReaderInlinePlugins(
+export const createReaderInlinePlugins = (
   resolveImageSrc?: ImageSrcResolver,
-): MarkdownInlinePlugin[] {
-  return [linkedBadgePlugin, inlineMathPlugin, ...createInlineHtmlPlugins(resolveImageSrc)];
-}
+): MarkdownInlinePlugin[] => [
+  linkedBadgePlugin,
+  inlineMathPlugin,
+  ...createInlineHtmlPlugins(resolveImageSrc),
+];

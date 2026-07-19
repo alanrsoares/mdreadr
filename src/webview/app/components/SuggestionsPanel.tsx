@@ -35,11 +35,7 @@ export function SuggestionsPanel({
 }: SuggestionsPanelProps) {
   const pending = suggestions.filter((suggestion) => suggestion.status === "pending");
 
-  if (pending.length === 0) {
-    return null;
-  }
-
-  return (
+  return pending.length === 0 ? null : (
     <PanelStack>
       <MutedText>Suggestions</MutedText>
       {pending.map((suggestion) => (

@@ -14,10 +14,10 @@ export function getApiBase(): string {
  * (packages/api/auth.ts). Injected via Electrobun preload, same seam as
  * `__MDREADR_API__` — never written to disk, unlike the MCP agent token.
  */
-export function getWebviewToken(): string | undefined {
-  if (typeof window === "undefined") return undefined;
-  return (window as Window & { __MDREADR_WEBVIEW_TOKEN__?: string }).__MDREADR_WEBVIEW_TOKEN__;
-}
+export const getWebviewToken = (): string | undefined =>
+  typeof window === "undefined"
+    ? undefined
+    : (window as Window & { __MDREADR_WEBVIEW_TOKEN__?: string }).__MDREADR_WEBVIEW_TOKEN__;
 
 const webviewToken = getWebviewToken();
 
