@@ -7,9 +7,11 @@ import {
   type BlockAnchor,
   createNote,
   createSuggestion,
+  listDocumentBlocks,
   type Note,
   nowIso,
   resolveBlockText,
+  type Suggestion,
   setNoteStatus,
 } from "../domain/index.ts";
 import { documentSession } from "./document-session.ts";
@@ -64,6 +66,19 @@ function toNoteSummary(note: Note) {
               : lastReply.body,
         }
       : null,
+  };
+}
+
+/** Compact row for suggestion listings: status + where it lands, without the full replacement text. */
+function toSuggestionSummary(suggestion: Suggestion) {
+  return {
+    id: suggestion.id,
+    status: suggestion.status,
+    noteId: suggestion.noteId ?? null,
+    anchor: suggestion.anchor.label ?? suggestion.anchor.blockId,
+    blockId: suggestion.anchor.blockId,
+    author: suggestion.author,
+    updatedAt: suggestion.updatedAt,
   };
 }
 
@@ -248,7 +263,7 @@ function registerHandlers(mcpServer: Server) {
       {
         name: "get_events",
         description:
-          "Non-blocking catch-up read of journal entries newer than sinceSeq. Use this to resume after a reconnect instead of waiting.",
+          "Non-blocking catch-up read of journal entries newer than sinceSeq. Each event carries a `summary` of the entity it touched (note kind/status/last-author, or suggestion status), so you can act without a follow-up read. Response also includes `latestSeq`. Use this to resume after a reconnect instead of waiting.",
         inputSchema: {
           type: "object",
           properties: {
@@ -258,6 +273,43 @@ function registerHandlers(mcpServer: Server) {
             },
           },
           required: ["sinceSeq"],
+        },
+      },
+      {
+        name: "get_document_blocks",
+        description:
+          "List every anchorable block in the open document, in order, with the exact blockId to use in propose_edit / get_document_block / add_note. Each entry has { kind (heading|paragraph|code), blockId, label, headingPath, language? }. Read the target block's id off this list instead of reconstructing the content-hash id scheme by hand — e.g. to fix a code block under a heading, find the `code` entry whose headingPath ends with that heading.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
+        name: "get_suggestions",
+        description:
+          "List edit suggestions (propose_edit results) as compact rows (id, status, anchor, noteId, author). Status is pending → accepted → completed (landed on disk) or rejected. After a suggestion_status_changed event, call this (or get_suggestion) to learn whether the human accepted or rejected your proposal. Pass verbose: true for full suggestions including replacementText.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            verbose: {
+              type: "boolean",
+              description:
+                "Return full suggestions including replacementText and anchor. Defaults to false.",
+            },
+          },
+        },
+      },
+      {
+        name: "get_suggestion",
+        description: "Get one suggestion by id, including its replacementText, anchor, and status.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            suggestionId: {
+              type: "string",
+            },
+          },
+          required: ["suggestionId"],
         },
       },
     ],
@@ -274,6 +326,7 @@ function registerHandlers(mcpServer: Server) {
               text: JSON.stringify({
                 path: snapshot.document?.path ?? null,
                 content: snapshot.documentContent ?? null,
+                latestSeq: sessionStore.latestSeq(),
               }),
             },
           ],
@@ -473,19 +526,67 @@ function registerHandlers(mcpServer: Server) {
           content: [
             {
               type: "text",
-              text: JSON.stringify({ events }),
+              text: JSON.stringify({
+                events: sessionStore.enrichEvents(events),
+                latestSeq: sessionStore.latestSeq(),
+              }),
             },
           ],
         };
       }
       case "get_events": {
         const args = request.params.arguments as unknown as { sinceSeq: number };
-        const events = sessionStore.getEvents(args.sinceSeq);
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify({ events }),
+              text: JSON.stringify({
+                events: sessionStore.getEnrichedEvents(args.sinceSeq),
+                latestSeq: sessionStore.latestSeq(),
+              }),
+            },
+          ],
+        };
+      }
+      case "get_document_blocks": {
+        const snapshot = sessionStore.snapshot();
+        const blocks = snapshot.documentContent ? listDocumentBlocks(snapshot.documentContent) : [];
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ blocks }),
+            },
+          ],
+        };
+      }
+      case "get_suggestions": {
+        const args = request.params.arguments as unknown as { verbose?: boolean };
+        const suggestions = sessionStore.getSuggestions();
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                suggestions: args.verbose ? suggestions : suggestions.map(toSuggestionSummary),
+              }),
+            },
+          ],
+        };
+      }
+      case "get_suggestion": {
+        const args = request.params.arguments as unknown as { suggestionId: string };
+        const suggestion = sessionStore
+          .getSuggestions()
+          .find((item) => item.id === args.suggestionId);
+        if (!suggestion) {
+          throw new Error(`Suggestion not found: ${args.suggestionId}`);
+        }
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(suggestion),
             },
           ],
         };
