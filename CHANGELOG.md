@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.0](https://github.com/alanrsoares/mdreadr/compare/v0.3.0...v0.4.0) (2026-07-20)
+
+
+### Features
+
+* **api:** enrich journal events with entity summaries and latestSeq ([f7151cc](https://github.com/alanrsoares/mdreadr/commit/f7151ccbb6bd00f9f516dc95906594c64b86338b))
+* **domain:** add listDocumentBlocks for anchor discovery ([39bedee](https://github.com/alanrsoares/mdreadr/commit/39bedeef461438ca9ecd0814e0db8f0a7a60ba65))
+* HITL loop improvements for the MCP review API ([3456d45](https://github.com/alanrsoares/mdreadr/commit/3456d458702f18dc451b5b0da8ab2b919ddde221))
+* **mcp:** add get_document_blocks and suggestion read tools ([f4fe5f3](https://github.com/alanrsoares/mdreadr/commit/f4fe5f307cd3c537190a4af213185b4bdb9cdbac))
+
 ## [0.3.0](https://github.com/alanrsoares/mdreadr/compare/v0.2.1...v0.3.0) (2026-07-19)
 
 
