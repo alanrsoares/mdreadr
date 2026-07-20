@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import type { DocumentRef, Note, Suggestion } from "../domain/index.ts";
+import type { Author, DocumentRef, Note, Suggestion } from "../domain/index.ts";
 import { nowIso } from "../domain/index.ts";
 
 export type SessionSnapshot = {
@@ -23,6 +23,31 @@ export type JournalEntry = {
   type: JournalEventType;
   entityId: string;
 };
+
+/**
+ * Compact snapshot of the entity a journal entry refers to, attached to events
+ * so a watcher can act on what changed without a follow-up get_note/get_suggestion
+ * round-trip. `null` when the entity is gone (e.g. notes reloaded from disk).
+ */
+export type EventSummary =
+  | {
+      entity: "note";
+      kind: Note["kind"];
+      status: Note["status"];
+      blockId: string;
+      label?: string;
+      replies: number;
+      lastAuthor?: Author["kind"];
+    }
+  | {
+      entity: "suggestion";
+      status: Suggestion["status"];
+      blockId: string;
+      noteId?: string;
+      author: Author["kind"];
+    };
+
+export type EnrichedJournalEntry = JournalEntry & { summary: EventSummary | null };
 
 type Waiter = {
   sinceSeq: number;
@@ -112,6 +137,54 @@ export class SessionStore {
   /** Journal entries with `seq > sinceSeq`, oldest first — a non-blocking catch-up read. */
   getEvents(sinceSeq: number): JournalEntry[] {
     return this.journal.filter((entry) => entry.seq > sinceSeq);
+  }
+
+  /**
+   * Highest seq issued so far (0 before any event). A fresh subscriber seeds
+   * `sinceSeq` with this to start watching from "now" instead of replaying the
+   * whole journal as if it were new.
+   */
+  latestSeq(): number {
+    return this.nextSeq - 1;
+  }
+
+  /** Compact snapshot of the entity a journal entry points at; `null` if it is gone. */
+  describeEvent(entry: JournalEntry): EventSummary | null {
+    if (entry.type.startsWith("suggestion_")) {
+      const suggestion = this.suggestions.find((item) => item.id === entry.entityId);
+      if (!suggestion) return null;
+      return {
+        entity: "suggestion",
+        status: suggestion.status,
+        blockId: suggestion.anchor.blockId,
+        noteId: suggestion.noteId,
+        author: suggestion.author.kind,
+      };
+    }
+    const note = this.notes.find((item) => item.id === entry.entityId);
+    if (!note) return null;
+    return {
+      entity: "note",
+      kind: note.kind,
+      status: note.status,
+      blockId: note.anchor.blockId,
+      label: note.anchor.label,
+      replies: note.replies.length,
+      lastAuthor: note.replies.at(-1)?.author.kind,
+    };
+  }
+
+  /** `getEvents`, with each entry's entity summary attached. */
+  getEnrichedEvents(sinceSeq: number): EnrichedJournalEntry[] {
+    return this.getEvents(sinceSeq).map((entry) => ({
+      ...entry,
+      summary: this.describeEvent(entry),
+    }));
+  }
+
+  /** Attaches summaries to a batch of raw entries (e.g. the result of `waitForActivity`). */
+  enrichEvents(entries: JournalEntry[]): EnrichedJournalEntry[] {
+    return entries.map((entry) => ({ ...entry, summary: this.describeEvent(entry) }));
   }
 
   /**
