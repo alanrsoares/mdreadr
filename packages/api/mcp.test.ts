@@ -447,4 +447,123 @@ describe("MCP Server", () => {
       expect(await Bun.file(path).exists()).toBe(true);
     });
   });
+
+  describe("HITL loop improvements", () => {
+    async function callTool(name: string, args: Record<string, unknown>) {
+      const { mcpServer } = await import("./mcp.ts");
+      const handler = (
+        mcpServer as unknown as {
+          _requestHandlers: Map<
+            string,
+            (
+              request: unknown,
+              extra: unknown,
+            ) => Promise<{ content: Array<{ type: string; text: string }> }>
+          >;
+        }
+      )._requestHandlers.get("tools/call");
+      if (!handler) throw new Error("tools/call handler not registered");
+      const result = await handler({ method: "tools/call", params: { name, arguments: args } }, {});
+      const first = result.content[0];
+      if (!first) throw new Error("expected tool result content");
+      return JSON.parse(first.text);
+    }
+
+    const doc = ["# Title", "", "## Code", "", "```ts", "const x = 1;", "```", ""].join("\n");
+
+    type DocBlock = {
+      kind: string;
+      blockId: string;
+      label: string;
+      headingPath: string[];
+      language?: string;
+    };
+
+    it("get_document_blocks lists anchorable blocks with ids for propose_edit", async () => {
+      sessionStore.setDocument({ path: "/tmp/hitl.md" }, doc);
+      const { blocks } = await callTool("get_document_blocks", {});
+      expect(blocks.map((block: DocBlock) => block.kind)).toEqual(["heading", "heading", "code"]);
+      const code = blocks.find((block: DocBlock) => block.kind === "code");
+      expect(code.language).toBe("ts");
+      expect(code.headingPath).toEqual(["Title", "Code"]);
+
+      // the id must round-trip through propose_edit
+      const suggestion = await callTool("propose_edit", {
+        anchor: { kind: "code", blockId: code.blockId },
+        replacementText: "const x = 2;",
+      });
+      expect(suggestion.status).toBe("pending");
+    });
+
+    it("get_document_blocks returns an empty list when no document is open", async () => {
+      const { blocks } = await callTool("get_document_blocks", {});
+      expect(blocks).toEqual([]);
+    });
+
+    it("get_suggestions / get_suggestion expose status for the accept/reject round-trip", async () => {
+      sessionStore.setDocument({ path: "/tmp/hitl.md" }, doc);
+      const { blocks } = await callTool("get_document_blocks", {});
+      const code = blocks.find((block: DocBlock) => block.kind === "code");
+      const created = await callTool("propose_edit", {
+        anchor: { kind: "code", blockId: code.blockId },
+        replacementText: "const x = 2;",
+      });
+
+      const { suggestions } = await callTool("get_suggestions", {});
+      expect(suggestions).toHaveLength(1);
+      expect(suggestions[0].status).toBe("pending");
+      expect(suggestions[0].replacementText).toBeUndefined();
+
+      // human accepts in-app
+      const [pending] = sessionStore.getSuggestions();
+      if (!pending) throw new Error("expected a pending suggestion");
+      sessionStore.setSuggestions([{ ...pending, status: "accepted" }]);
+
+      const one = await callTool("get_suggestion", { suggestionId: created.id });
+      expect(one.status).toBe("accepted");
+      expect(one.replacementText).toBe("const x = 2;");
+
+      const verbose = await callTool("get_suggestions", { verbose: true });
+      expect(verbose.suggestions[0].replacementText).toBe("const x = 2;");
+    });
+
+    it("get_suggestion throws for an unknown id", async () => {
+      await expect(callTool("get_suggestion", { suggestionId: "nope" })).rejects.toThrow(
+        "Suggestion not found: nope",
+      );
+    });
+
+    it("events carry an entity summary and responses include latestSeq", async () => {
+      sessionStore.setDocument({ path: "/tmp/hitl.md" }, doc);
+      const before = await callTool("get_events", { sinceSeq: 0 });
+      const sinceSeq = before.latestSeq;
+
+      const added = await callTool("add_note", {
+        anchor: { kind: "heading", blockId: "heading-code", label: "Code" },
+        body: "look here",
+        author: { kind: "human" },
+        kind: "request",
+      });
+
+      const { events, latestSeq } = await callTool("get_events", { sinceSeq });
+      expect(events).toHaveLength(1);
+      expect(events[0].entityId).toBe(added.id);
+      expect(latestSeq).toBeGreaterThan(sinceSeq);
+      expect(events[0].summary).toMatchObject({
+        entity: "note",
+        kind: "request",
+        status: "open",
+        blockId: "heading-code",
+        label: "Code",
+        replies: 1,
+        lastAuthor: "human",
+      });
+    });
+
+    it("get_current_document reports latestSeq so a watcher can seed from now", async () => {
+      sessionStore.setDocument({ path: "/tmp/hitl.md" }, doc);
+      const current = await callTool("get_current_document", {});
+      expect(current.latestSeq).toBe(sessionStore.latestSeq());
+    });
+  });
 });

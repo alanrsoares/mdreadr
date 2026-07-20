@@ -6,6 +6,7 @@ import {
   blockIdForParagraph,
   extractHeadings,
   hashBlockContent,
+  truncateAnchorLabel,
 } from "./markdown.ts";
 
 export type PinnableBlock =
@@ -182,4 +183,100 @@ export function resolveBlockText(
   }
 
   return undefined;
+}
+
+/** One anchorable block in the open document, ready to hand to propose_edit. */
+export type DocumentBlockSummary = {
+  kind: "heading" | "paragraph" | "code";
+  /** The id to put in a BlockAnchor — no client-side hashing required. */
+  blockId: string;
+  /** Short preview: heading/paragraph text, or a code block's first line. */
+  label: string;
+  /** Enclosing heading trail (a heading includes itself as the last entry). */
+  headingPath: string[];
+  /** Fence language, for code blocks only. */
+  language?: string;
+};
+
+/**
+ * Lists every anchorable block in `content` in document order, with the exact
+ * `blockId` the reader's AnchorPlan pins against. Lets an agent target a
+ * specific block for `propose_edit`/`get_document_block` by reading it off this
+ * list instead of reconstructing the content-hash id scheme by hand.
+ *
+ * Ids stay in parity with `resolveBlockText`: heading ids are index-paired to
+ * `extractHeadings` (as the renderer does), and paragraph/code occurrence
+ * counts follow the same `collectPinnableBlocks` traversal order.
+ */
+export function listDocumentBlocks(
+  content: string,
+  options?: ResolveBlockTextOptions,
+): DocumentBlockSummary[] {
+  const headings = extractHeadings(content);
+  const blocks = parseMarkdown(content, { autolink: "gfm" });
+  const isPinnableCode = options?.isPinnableCode ?? (() => true);
+
+  const paragraphCounts = new Map<string, number>();
+  const codeCounts = new Map<string, number>();
+  let headingIndex = 0;
+  let headingStack: HeadingStackEntry[] = [];
+  const result: DocumentBlockSummary[] = [];
+
+  const walk = (nodes: BlockNode[]): void => {
+    for (const block of nodes) {
+      switch (block.type) {
+        case "heading": {
+          const text = inlineToText(block.children);
+          const { stack, path } = headingPathForLevel(headingStack, block.level, text);
+          headingStack = stack;
+          const entry = headings[headingIndex];
+          headingIndex += 1;
+          const blockId = entry ? blockIdForHeading(entry) : `heading-${headingIndex}`;
+          result.push({
+            kind: "heading",
+            blockId,
+            label: truncateAnchorLabel(text),
+            headingPath: path,
+          });
+          continue;
+        }
+        case "paragraph": {
+          const text = inlineToText(block.children);
+          const hash = hashBlockContent(text);
+          const occurrence = paragraphCounts.get(hash) ?? 0;
+          paragraphCounts.set(hash, occurrence + 1);
+          result.push({
+            kind: "paragraph",
+            blockId: blockIdForParagraph(text, occurrence),
+            label: truncateAnchorLabel(text),
+            headingPath: headingStack.map((item) => item.text),
+          });
+          continue;
+        }
+        case "codeblock": {
+          if (!isPinnableCode(block.language)) continue;
+          const key = hashBlockContent(`${block.language ?? ""}\n${block.content}`);
+          const occurrence = codeCounts.get(key) ?? 0;
+          codeCounts.set(key, occurrence + 1);
+          result.push({
+            kind: "code",
+            blockId: blockIdForCode(block.content, block.language, occurrence),
+            label: truncateAnchorLabel(block.content.split("\n")[0] ?? block.content),
+            headingPath: headingStack.map((item) => item.text),
+            language: block.language,
+          });
+          continue;
+        }
+        case "blockquote":
+          walk(block.children);
+          continue;
+        case "list":
+          for (const item of block.items) walk(item.children);
+          break;
+      }
+    }
+  };
+
+  walk(blocks);
+  return result;
 }

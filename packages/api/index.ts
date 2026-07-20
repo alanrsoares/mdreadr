@@ -102,7 +102,10 @@ export const app = new Elysia()
       set.status = 400;
       return { error: "sinceSeq must be a non-negative number", code: "ValidationError" };
     }
-    return { events: sessionStore.getEvents(sinceSeq) };
+    return {
+      events: sessionStore.getEnrichedEvents(sinceSeq),
+      latestSeq: sessionStore.latestSeq(),
+    };
   })
   // Long-poll twin of the MCP wait_for_activity tool: blocks until session
   // activity newer than sinceSeq lands (or timeoutMs elapses), so a detached
@@ -124,7 +127,10 @@ export const app = new Elysia()
       sinceSeq,
       Math.min(requestedTimeoutMs, MAX_WAIT_TIMEOUT_MS),
     );
-    return { events };
+    return {
+      events: sessionStore.enrichEvents(events),
+      latestSeq: sessionStore.latestSeq(),
+    };
   })
   .get("/documents/recent", async ({ set }) => {
     const result = await readRecents();

@@ -11,6 +11,7 @@ import {
   extractHeadings,
   findNote,
   findSuggestion,
+  listDocumentBlocks,
   parseNotesFileJson,
   resolveBlockText,
   SaveDocumentBodySchema,
@@ -260,5 +261,59 @@ describe("suggestions domain", () => {
       "x",
     );
     expect(result).toBeUndefined();
+  });
+});
+
+describe("listDocumentBlocks", () => {
+  const content = [
+    "# Title",
+    "",
+    "Intro paragraph.",
+    "",
+    "## Code",
+    "",
+    "```ts",
+    "const x = 1;",
+    "```",
+    "",
+  ].join("\n");
+
+  test("lists heading, paragraph and code blocks in document order", () => {
+    const blocks = listDocumentBlocks(content);
+    expect(blocks.map((block) => block.kind)).toEqual(["heading", "paragraph", "heading", "code"]);
+  });
+
+  test("block ids match the canonical blockId functions", () => {
+    const blocks = listDocumentBlocks(content);
+    const [title, intro, code, codeBlock] = blocks;
+    const [titleHeading, codeHeading] = extractHeadings(content);
+    if (!titleHeading || !codeHeading) throw new Error("expected two headings");
+
+    expect(title?.blockId).toBe(blockIdForHeading(titleHeading));
+    expect(intro?.blockId).toBe(blockIdForParagraph("Intro paragraph.", 0));
+    expect(code?.blockId).toBe(blockIdForHeading(codeHeading));
+    expect(codeBlock?.blockId).toBe(blockIdForCode("const x = 1;", "ts", 0));
+    expect(codeBlock?.language).toBe("ts");
+  });
+
+  test("ids resolve back through resolveBlockText", () => {
+    const codeBlock = listDocumentBlocks(content).find((block) => block.kind === "code");
+    if (!codeBlock) throw new Error("expected a code block");
+    expect(resolveBlockText(content, { kind: "code", blockId: codeBlock.blockId })).toBe(
+      "const x = 1;",
+    );
+  });
+
+  test("carries the enclosing heading trail on nested blocks", () => {
+    const codeBlock = listDocumentBlocks(content).find((block) => block.kind === "code");
+    expect(codeBlock?.headingPath).toEqual(["Title", "Code"]);
+  });
+
+  test("disambiguates repeated blocks by occurrence", () => {
+    const dupes = ["dup", "", "dup", ""].join("\n");
+    const [first, second] = listDocumentBlocks(dupes);
+    expect(first?.blockId).toBe(blockIdForParagraph("dup", 0));
+    expect(second?.blockId).toBe(blockIdForParagraph("dup", 1));
+    expect(first?.blockId).not.toBe(second?.blockId);
   });
 });
