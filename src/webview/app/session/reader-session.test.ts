@@ -43,6 +43,9 @@ function createInMemoryReaderApi() {
     async openDocument(path) {
       return { path, content: fakeDocumentContent };
     },
+    async createDocument(path, content) {
+      return { path, content };
+    },
     async pickPath() {
       if (pickQueue.length === 0) throw new Error("test bug: no scripted pick left");
       return pickQueue.shift() ?? null;

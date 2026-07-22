@@ -1,6 +1,7 @@
 import { type FSWatcher, watch } from "node:fs";
 import { errAsync, type ResultAsync } from "@onrails/result";
 import {
+  createDocument,
   type DocumentError,
   type OpenDocumentResult,
   openDocument,
@@ -17,6 +18,8 @@ export type DocumentSaveError =
 export type DocumentSession = {
   /** Read + record Document, refresh recents, start watching it. */
   open(path: string): ResultAsync<OpenDocumentResult, DocumentError>;
+  /** Write a new Document (e.g. Save As for a dropped/unsaved file), then open it like `open`. */
+  createAndOpen(path: string, content: string): ResultAsync<OpenDocumentResult, DocumentError>;
   /** Asset requests may only reference the currently open Document. */
   isAssetAllowed(docPath: string): boolean;
   /** Persist edited content to the currently open Document. Scope-checked. */
@@ -83,13 +86,18 @@ export function createDocumentSession(deps: CreateDocumentSessionDeps): Document
     }
   }
 
+  function applyOpenedDocument(result: OpenDocumentResult): OpenDocumentResult {
+    store.setDocument({ path: result.path }, result.content);
+    startWatching(result.path);
+    return result;
+  }
+
   return {
     open(path) {
-      return openDocument(path).map((result) => {
-        store.setDocument({ path: result.path }, result.content);
-        startWatching(result.path);
-        return result;
-      });
+      return openDocument(path).map(applyOpenedDocument);
+    },
+    createAndOpen(path, content) {
+      return createDocument(path, content).map(applyOpenedDocument);
     },
     isAssetAllowed(docPath) {
       return store.snapshot().document?.path === docPath;

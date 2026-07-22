@@ -44,14 +44,27 @@ const readerApi = createTreatyReaderApi();
 
 type ReaderDocumentTopNavHeadingProps = {
   documentPath?: string;
+  unsavedName?: string;
   homeDirectory?: string;
 };
 
 function ReaderDocumentTopNavHeading({
   documentPath,
+  unsavedName,
   homeDirectory,
 }: ReaderDocumentTopNavHeadingProps) {
   const anchorRef = useRef<HTMLDivElement>(null);
+
+  if (unsavedName) {
+    return (
+      <TopNavHeading
+        logo={<AppLogo />}
+        superheading="mdreadr"
+        heading={unsavedName}
+        subheading="Unsaved"
+      />
+    );
+  }
 
   if (!documentPath) {
     return <TopNavHeading logo={<AppLogo />} heading="mdreadr" />;
@@ -92,9 +105,14 @@ export function ReaderPage() {
   const dragDepthRef = useRef(0);
   const pendingActionRef = useRef<(() => void) | null>(null);
   const [isMcpSettingsOpen, setIsMcpSettingsOpen] = useState(false);
+  // Content read client-side from a drag-drop the webview can't resolve a path
+  // for (Electrobun's WKWebView, unlike Electron, never exposes File.path).
+  // Held locally until the user Saves it via a native Save As dialog.
+  const [unsavedDrop, setUnsavedDrop] = useState<{ name: string; content: string } | null>(null);
 
   const reader = useReaderSession(readerApi, {
     onOpened: (path) => {
+      setUnsavedDrop(null);
       store.actions.pendingAnchorChanged(null);
       store.actions.liveMessageChanged(`Opened ${pathFileName(path)}`);
     },
@@ -120,10 +138,12 @@ export function ReaderPage() {
     },
   });
 
-  const content = reader.session.data?.documentContent ?? "";
-  const documentPath = reader.session.data?.document?.path;
-  const dirty = isDirty(draft, documentPath);
-  const editorValue = (draft.path === documentPath ? draft.text : null) ?? content;
+  const content = unsavedDrop ? unsavedDrop.content : (reader.session.data?.documentContent ?? "");
+  const documentPath = unsavedDrop ? undefined : reader.session.data?.document?.path;
+  const dirty = unsavedDrop !== null || isDirty(draft, documentPath);
+  const editorValue = unsavedDrop
+    ? unsavedDrop.content
+    : ((draft.path === documentPath ? draft.text : null) ?? content);
 
   const runGuarded = useCallback(
     (action: () => void) => {
@@ -146,16 +166,24 @@ export function ReaderPage() {
 
   const onEditorChange = useCallback(
     (text: string) => {
+      if (unsavedDrop) {
+        setUnsavedDrop({ ...unsavedDrop, content: text });
+        return;
+      }
       if (!documentPath) return;
       store.actions.draftEdited({ path: documentPath, text, savedContent: content });
     },
-    [documentPath, content, store],
+    [unsavedDrop, documentPath, content, store],
   );
 
   const saveDraft = useCallback(async () => {
+    if (unsavedDrop) {
+      reader.saveDropped(unsavedDrop);
+      return;
+    }
     if (!documentPath || draft.path !== documentPath || draft.text === null) return;
     await reader.saveDocument(documentPath, draft.text);
-  }, [documentPath, draft, reader]);
+  }, [unsavedDrop, documentPath, draft, reader]);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
@@ -166,20 +194,30 @@ export function ReaderPage() {
       const file = event.dataTransfer.files.item(0);
       if (!file) return;
 
+      const isMarkdown = /\.(md|markdown)$/i.test(file.name);
       const path = (file as File & { path?: string }).path;
-      if (path?.endsWith(".md")) {
-        requestOpen(path);
+
+      // Some environments (Electron) expose the real filesystem path on drop.
+      // Electrobun's WKWebView never does — fall through to reading the
+      // File's content directly below.
+      if (path) {
+        if (isMarkdown) requestOpen(path);
         return;
       }
 
-      if (!path) {
-        showError(
-          "Open dropped file",
-          "This environment cannot read the file path from drag-and-drop. Use Open… instead.",
-        );
+      if (!isMarkdown) {
+        showError("Open dropped file", `"${file.name}" is not a markdown file.`);
+        return;
       }
+
+      runGuarded(() => {
+        void file
+          .text()
+          .then((text) => setUnsavedDrop({ name: file.name, content: text }))
+          .catch(() => showError("Open dropped file", "Could not read the dropped file."));
+      });
     },
-    [requestOpen, showError, store],
+    [requestOpen, runGuarded, showError, store],
   );
 
   const onDragEnter = useCallback(
@@ -261,7 +299,9 @@ export function ReaderPage() {
   const prevContentRef = useRef(content);
   useEffect(() => {
     if (prevContentRef.current !== content) {
-      if (dirty) {
+      // A drop populating `unsavedDrop` also changes `content`, but that's a
+      // local read, not the backend document changing under an open draft.
+      if (dirty && !unsavedDrop) {
         showError(
           "Document changed on disk",
           "Your draft is kept. Save to overwrite, or discard to reload.",
@@ -269,7 +309,7 @@ export function ReaderPage() {
       }
       prevContentRef.current = content;
     }
-  }, [content, dirty, showError]);
+  }, [content, dirty, showError, unsavedDrop]);
 
   const notes = reader.notes.data ?? [];
   const suggestions = reader.suggestions.data ?? [];
@@ -327,6 +367,7 @@ export function ReaderPage() {
           heading={
             <ReaderDocumentTopNavHeading
               documentPath={documentPath}
+              unsavedName={unsavedDrop?.name}
               homeDirectory={reader.session.data?.homeDirectory}
             />
           }
@@ -405,10 +446,10 @@ export function ReaderPage() {
               Drop to open
             </Stack>
           </div>
-          {content ? (
+          {content || unsavedDrop ? (
             <ReaderContent>
               <DocumentView
-                key={documentPath}
+                key={documentPath ?? unsavedDrop?.name}
                 content={content}
                 documentPath={documentPath}
                 notes={notes}
@@ -426,11 +467,11 @@ export function ReaderPage() {
                 chromeEnd={
                   documentViewMode === "edit" ? (
                     <Button
-                      label="Save"
+                      label={unsavedDrop ? "Save As…" : "Save"}
                       variant="primary"
                       size="sm"
                       isDisabled={!dirty}
-                      isLoading={reader.isSavingDocument}
+                      isLoading={reader.isSavingDocument || reader.isSavingDropped}
                       onClick={() => {
                         void saveDraft();
                       }}
@@ -502,10 +543,11 @@ export function ReaderPage() {
           }
         }}
         title="Discard draft?"
-        description={`${draft.path ? pathFileName(draft.path) : "This Document"} has unsaved changes. Discarding cannot be undone.`}
+        description={`${unsavedDrop ? unsavedDrop.name : draft.path ? pathFileName(draft.path) : "This Document"} has unsaved changes. Discarding cannot be undone.`}
         cancelLabel="Keep editing"
         actionLabel="Discard"
         onAction={() => {
+          setUnsavedDrop(null);
           store.actions.draftDiscarded();
           store.actions.discardDialogOpenChanged(false);
           const pending = pendingActionRef.current;

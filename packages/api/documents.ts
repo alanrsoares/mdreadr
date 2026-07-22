@@ -53,6 +53,17 @@ export const openDocument = (path: string): ResultAsync<OpenDocumentResult, Docu
       ),
   );
 
+/** Write a new Document to `path` (e.g. a Save As target picked via native dialog), then open it. */
+export const createDocument = (
+  path: string,
+  content: string,
+): ResultAsync<OpenDocumentResult, DocumentError> =>
+  writeTextFile(path, content)
+    .mapErr(
+      (error): DocumentError => ({ _tag: "DocumentReadFailed", path, message: error.message }),
+    )
+    .andThen(() => openDocument(path));
+
 /** Resolve a Document-relative asset reference (e.g. `docs/hero.png`). */
 export const resolveAssetPath = (documentPath: string, src: string): string =>
   resolve(dirname(documentPath), src);
