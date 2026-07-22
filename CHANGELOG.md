@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1](https://github.com/alanrsoares/mdreadr/compare/v0.4.0...v0.4.1) (2026-07-22)
+
+
+### Bug Fixes
+
+* **webview:** make drag-and-drop of markdown files work in packaged app ([cf4f93c](https://github.com/alanrsoares/mdreadr/commit/cf4f93c219d7c4dba74b072b83f45d61eaa8d393))
+* **webview:** make drag-and-drop of markdown files work in packaged app ([356a34b](https://github.com/alanrsoares/mdreadr/commit/356a34b7d82bfa39d14c7e31f7824107eb249a25))
+
 ## [0.4.0](https://github.com/alanrsoares/mdreadr/compare/v0.3.0...v0.4.0) (2026-07-20)
 
 
