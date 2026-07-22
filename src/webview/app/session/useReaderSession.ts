@@ -10,7 +10,13 @@ import { useCallback, useEffect } from "react";
 import { formatDisplayPath } from "../components/path-display.ts";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
 import type { ReaderApi, SessionSnapshot } from "./reader-api.ts";
-import { loadNotesFlow, pickDocumentFlow, saveNotesFlow } from "./reader-flows.ts";
+import {
+  loadNotesFlow,
+  pickDocumentFlow,
+  type SaveDroppedDocumentInput,
+  saveDroppedDocumentFlow,
+  saveNotesFlow,
+} from "./reader-flows.ts";
 
 type AddReplyMutationInput = { noteId: string; body: string };
 type SetNoteStatusMutationInput = { noteId: string; status: NoteStatus };
@@ -34,6 +40,8 @@ export type ReaderSession = {
   suggestions: UseQueryResult<Suggestion[]>;
   open: (path: string) => void;
   pick: () => void;
+  saveDropped: (input: SaveDroppedDocumentInput) => void;
+  isSavingDropped: boolean;
   createNote: (input: CreateNoteRequest) => Promise<void>;
   addReply: (noteId: string, body: string) => Promise<void>;
   setStatus: (noteId: string, status: NoteStatus) => Promise<void>;
@@ -127,6 +135,20 @@ export function useReaderSession(
     },
     onError: (error) => {
       showError("Pick file", error);
+    },
+  });
+
+  const saveDroppedDocumentMutation = useMutation({
+    mutationFn: (input: SaveDroppedDocumentInput) => saveDroppedDocumentFlow(readerApi, input),
+    onSuccess: (outcome) => {
+      if (outcome.kind !== "saved") return;
+      invalidateSession();
+      invalidateRecents();
+      showSuccess(`Saved ${outcome.path}`);
+      callbacks.onOpened?.(outcome.path);
+    },
+    onError: (error) => {
+      showError("Save dropped file", error);
     },
   });
 
@@ -229,6 +251,8 @@ export function useReaderSession(
     suggestions,
     open: (path) => openDocumentMutation.mutate(path),
     pick: () => pickDocumentMutation.mutate(),
+    saveDropped: (input) => saveDroppedDocumentMutation.mutate(input),
+    isSavingDropped: saveDroppedDocumentMutation.isPending,
     createNote: async (input) => {
       await createNoteMutation.mutateAsync(input);
     },

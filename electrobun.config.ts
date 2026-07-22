@@ -31,7 +31,14 @@ export default {
       codesign: false,
       notarize: false,
       bundleCEF: false,
-      entitlements: {},
+      entitlements: {
+        "com.apple.security.files.user-selected.read-write":
+          "mdreadr needs access to open and save the markdown files you pick or drag in.",
+        "com.apple.security.files.downloads.read-write":
+          "mdreadr needs access to markdown files in your Downloads folder.",
+        "com.apple.security.files.desktop.read-write":
+          "mdreadr needs access to markdown files on your Desktop.",
+      },
     },
     linux: {
       bundleCEF: false,

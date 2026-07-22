@@ -26,6 +26,7 @@ export type ReaderApi = {
   getRecents(): Promise<string[]>;
   getNotes(): Promise<Note[]>;
   openDocument(path: string): Promise<OpenDocumentResult>;
+  createDocument(path: string, content: string): Promise<OpenDocumentResult>;
   pickPath(input: PickFileInput): Promise<string | null>;
   createNote(input: CreateNoteRequest): Promise<void>;
   addReply(noteId: string, body: string): Promise<Note>;
@@ -104,6 +105,11 @@ export const createTreatyReaderApi = (): ReaderApi => ({
   async openDocument(path) {
     const data = unwrap(await api.documents.open.post({ path }));
     if (!data || "error" in data) throw new Error("Failed to open document");
+    return data;
+  },
+  async createDocument(path, content) {
+    const data = unwrap(await api.documents.create.post({ path, content }));
+    if (!data || "error" in data) throw new Error("Failed to save document");
     return data;
   },
   async pickPath(input) {

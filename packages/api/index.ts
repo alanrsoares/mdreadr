@@ -167,6 +167,40 @@ export const app = new Elysia()
       body: OpenDocumentBodySchema,
     },
   )
+  // Save As for a dropped/unsaved Document (no path yet, e.g. drag-and-drop content
+  // the webview read itself since it can't read the source path — see onDrop).
+  .post(
+    "/documents/create",
+    async ({ body, request, set }) => {
+      if (!isWebviewRequest(request)) {
+        set.status = 401;
+        return unauthorized;
+      }
+
+      const parsed = SaveDocumentBodySchema.safeParse(body);
+      if (!parsed.success) {
+        set.status = 400;
+        return { error: parsed.error.message, code: "ValidationError" };
+      }
+
+      const result = await documentSession.createAndOpen(parsed.data.path, parsed.data.content);
+      if (isErr(result)) {
+        set.status = match(result.error._tag)
+          .with("DocumentNotFound", () => 404)
+          .with("DocumentReadFailed", () => 500)
+          .exhaustive();
+        return toDocumentHttpError(result.error);
+      }
+
+      return {
+        path: result.value.path,
+        content: result.value.content,
+      };
+    },
+    {
+      body: SaveDocumentBodySchema,
+    },
+  )
   // Serves images referenced relative to the currently open Document. Scoped
   // to that Document so the endpoint cannot be used to probe arbitrary paths.
   .get("/documents/asset", async ({ query, set }) => {
