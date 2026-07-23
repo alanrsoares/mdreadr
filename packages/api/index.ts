@@ -5,9 +5,10 @@ import { cors } from "@elysiajs/cors";
 import { match } from "@onrails/pattern";
 import { isErr } from "@onrails/result";
 import { Elysia } from "elysia";
-import { NOTES_SCHEMA_VERSION } from "../../shared/constants.ts";
 import {
   addReply,
+  backfillNoteDocument,
+  buildNotesFilePayload,
   createNote,
   createSuggestion,
   findNote,
@@ -201,6 +202,23 @@ export const app = new Elysia()
       body: SaveDocumentBodySchema,
     },
   )
+  .get("/documents/tabs", () => ({
+    tabs: sessionStore.listTabs(),
+    activeId: sessionStore.activeTabId,
+  }))
+  .post("/documents/tabs/:id/activate", ({ params, set }) => {
+    const exists = sessionStore.listTabs().some((tab) => tab.id === params.id);
+    if (!exists) {
+      set.status = 404;
+      return { error: `Tab not found: ${params.id}`, code: "TabNotFound" };
+    }
+    sessionStore.activateTab(params.id);
+    return sessionStore.snapshot();
+  })
+  .post("/documents/tabs/:id/close", ({ params }) => {
+    documentSession.closeTab(params.id);
+    return { tabs: sessionStore.listTabs(), activeId: sessionStore.activeTabId };
+  })
   // Serves images referenced relative to the currently open Document. Scoped
   // to that Document so the endpoint cannot be used to probe arbitrary paths.
   .get("/documents/asset", async ({ query, set }) => {
@@ -285,7 +303,7 @@ export const app = new Elysia()
         return { error: parsed.error.message, code: "ValidationError" };
       }
 
-      const note = createNote(parsed.data);
+      const note = createNote(parsed.data, sessionStore.snapshot().document ?? undefined);
       sessionStore.addNote(note);
       return { note };
     },
@@ -342,11 +360,12 @@ export const app = new Elysia()
         return { error: parsed.error.message, code: "ValidationError" };
       }
 
-      const payload = NotesFileSchema.parse({
-        schemaVersion: NOTES_SCHEMA_VERSION,
-        document: parsed.data.document ?? sessionStore.snapshot().document ?? undefined,
-        notes: parsed.data.notes,
-      });
+      const payload = NotesFileSchema.parse(
+        buildNotesFilePayload(
+          parsed.data.document ?? sessionStore.snapshot().document ?? undefined,
+          parsed.data.notes,
+        ),
+      );
 
       const result = await writeTextFile(parsed.data.path, `${JSON.stringify(payload, null, 2)}\n`);
 
@@ -385,17 +404,24 @@ export const app = new Elysia()
         return domainError(notesFile.error);
       }
 
-      sessionStore.setNotes(notesFile.value.notes);
-      if (notesFile.value.document) {
-        const snapshot = sessionStore.snapshot();
-        if (!snapshot.document || snapshot.document.path !== notesFile.value.document.path) {
-          sessionStore.clearDocument();
+      const backfilled = backfillNoteDocument(notesFile.value);
+
+      if (backfilled.document) {
+        const opened = await documentSession.open(backfilled.document.path);
+        if (isErr(opened)) {
+          set.status = opened.error._tag === "DocumentNotFound" ? 404 : 500;
+          return toDocumentHttpError(opened.error);
         }
+      } else {
+        sessionStore.clearDocument();
       }
 
+      sessionStore.setNotes(backfilled.notes);
+
       return {
-        notes: notesFile.value.notes,
-        document: notesFile.value.document,
+        notes: backfilled.notes,
+        document: backfilled.document,
+        tabId: sessionStore.activeTabId,
       };
     },
     { body: LoadNotesBodySchema },
@@ -421,7 +447,10 @@ export const app = new Elysia()
         return { error: parsed.error.message, code: "ValidationError" };
       }
 
-      const suggestion = createSuggestion(parsed.data);
+      const suggestion = createSuggestion(
+        parsed.data,
+        sessionStore.snapshot().document ?? undefined,
+      );
       sessionStore.addSuggestion(suggestion);
       return { suggestion };
     },

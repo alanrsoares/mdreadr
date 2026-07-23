@@ -41,6 +41,9 @@ export const NoteSchema = z.object({
   replies: z.array(ReplySchema),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
+  /** Which open document this Note belongs to. Optional for back-compat with
+   * notes.json files saved before multi-document support. */
+  document: DocumentRefSchema.optional(),
 });
 
 export const NotesFileSchema = z.object({
@@ -104,6 +107,10 @@ export const SuggestionSchema = z.object({
   status: SuggestionStatusSchema,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
+  /** Which open document this Suggestion belongs to. Optional — Suggestions
+   * are never persisted to notes.json, so this only matters for in-memory
+   * per-tab scoping. */
+  document: DocumentRefSchema.optional(),
 });
 
 export const CreateSuggestionBodySchema = z.object({

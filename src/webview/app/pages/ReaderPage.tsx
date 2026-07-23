@@ -4,43 +4,28 @@ import { Button } from "@astryxdesign/core/Button";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
-import { ResizeHandle, useResizable } from "@astryxdesign/core/Resizable";
-import { Stack } from "@astryxdesign/core/Stack";
+import { useResizable } from "@astryxdesign/core/Resizable";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
-import type { Suggestion } from "@mdreadr/domain";
-import { applySuggestion, extractHeadings } from "@mdreadr/domain";
-import { useContainer, useStoreValues } from "@re-reduced/react";
-import type { CSSProperties } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppLogo } from "../components/AppLogo.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
-import { DocumentView } from "../components/DocumentView.tsx";
 import { McpClientsIndicator } from "../components/McpClientsIndicator.tsx";
 import { McpSettingsDialog } from "../components/McpSettingsDialog.tsx";
-import { NotesPanel } from "../components/NotesPanel.tsx";
 import { formatDisplayPath, pathFileName } from "../components/path-display.ts";
 import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
 import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
-import { SuggestionsPanel } from "../components/SuggestionsPanel.tsx";
-import { TocSidebar } from "../components/TocSidebar.tsx";
-import { useMutationToast } from "../hooks/useMutationToast.ts";
-import { ArrowDownTrayIcon, Cog6ToothIcon, ViewColumnsIcon } from "../icons.ts";
-import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
-import { isDirty } from "../session/document-draft.ts";
+import { TabStrip } from "../components/TabStrip.tsx";
+import { Cog6ToothIcon, ViewColumnsIcon } from "../icons.ts";
 import { createTreatyReaderApi } from "../session/reader-api.ts";
-import { useReaderSession } from "../session/useReaderSession.ts";
-import {
-  EmptyState,
-  ReaderContent,
-  ReaderLayout,
-  ReaderMain,
-  ReaderNotesAside,
-  ReaderPanel,
-} from "../ui/layout.tsx";
-import { readerPageContainer } from "./reader-page-container.ts";
+import { useDocumentTabs } from "../session/useReaderSession.ts";
+import { EmptyState } from "../ui/layout.tsx";
+import { ReaderTab, type ReaderTabHandle } from "./ReaderTab.tsx";
+import { UnsavedReaderTab } from "./UnsavedReaderTab.tsx";
 
 const readerApi = createTreatyReaderApi();
+
+const UNSAVED_TAB_ID = "__unsaved__";
 
 type ReaderDocumentTopNavHeadingProps = {
   documentPath?: string;
@@ -90,7 +75,6 @@ function ReaderDocumentTopNavHeading({
 }
 
 export function ReaderPage() {
-  const { showError } = useMutationToast();
   const notesSidebar = useResizable({
     defaultSize: 280,
     minSizePx: 220,
@@ -98,265 +82,166 @@ export function ReaderPage() {
     collapsible: true,
     autoSaveId: "mdreadr-notes-sidebar",
   });
-  const store = useContainer(readerPageContainer);
-  const { pendingAnchor, documentViewMode, liveMessage, isDragOver, draft, isDiscardDialogOpen } =
-    useStoreValues(store);
-  const readerMainRef = useRef<HTMLElement>(null);
-  const dragDepthRef = useRef(0);
-  const pendingActionRef = useRef<(() => void) | null>(null);
+
   const [isMcpSettingsOpen, setIsMcpSettingsOpen] = useState(false);
+  const [liveMessage, setLiveMessage] = useState("");
   // Content read client-side from a drag-drop the webview can't resolve a path
   // for (Electrobun's WKWebView, unlike Electron, never exposes File.path).
-  // Held locally until the user Saves it via a native Save As dialog.
-  const [unsavedDrop, setUnsavedDrop] = useState<{ name: string; content: string } | null>(null);
+  // Held locally, as its own client-only tab, until Save As succeeds.
+  const [unsavedDrop, setUnsavedDrop] = useState<{
+    name: string;
+    content: string;
+    key: number;
+  } | null>(null);
+  const [isUnsavedActive, setIsUnsavedActive] = useState(false);
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+  const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false);
+  const [discardTargetLabel, setDiscardTargetLabel] = useState("");
+  const pendingActionRef = useRef<(() => void) | null>(null);
+  const tabRefs = useRef<Record<string, ReaderTabHandle | null>>({});
+  const unsavedDropSeqRef = useRef(0);
 
-  const reader = useReaderSession(readerApi, {
-    onOpened: (path) => {
+  const tabs = useDocumentTabs(readerApi, {
+    onNotesLoaded: () => setLiveMessage("Notes loaded"),
+    onSaved: () => {
       setUnsavedDrop(null);
-      store.actions.pendingAnchorChanged(null);
-      store.actions.liveMessageChanged(`Opened ${pathFileName(path)}`);
-    },
-    onNoteCreated: () => {
-      store.actions.pendingAnchorChanged(null);
-      store.actions.liveMessageChanged("Note added");
-    },
-    onReplyAdded: () => {
-      store.actions.liveMessageChanged("Reply added");
-    },
-    onStatusChanged: (status) => {
-      store.actions.liveMessageChanged(`Note marked ${status ?? "updated"}`);
-    },
-    onNotesSaved: () => {
-      store.actions.liveMessageChanged("Notes saved");
-    },
-    onNotesLoaded: () => {
-      store.actions.liveMessageChanged("Notes loaded");
-    },
-    onDocumentSaved: () => {
-      store.actions.draftMarkedSaved();
-      store.actions.liveMessageChanged("Document saved");
+      setIsUnsavedActive(false);
     },
   });
 
-  const content = unsavedDrop ? unsavedDrop.content : (reader.session.data?.documentContent ?? "");
-  const documentPath = unsavedDrop ? undefined : reader.session.data?.document?.path;
-  const dirty = unsavedDrop !== null || isDirty(draft, documentPath);
-  const editorValue = unsavedDrop
-    ? unsavedDrop.content
-    : ((draft.path === documentPath ? draft.text : null) ?? content);
+  const effectiveActiveId = isUnsavedActive && unsavedDrop ? UNSAVED_TAB_ID : tabs.activeId;
+  const activeDocumentPath = isUnsavedActive ? undefined : tabs.activeDocument?.path;
 
-  const runGuarded = useCallback(
-    (action: () => void) => {
-      if (dirty) {
-        pendingActionRef.current = action;
-        store.actions.discardDialogOpenChanged(true);
-        return;
-      }
-      action();
-    },
-    [dirty, store],
-  );
-
-  const requestOpen = useCallback(
-    (path: string) => runGuarded(() => reader.open(path)),
-    [reader, runGuarded],
-  );
-
-  const requestPick = useCallback(() => runGuarded(() => reader.pick()), [reader, runGuarded]);
-
-  const onEditorChange = useCallback(
-    (text: string) => {
-      if (unsavedDrop) {
-        setUnsavedDrop({ ...unsavedDrop, content: text });
-        return;
-      }
-      if (!documentPath) return;
-      store.actions.draftEdited({ path: documentPath, text, savedContent: content });
-    },
-    [unsavedDrop, documentPath, content, store],
-  );
-
-  const saveDraft = useCallback(async () => {
-    if (unsavedDrop) {
-      reader.saveDropped(unsavedDrop);
-      return;
-    }
-    if (!documentPath || draft.path !== documentPath || draft.text === null) return;
-    await reader.saveDocument(documentPath, draft.text);
-  }, [unsavedDrop, documentPath, draft, reader]);
-
-  const onDrop = useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault();
-      dragDepthRef.current = 0;
-      store.actions.dragOverChanged(false);
-
-      const file = event.dataTransfer.files.item(0);
-      if (!file) return;
-
-      const isMarkdown = /\.(md|markdown)$/i.test(file.name);
-      const path = (file as File & { path?: string }).path;
-
-      // Some environments (Electron) expose the real filesystem path on drop.
-      // Electrobun's WKWebView never does — fall through to reading the
-      // File's content directly below.
-      if (path) {
-        if (isMarkdown) requestOpen(path);
-        return;
-      }
-
-      if (!isMarkdown) {
-        showError("Open dropped file", `"${file.name}" is not a markdown file.`);
-        return;
-      }
-
-      runGuarded(() => {
-        void file
-          .text()
-          .then((text) => setUnsavedDrop({ name: file.name, content: text }))
-          .catch(() => showError("Open dropped file", "Could not read the dropped file."));
-      });
-    },
-    [requestOpen, runGuarded, showError, store],
-  );
-
-  const onDragEnter = useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault();
-      if (!event.dataTransfer.types.includes("Files")) return;
-      dragDepthRef.current += 1;
-      store.actions.dragOverChanged(true);
-    },
-    [store],
-  );
-
-  const onDragLeave = useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault();
-      if (!event.dataTransfer.types.includes("Files")) return;
-      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-      if (dragDepthRef.current === 0) {
-        store.actions.dragOverChanged(false);
-      }
-    },
-    [store],
-  );
-
-  const onDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    if (event.dataTransfer.types.includes("Files")) {
-      event.dataTransfer.dropEffect = "copy";
-    }
+  const handleDirtyChange = useCallback((id: string, dirty: boolean) => {
+    setDirtyIds((prev) => {
+      if (prev.has(id) === dirty) return prev;
+      const next = new Set(prev);
+      if (dirty) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   }, []);
+
+  const handleOpenPath = useCallback(
+    (path: string) => {
+      setIsUnsavedActive(false);
+      tabs.open(path);
+    },
+    [tabs],
+  );
+
+  const handleDropUnsaved = useCallback(
+    (name: string, content: string) => {
+      const replace = () => {
+        unsavedDropSeqRef.current += 1;
+        setUnsavedDrop({ name, content, key: unsavedDropSeqRef.current });
+        setIsUnsavedActive(true);
+      };
+
+      if (unsavedDrop && dirtyIds.has(UNSAVED_TAB_ID)) {
+        pendingActionRef.current = replace;
+        setDiscardTargetLabel(unsavedDrop.name);
+        setIsDiscardDialogOpen(true);
+        return;
+      }
+
+      replace();
+    },
+    [unsavedDrop, dirtyIds],
+  );
+
+  const handleActivateTab = useCallback(
+    (id: string) => {
+      if (id === UNSAVED_TAB_ID) {
+        setIsUnsavedActive(true);
+        return;
+      }
+      setIsUnsavedActive(false);
+      tabs.activateTab(id);
+    },
+    [tabs],
+  );
+
+  const handleRequestCloseTab = useCallback(
+    (id: string) => {
+      if (id === UNSAVED_TAB_ID) {
+        const close = () => {
+          setUnsavedDrop(null);
+          setIsUnsavedActive(false);
+          handleDirtyChange(UNSAVED_TAB_ID, false);
+        };
+        if (dirtyIds.has(UNSAVED_TAB_ID)) {
+          pendingActionRef.current = close;
+          setDiscardTargetLabel(unsavedDrop?.name ?? "This document");
+          setIsDiscardDialogOpen(true);
+          return;
+        }
+        close();
+        return;
+      }
+
+      if (dirtyIds.has(id)) {
+        pendingActionRef.current = () => {
+          tabRefs.current[id]?.discardDraft();
+          tabs.closeTab(id);
+        };
+        const path = tabs.tabs.find((tab) => tab.id === id)?.document.path;
+        setDiscardTargetLabel(path ? pathFileName(path) : "This document");
+        setIsDiscardDialogOpen(true);
+        return;
+      }
+
+      tabs.closeTab(id);
+    },
+    [dirtyIds, tabs, unsavedDrop, handleDirtyChange],
+  );
+
+  const handleSaveAs = useCallback(
+    (content: string) => {
+      if (!unsavedDrop) return;
+      tabs.saveDropped({ name: unsavedDrop.name, content });
+    },
+    [unsavedDrop, tabs],
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
-      const key = event.key.toLowerCase();
+      if (event.key.toLowerCase() !== "o") return;
 
-      if (key === "s") {
-        if (documentViewMode !== "edit") return;
-        event.preventDefault();
-        if (dirty) {
-          void saveDraft();
-        }
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.closest("input, textarea, select, [contenteditable='true']"))
+      ) {
         return;
       }
 
-      if (key === "o") {
-        // Cmd+S must work while the editor textarea has focus, so this
-        // input/textarea focus guard applies only to Cmd+O.
-        const target = event.target;
-        if (
-          target instanceof HTMLElement &&
-          (target.isContentEditable ||
-            target.closest("input, textarea, select, [contenteditable='true']"))
-        ) {
-          return;
-        }
-
-        event.preventDefault();
-        requestPick();
-      }
+      event.preventDefault();
+      tabs.pick();
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [dirty, documentViewMode, requestPick, saveDraft]);
+  }, [tabs]);
 
   useEffect(() => {
     readerApi.log("ReaderPage mounted");
 
     const handleOpenDocument = () => {
       readerApi.log("mdreadr:open-document received, invalidating queries...");
-      reader.refresh();
+      tabs.refresh();
     };
 
     window.addEventListener("mdreadr:open-document", handleOpenDocument);
     return () => window.removeEventListener("mdreadr:open-document", handleOpenDocument);
-  }, [reader]);
+  }, [tabs]);
 
-  const prevContentRef = useRef(content);
-  useEffect(() => {
-    if (prevContentRef.current !== content) {
-      // A drop populating `unsavedDrop` also changes `content`, but that's a
-      // local read, not the backend document changing under an open draft.
-      if (dirty && !unsavedDrop) {
-        showError(
-          "Document changed on disk",
-          "Your draft is kept. Save to overwrite, or discard to reload.",
-        );
-      }
-      prevContentRef.current = content;
-    }
-  }, [content, dirty, showError, unsavedDrop]);
-
-  const notes = reader.notes.data ?? [];
-  const suggestions = reader.suggestions.data ?? [];
-  const toc = useMemo(() => extractHeadings(content), [content]);
-  const isOpening = reader.isOpening;
-
-  const onScrollToAnchor = useCallback(
-    (blockId: string) => {
-      const jump = () => {
-        if (!scrollToAnchor(blockId)) {
-          showError("Jump to note", "Could not find that block in the document.");
-        }
-      };
-
-      if (documentViewMode !== "preview") {
-        store.actions.documentViewModeChanged("preview");
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(jump);
-        });
-        return;
-      }
-
-      jump();
-    },
-    [documentViewMode, showError, store],
-  );
-
-  const onAcceptSuggestion = useCallback(
-    async (suggestion: Suggestion) => {
-      if (!documentPath) return;
-      const spliced = applySuggestion(editorValue, suggestion.anchor, suggestion.replacementText);
-      if (spliced === undefined) {
-        showError("Accept suggestion", "Could not locate that text in the document anymore.");
-        return;
-      }
-      store.actions.draftEdited({ path: documentPath, text: spliced, savedContent: content });
-      await reader.setSuggestionStatus(suggestion.id, "accepted");
-    },
-    [documentPath, editorValue, content, reader, showError, store],
-  );
-
-  const onRejectSuggestion = useCallback(
-    async (suggestion: Suggestion) => {
-      await reader.setSuggestionStatus(suggestion.id, "rejected");
-    },
-    [reader],
-  );
+  const tabStripEntries = [
+    ...tabs.tabs.map((tab) => ({ id: tab.id, label: pathFileName(tab.document.path) })),
+    ...(unsavedDrop ? [{ id: UNSAVED_TAB_ID, label: unsavedDrop.name }] : []),
+  ];
 
   return (
     <AppShell
@@ -366,9 +251,9 @@ export function ReaderPage() {
           label="Reader"
           heading={
             <ReaderDocumentTopNavHeading
-              documentPath={documentPath}
-              unsavedName={unsavedDrop?.name}
-              homeDirectory={reader.session.data?.homeDirectory}
+              documentPath={activeDocumentPath}
+              unsavedName={isUnsavedActive ? unsavedDrop?.name : undefined}
+              homeDirectory={tabs.homeDirectory}
             />
           }
           endContent={
@@ -394,8 +279,8 @@ export function ReaderPage() {
               <Button
                 label="Open…"
                 variant="secondary"
-                isLoading={isOpening}
-                onClick={requestPick}
+                isLoading={tabs.isOpening}
+                onClick={tabs.pick}
               />
             </HStack>
           }
@@ -403,153 +288,92 @@ export function ReaderPage() {
       }
       sideNav={
         <RecentsSidebar
-          paths={reader.recents.data ?? []}
-          selectedPath={documentPath}
-          homeDirectory={reader.session.data?.homeDirectory}
-          onOpen={requestOpen}
-          onPickDocument={requestPick}
-          isOpening={isOpening}
+          paths={tabs.recents}
+          selectedPath={activeDocumentPath}
+          homeDirectory={tabs.homeDirectory}
+          onOpen={handleOpenPath}
+          onPickDocument={tabs.pick}
+          isOpening={tabs.isOpening}
         />
       }
     >
       <div aria-live="polite" className="sr-only">
         {liveMessage}
       </div>
-      <ReaderLayout
-        aria-label="Document reader"
-        style={{ "--notes-col-width": `${notesSidebar.size}px` } as CSSProperties}
-      >
-        <ReaderPanel>
-          {documentViewMode === "preview" ? (
-            <TocSidebar entries={toc} scrollRootRef={readerMainRef} documentKey={documentPath} />
-          ) : (
-            <EmptyState className="reader-empty-enter">
-              <p>Table of contents is available in preview.</p>
-            </EmptyState>
-          )}
-        </ReaderPanel>
 
-        <ReaderMain
-          ref={readerMainRef}
-          onDragEnter={onDragEnter}
-          onDragLeave={onDragLeave}
-          onDragOver={onDragOver}
-          onDrop={onDrop}
-        >
-          <div
-            aria-hidden
-            className="reader-main-drop-overlay"
-            data-active={isDragOver ? "true" : "false"}
-          >
-            <Stack gap={2} vAlign="center" hAlign="center" className="reader-drop-overlay-content">
-              <Icon icon={ArrowDownTrayIcon} size="lg" />
-              Drop to open
-            </Stack>
-          </div>
-          {content || unsavedDrop ? (
-            <ReaderContent>
-              <DocumentView
-                key={documentPath ?? unsavedDrop?.name}
-                content={content}
-                documentPath={documentPath}
-                notes={notes}
-                viewMode={documentViewMode}
-                onViewModeChange={store.actions.documentViewModeChanged}
-                onPinBlock={(anchor) => {
-                  store.actions.pendingAnchorChanged(anchor);
-                  flashAnchor(anchor.blockId, "reader-block-pin-flash");
-                  store.actions.liveMessageChanged(
-                    `Pinning note to ${anchor.label ?? anchor.kind}`,
-                  );
+      {tabStripEntries.length === 0 ? (
+        <EmptyState className="reader-empty-enter">
+          <AppLogo size={48} />
+          <ReaderDropHint />
+          <Button
+            label="Open markdown…"
+            variant="primary"
+            isLoading={tabs.isOpening}
+            onClick={tabs.pick}
+          />
+        </EmptyState>
+      ) : (
+        <>
+          <TabStrip
+            tabs={tabStripEntries}
+            activeId={effectiveActiveId}
+            dirtyIds={dirtyIds}
+            onActivate={handleActivateTab}
+            onRequestClose={handleRequestCloseTab}
+          />
+
+          {tabs.tabs.map((tab) => (
+            <div key={tab.id} hidden={effectiveActiveId !== tab.id}>
+              <ReaderTab
+                ref={(handle) => {
+                  tabRefs.current[tab.id] = handle;
                 }}
-                editorValue={editorValue}
-                onEditorChange={onEditorChange}
-                chromeEnd={
-                  documentViewMode === "edit" ? (
-                    <Button
-                      label={unsavedDrop ? "Save As…" : "Save"}
-                      variant="primary"
-                      size="sm"
-                      isDisabled={!dirty}
-                      isLoading={reader.isSavingDocument || reader.isSavingDropped}
-                      onClick={() => {
-                        void saveDraft();
-                      }}
-                    />
-                  ) : undefined
-                }
+                readerApi={readerApi}
+                tabId={tab.id}
+                isActive={effectiveActiveId === tab.id}
+                notesSidebar={notesSidebar}
+                onOpenPath={handleOpenPath}
+                onDropUnsaved={handleDropUnsaved}
+                onDirtyChange={handleDirtyChange}
+                onAnnounce={setLiveMessage}
+                onLoadNotes={tabs.load}
+                isLoadingNotes={tabs.isLoadingNotes}
               />
-            </ReaderContent>
-          ) : (
-            <EmptyState className="reader-empty-enter">
-              <AppLogo size={48} />
-              <ReaderDropHint />
-              <Button
-                label="Open markdown…"
-                variant="primary"
-                isLoading={isOpening}
-                onClick={requestPick}
+            </div>
+          ))}
+
+          {unsavedDrop ? (
+            <div hidden={effectiveActiveId !== UNSAVED_TAB_ID}>
+              <UnsavedReaderTab
+                key={unsavedDrop.key}
+                name={unsavedDrop.name}
+                content={unsavedDrop.content}
+                notesSidebar={notesSidebar}
+                isSaving={tabs.isSavingDropped}
+                onOpenPath={handleOpenPath}
+                onDropUnsaved={handleDropUnsaved}
+                onDirtyChange={handleDirtyChange}
+                onSaveAs={handleSaveAs}
               />
-            </EmptyState>
-          )}
-        </ReaderMain>
-
-        <ResizeHandle
-          resizable={notesSidebar.props}
-          isReversed
-          hasDivider
-          label="Resize notes sidebar"
-        />
-
-        <ReaderNotesAside data-pending={pendingAnchor ? "true" : "false"}>
-          <SuggestionsPanel
-            suggestions={suggestions}
-            onAccept={onAcceptSuggestion}
-            onReject={onRejectSuggestion}
-            onScrollToAnchor={onScrollToAnchor}
-          />
-          <NotesPanel
-            notes={notes}
-            pendingAnchor={pendingAnchor}
-            isSaving={reader.isSaving}
-            isLoadingNotes={reader.isLoadingNotes}
-            isCreatingNote={reader.isCreatingNote}
-            onCreateNote={async (input) => {
-              await reader.createNote(input);
-            }}
-            onAddReply={async (noteId, body) => {
-              await reader.addReply(noteId, body);
-            }}
-            onUpdateStatus={async (noteId, status) => {
-              await reader.setStatus(noteId, status);
-            }}
-            onSaveNotes={async () => {
-              await reader.save();
-            }}
-            onLoadNotes={async () => {
-              await reader.load();
-            }}
-            onScrollToAnchor={onScrollToAnchor}
-          />
-        </ReaderNotesAside>
-      </ReaderLayout>
+            </div>
+          ) : null}
+        </>
+      )}
 
       <AlertDialog
         isOpen={isDiscardDialogOpen}
         onOpenChange={(open) => {
-          store.actions.discardDialogOpenChanged(open);
+          setIsDiscardDialogOpen(open);
           if (!open) {
             pendingActionRef.current = null;
           }
         }}
         title="Discard draft?"
-        description={`${unsavedDrop ? unsavedDrop.name : draft.path ? pathFileName(draft.path) : "This Document"} has unsaved changes. Discarding cannot be undone.`}
+        description={`${discardTargetLabel} has unsaved changes. Discarding cannot be undone.`}
         cancelLabel="Keep editing"
         actionLabel="Discard"
         onAction={() => {
-          setUnsavedDrop(null);
-          store.actions.draftDiscarded();
-          store.actions.discardDialogOpenChanged(false);
+          setIsDiscardDialogOpen(false);
           const pending = pendingActionRef.current;
           pendingActionRef.current = null;
           pending?.();

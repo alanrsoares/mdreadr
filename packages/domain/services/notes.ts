@@ -1,9 +1,11 @@
 import { match } from "@onrails/pattern";
 import { err, ok, type Result } from "@onrails/result";
+import { NOTES_SCHEMA_VERSION } from "../../../shared/constants.ts";
 import type {
   AddReplyInput,
   Author,
   CreateNoteInput,
+  DocumentRef,
   Note,
   NoteStatus,
   NotesFile,
@@ -19,7 +21,7 @@ export const newId = (): string => crypto.randomUUID();
 
 export const nowIso = (): string => new Date().toISOString();
 
-export function createNote(input: CreateNoteInput): Note {
+export function createNote(input: CreateNoteInput, document?: DocumentRef): Note {
   const timestamp = nowIso();
   const reply: Reply = {
     id: newId(),
@@ -36,6 +38,7 @@ export function createNote(input: CreateNoteInput): Note {
     replies: [reply],
     createdAt: timestamp,
     updatedAt: timestamp,
+    document,
   };
 }
 
@@ -74,6 +77,25 @@ export function parseNotesFileJson(raw: unknown): Result<NotesFile, NotesDomainE
 export function findNote(notes: Note[], id: string): Result<Note, NotesDomainError> {
   const note = notes.find((item) => item.id === id);
   return !note ? err({ _tag: "NoteNotFound", id }) : ok(note);
+}
+
+/**
+ * Legacy notes.json files (saved before multi-document support) only carry
+ * the file-level `document` ref, not one per note. Stamp it onto any note
+ * that doesn't already have its own.
+ */
+export function backfillNoteDocument(file: NotesFile): NotesFile {
+  if (!file.document) return file;
+  return {
+    ...file,
+    notes: file.notes.map((note) => (note.document ? note : { ...note, document: file.document })),
+  };
+}
+
+/** Shared shape for both the `/notes/save` route and the `save_session_notes`
+ * MCP tool, so the two never drift into incompatible notes.json shapes again. */
+export function buildNotesFilePayload(document: DocumentRef | undefined, notes: Note[]): NotesFile {
+  return { schemaVersion: NOTES_SCHEMA_VERSION, document, notes };
 }
 
 export const formatAuthorLabel = (author: Author): string =>

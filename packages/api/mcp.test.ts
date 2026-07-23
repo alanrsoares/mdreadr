@@ -8,9 +8,7 @@ import { sessionStore } from "./session.ts";
 
 describe("MCP Server", () => {
   beforeEach(() => {
-    sessionStore.clearDocument();
-    sessionStore.setNotes([]);
-    sessionStore.setSuggestions([]);
+    sessionStore.resetAllTabs();
   });
 
   it("exposes /mcp POST endpoint for initialization", async () => {

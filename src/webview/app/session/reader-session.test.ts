@@ -17,9 +17,10 @@ function createInMemoryReaderApi() {
   const pickQueue: Array<string | null> = [];
   let saveNotesCallCount = 0;
   let savedInput: { path: string; notes: Note[]; document?: DocumentRef } | null = null;
-  let loadNotesResult: { notes: Note[]; document?: DocumentRef | null } = {
+  let loadNotesResult: LoadNotesResult = {
     notes: [],
     document: null,
+    tabId: null,
   };
   let lastSaveDocumentCall: { path: string; content: string } | null = null;
   let fakeDocumentContent = "";
@@ -74,6 +75,15 @@ function createInMemoryReaderApi() {
       lastSaveDocumentCall = { path, content };
       fakeDocumentContent = content;
     },
+    async getTabs() {
+      return { tabs: [], activeId: null };
+    },
+    async activateTab() {
+      throw new Error("not exercised by these tests");
+    },
+    async closeTab() {
+      return { tabs: [], activeId: null };
+    },
     log() {},
   };
 
@@ -124,24 +134,28 @@ describe("loadNotesFlow", () => {
     expect(outcome).toEqual({ kind: "cancelled" });
   });
 
-  test("loaded with a document -> documentPath is set", async () => {
+  test("loaded with a document -> tabId is set", async () => {
     const helper = createInMemoryReaderApi();
     helper.pushPick("/tmp/notes.json");
-    helper.setLoadNotesResult({ notes: [], document: { path: "/tmp/doc.md" } });
+    helper.setLoadNotesResult({
+      notes: [],
+      document: { path: "/tmp/doc.md" },
+      tabId: "/tmp/doc.md",
+    });
 
     const outcome = await loadNotesFlow(helper.api);
 
-    expect(outcome).toEqual({ kind: "loaded", documentPath: "/tmp/doc.md" });
+    expect(outcome).toEqual({ kind: "loaded", tabId: "/tmp/doc.md" });
   });
 
-  test("loaded without a document -> documentPath is null", async () => {
+  test("loaded without a document -> tabId is null", async () => {
     const helper = createInMemoryReaderApi();
     helper.pushPick("/tmp/notes.json");
-    helper.setLoadNotesResult({ notes: [], document: null });
+    helper.setLoadNotesResult({ notes: [], document: null, tabId: null });
 
     const outcome = await loadNotesFlow(helper.api);
 
-    expect(outcome).toEqual({ kind: "loaded", documentPath: null });
+    expect(outcome).toEqual({ kind: "loaded", tabId: null });
   });
 });
 

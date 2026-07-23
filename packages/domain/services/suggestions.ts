@@ -2,6 +2,7 @@ import { err, ok, type Result } from "@onrails/result";
 import type {
   BlockAnchor,
   CreateSuggestionInput,
+  DocumentRef,
   Suggestion,
   SuggestionStatus,
 } from "../schemas/index.ts";
@@ -18,7 +19,7 @@ export function findSuggestion(
   return !suggestion ? err({ _tag: "SuggestionNotFound", id }) : ok(suggestion);
 }
 
-export function createSuggestion(input: CreateSuggestionInput): Suggestion {
+export function createSuggestion(input: CreateSuggestionInput, document?: DocumentRef): Suggestion {
   const timestamp = nowIso();
   return {
     id: newId(),
@@ -29,6 +30,7 @@ export function createSuggestion(input: CreateSuggestionInput): Suggestion {
     status: "pending",
     createdAt: timestamp,
     updatedAt: timestamp,
+    document,
   };
 }
 

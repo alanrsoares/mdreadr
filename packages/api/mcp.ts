@@ -5,6 +5,7 @@ import { isErr } from "@onrails/result";
 import {
   addReply,
   type BlockAnchor,
+  buildNotesFilePayload,
   createNote,
   createSuggestion,
   listDocumentBlocks,
@@ -361,12 +362,15 @@ function registerHandlers(mcpServer: Server) {
       }
       case "add_note": {
         const args = request.params.arguments as unknown as Parameters<typeof createNote>[0];
-        const note = createNote({
-          anchor: args.anchor,
-          body: args.body,
-          author: args.author,
-          kind: args.kind,
-        });
+        const note = createNote(
+          {
+            anchor: args.anchor,
+            body: args.body,
+            author: args.author,
+            kind: args.kind,
+          },
+          sessionStore.snapshot().document ?? undefined,
+        );
         sessionStore.addNote(note);
         documentSession.triggerChange();
         return {
@@ -456,7 +460,8 @@ function registerHandlers(mcpServer: Server) {
           };
         }
         const notes = sessionStore.getNotes();
-        const content = JSON.stringify({ version: 1, notes }, null, 2);
+        const document = sessionStore.snapshot().document ?? undefined;
+        const content = JSON.stringify(buildNotesFilePayload(document, notes), null, 2);
         const result = await writeTextFile(args.path, content);
         if (isErr(result)) {
           throw new Error(`Failed to save notes: ${result.error.message}`);
@@ -492,12 +497,15 @@ function registerHandlers(mcpServer: Server) {
           noteId?: string;
           author?: Parameters<typeof createSuggestion>[0]["author"];
         };
-        const suggestion = createSuggestion({
-          anchor: args.anchor,
-          replacementText: args.replacementText,
-          noteId: args.noteId,
-          author: args.author ?? { kind: "agent" },
-        });
+        const suggestion = createSuggestion(
+          {
+            anchor: args.anchor,
+            replacementText: args.replacementText,
+            noteId: args.noteId,
+            author: args.author ?? { kind: "agent" },
+          },
+          sessionStore.snapshot().document ?? undefined,
+        );
         sessionStore.addSuggestion(suggestion);
         documentSession.triggerChange();
         return {

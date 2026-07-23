@@ -2,9 +2,7 @@ import type { DocumentRef, Note } from "@mdreadr/domain";
 import type { ReaderApi } from "./reader-api.ts";
 
 export type SaveNotesOutcome = { kind: "saved"; path: string } | { kind: "cancelled" };
-export type LoadNotesOutcome =
-  | { kind: "loaded"; documentPath: string | null }
-  | { kind: "cancelled" };
+export type LoadNotesOutcome = { kind: "loaded"; tabId: string | null } | { kind: "cancelled" };
 
 export type SaveNotesFlowInput = { notes: Note[]; document?: DocumentRef };
 
@@ -26,7 +24,7 @@ export async function loadNotesFlow(api: ReaderApi): Promise<LoadNotesOutcome> {
   if (!path) return { kind: "cancelled" };
 
   const result = await api.loadNotes(path);
-  return { kind: "loaded", documentPath: result.document?.path ?? null };
+  return { kind: "loaded", tabId: result.tabId };
 }
 
 /** Pick a Document (cancel → null). */

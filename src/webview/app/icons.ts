@@ -14,4 +14,5 @@ export {
   ShieldCheckIcon,
   SunIcon,
   ViewColumnsIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";

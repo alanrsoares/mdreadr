@@ -89,3 +89,30 @@ export const TocNav = tw.nav`p-3`;
 export const MermaidBlock = tw.div(
   "overflow-auto rounded-(--radius-container) border border-(--color-border) p-4",
 );
+
+export const TabStripRow = tw.div(
+  "flex min-w-0 items-stretch gap-1 overflow-x-auto border-(--color-border) border-b bg-(--color-background-surface) px-2",
+);
+
+export const TabStripItem = tw.button(
+  "group flex min-w-0 max-w-[200px] cursor-pointer items-center gap-2 rounded-t-(--radius-inner) border border-transparent border-b-0 px-3 py-2 text-(--color-text-secondary) text-sm transition-[background-color,color] duration-(--duration-fast) ease-(--ease-standard) hover:bg-(--color-background-muted) hover:text-(--color-text-primary)",
+  {
+    variants: {
+      $active: {
+        true: "bg-(--reader-well-bg) text-(--color-text-primary)",
+        false: "",
+      },
+    },
+    defaultVariants: {
+      $active: false,
+    },
+  },
+);
+
+export const TabStripLabel = tw.span`min-w-0 flex-1 truncate text-left`;
+
+export const TabStripDirtyDot = tw.span`size-1.5 shrink-0 rounded-full bg-(--color-text-accent)`;
+
+export const TabStripCloseButton = tw.span(
+  "grid shrink-0 place-items-center rounded-(--radius-inner) p-0.5 opacity-0 transition-opacity duration-(--duration-fast) ease-(--ease-standard) group-hover:opacity-100 hover:bg-(--color-background-muted)",
+);

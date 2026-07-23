@@ -11,12 +11,12 @@ let activeMainWindow: BrowserWindow | null = null;
 let pendingOpenUrl: string | null = null;
 
 // Register file change notification to update the webview dynamically
-documentSession.onChange(() => {
+documentSession.onChange((documentId) => {
   if (activeMainWindow) {
     try {
       fs.appendFileSync(
         "/tmp/mdreadr-debug.log",
-        `[${new Date().toISOString()}] File change detected, dispatching open-document event to webview...\n`,
+        `[${new Date().toISOString()}] File change detected for ${documentId}, dispatching open-document event to webview...\n`,
       );
     } catch {}
     activeMainWindow.webview.executeJavascript(

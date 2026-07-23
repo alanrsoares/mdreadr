@@ -1,15 +1,9 @@
-import type {
-  CreateNoteRequest,
-  Note,
-  NoteStatus,
-  SaveDocumentInput,
-  Suggestion,
-} from "@mdreadr/domain";
+import type { CreateNoteRequest, DocumentRef, Note, NoteStatus, Suggestion } from "@mdreadr/domain";
 import { type UseQueryResult, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 import { formatDisplayPath } from "../components/path-display.ts";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
-import type { ReaderApi, SessionSnapshot } from "./reader-api.ts";
+import type { ReaderApi, SessionSnapshot, TabSummary } from "./reader-api.ts";
 import {
   loadNotesFlow,
   pickDocumentFlow,
@@ -21,67 +15,64 @@ import {
 type AddReplyMutationInput = { noteId: string; body: string };
 type SetNoteStatusMutationInput = { noteId: string; status: NoteStatus };
 type SetSuggestionStatusMutationInput = { suggestionId: string; status: "accepted" | "rejected" };
+type SaveDocumentMutationInput = { path: string; content: string };
 
 export type ReaderSessionCallbacks = {
-  onOpened?: (path: string) => void;
   onNoteCreated?: () => void;
   onReplyAdded?: () => void;
   onStatusChanged?: (status: NoteStatus | undefined) => void;
   onNotesSaved?: () => void;
-  onNotesLoaded?: () => void;
   onDocumentSaved?: () => void;
   onSuggestionStatusChanged?: (suggestion: Suggestion) => void;
 };
 
 export type ReaderSession = {
   session: UseQueryResult<SessionSnapshot>;
-  recents: UseQueryResult<string[]>;
   notes: UseQueryResult<Note[]>;
   suggestions: UseQueryResult<Suggestion[]>;
-  open: (path: string) => void;
-  pick: () => void;
-  saveDropped: (input: SaveDroppedDocumentInput) => void;
-  isSavingDropped: boolean;
   createNote: (input: CreateNoteRequest) => Promise<void>;
   addReply: (noteId: string, body: string) => Promise<void>;
   setStatus: (noteId: string, status: NoteStatus) => Promise<void>;
   setSuggestionStatus: (suggestionId: string, status: "accepted" | "rejected") => Promise<void>;
   save: () => Promise<void>;
-  load: () => Promise<void>;
   saveDocument: (path: string, content: string) => Promise<void>;
-  refresh: () => void;
-  isOpening: boolean;
   isSaving: boolean;
-  isLoadingNotes: boolean;
   isCreatingNote: boolean;
   isSavingDocument: boolean;
 };
 
+/**
+ * Per-tab data: scoped by `tabId` and gated by `isActive` so an inactive,
+ * keep-alive-rendered tab never fetches-and-caches the *active* tab's data
+ * under its own (inactive) query key — the server always answers `getSession`
+ * etc. for whichever tab is active server-side, regardless of which
+ * `tabId`-scoped hook instance is asking.
+ */
 export function useReaderSession(
   readerApi: ReaderApi,
+  tabId: string | null,
+  isActive: boolean,
   callbacks: ReaderSessionCallbacks = {},
 ): ReaderSession {
   const queryClient = useQueryClient();
   const { showError, showSuccess } = useMutationToast();
 
   const session = useQuery({
-    queryKey: ["session"],
+    queryKey: ["session", tabId],
     queryFn: () => readerApi.getSession(),
-  });
-
-  const recents = useQuery({
-    queryKey: ["recents"],
-    queryFn: () => readerApi.getRecents(),
+    enabled: isActive,
   });
 
   const notes = useQuery({
-    queryKey: ["notes"],
+    queryKey: ["notes", tabId],
     queryFn: () => readerApi.getNotes(),
+    enabled: isActive,
   });
 
   const suggestions = useQuery({
-    queryKey: ["suggestions"],
+    queryKey: ["suggestions", tabId],
     queryFn: () => readerApi.getSuggestions(),
+    enabled: isActive,
   });
 
   useEffect(() => {
@@ -96,14 +87,6 @@ export function useReaderSession(
     }
   }, [notes.error, notes.isError, showError]);
 
-  const invalidateSession = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ["session"] });
-  }, [queryClient]);
-
-  const invalidateRecents = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ["recents"] });
-  }, [queryClient]);
-
   const invalidateNotes = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["notes"] });
   }, [queryClient]);
@@ -111,46 +94,6 @@ export function useReaderSession(
   const invalidateSuggestions = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["suggestions"] });
   }, [queryClient]);
-
-  const openDocumentMutation = useMutation({
-    mutationFn: (path: string) => readerApi.openDocument(path),
-    onSuccess: (_data, path) => {
-      invalidateSession();
-      invalidateRecents();
-      const homeDirectory = queryClient.getQueryData<SessionSnapshot>(["session"])?.homeDirectory;
-      showSuccess(`Opened ${formatDisplayPath(path, homeDirectory)}`);
-      callbacks.onOpened?.(path);
-    },
-    onError: (error) => {
-      showError("Open document", error);
-    },
-  });
-
-  const pickDocumentMutation = useMutation({
-    mutationFn: () => pickDocumentFlow(readerApi),
-    onSuccess: (path) => {
-      if (path) {
-        openDocumentMutation.mutate(path);
-      }
-    },
-    onError: (error) => {
-      showError("Pick file", error);
-    },
-  });
-
-  const saveDroppedDocumentMutation = useMutation({
-    mutationFn: (input: SaveDroppedDocumentInput) => saveDroppedDocumentFlow(readerApi, input),
-    onSuccess: (outcome) => {
-      if (outcome.kind !== "saved") return;
-      invalidateSession();
-      invalidateRecents();
-      showSuccess(`Saved ${outcome.path}`);
-      callbacks.onOpened?.(outcome.path);
-    },
-    onError: (error) => {
-      showError("Save dropped file", error);
-    },
-  });
 
   const createNoteMutation = useMutation({
     mutationFn: (input: CreateNoteRequest) => readerApi.createNote(input),
@@ -216,10 +159,10 @@ export function useReaderSession(
   });
 
   const saveDocumentMutation = useMutation({
-    mutationFn: (input: SaveDocumentInput) => readerApi.saveDocument(input.path, input.content),
+    mutationFn: (input: SaveDocumentMutationInput) =>
+      readerApi.saveDocument(input.path, input.content),
     onSuccess: () => {
-      invalidateSession();
-      showSuccess("Document saved");
+      void queryClient.invalidateQueries({ queryKey: ["session", tabId] });
       callbacks.onDocumentSaved?.();
     },
     onError: (error) => {
@@ -227,32 +170,10 @@ export function useReaderSession(
     },
   });
 
-  const loadNotesMutation = useMutation({
-    mutationFn: () => loadNotesFlow(readerApi),
-    onSuccess: (outcome) => {
-      if (outcome.kind !== "loaded") return;
-      if (outcome.documentPath) {
-        openDocumentMutation.mutate(outcome.documentPath);
-      }
-      invalidateNotes();
-      invalidateSession();
-      showSuccess("Notes loaded");
-      callbacks.onNotesLoaded?.();
-    },
-    onError: (error) => {
-      showError("Load notes", error);
-    },
-  });
-
   return {
     session,
-    recents,
     notes,
     suggestions,
-    open: (path) => openDocumentMutation.mutate(path),
-    pick: () => pickDocumentMutation.mutate(),
-    saveDropped: (input) => saveDroppedDocumentMutation.mutate(input),
-    isSavingDropped: saveDroppedDocumentMutation.isPending,
     createNote: async (input) => {
       await createNoteMutation.mutateAsync(input);
     },
@@ -268,20 +189,194 @@ export function useReaderSession(
     save: async () => {
       await saveNotesMutation.mutateAsync();
     },
-    load: async () => {
-      await loadNotesMutation.mutateAsync();
-    },
     saveDocument: async (path, content) => {
       await saveDocumentMutation.mutateAsync({ path, content });
     },
-    refresh: () => {
-      invalidateSession();
-      invalidateNotes();
-    },
-    isOpening: pickDocumentMutation.isPending || openDocumentMutation.isPending,
     isSaving: saveNotesMutation.isPending,
-    isLoadingNotes: loadNotesMutation.isPending,
     isCreatingNote: createNoteMutation.isPending,
     isSavingDocument: saveDocumentMutation.isPending,
+  };
+}
+
+export type DocumentTabsCallbacks = {
+  onOpened?: (path: string) => void;
+  onNotesLoaded?: () => void;
+  onSaved?: () => void;
+};
+
+export type DocumentTabs = {
+  tabs: TabSummary[];
+  activeId: string | null;
+  activeDocument: DocumentRef | null;
+  homeDirectory: string | undefined;
+  recents: string[];
+  activateTab: (id: string) => void;
+  closeTab: (id: string) => void;
+  open: (path: string) => void;
+  pick: () => void;
+  saveDropped: (input: SaveDroppedDocumentInput) => void;
+  load: () => Promise<void>;
+  refresh: () => void;
+  isOpening: boolean;
+  isSavingDropped: boolean;
+  isLoadingNotes: boolean;
+};
+
+/**
+ * Shell-level: tab list, recents, and every action that opens-or-activates a
+ * (possibly different) tab. `activeId` is server-authoritative — the client
+ * never tracks its own "which tab is active" boolean.
+ *
+ * `activeDocument`/`homeDirectory` come from a `["session", activeId]` query
+ * using the exact same key a `useReaderSession(readerApi, activeId, true)`
+ * call makes for that same tab — TanStack Query dedupes by key, so this is
+ * one shared cache entry, not a second fetch, letting the shell read the
+ * active tab's snapshot for the TopNav heading / RecentsSidebar without
+ * prop-drilling up from that tab's own component.
+ */
+export function useDocumentTabs(
+  readerApi: ReaderApi,
+  callbacks: DocumentTabsCallbacks = {},
+): DocumentTabs {
+  const queryClient = useQueryClient();
+  const { showError, showSuccess } = useMutationToast();
+
+  const tabsQuery = useQuery({
+    queryKey: ["tabs"],
+    queryFn: () => readerApi.getTabs(),
+  });
+  const activeId = tabsQuery.data?.activeId ?? null;
+
+  const recentsQuery = useQuery({
+    queryKey: ["recents"],
+    queryFn: () => readerApi.getRecents(),
+  });
+
+  const activeSessionQuery = useQuery({
+    queryKey: ["session", activeId],
+    queryFn: () => readerApi.getSession(),
+    enabled: activeId != null,
+  });
+
+  const invalidateTabs = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["tabs"] });
+  }, [queryClient]);
+
+  const invalidateRecents = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["recents"] });
+  }, [queryClient]);
+
+  const invalidateSession = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["session"] });
+  }, [queryClient]);
+
+  const invalidateAfterTabChange = useCallback(() => {
+    invalidateTabs();
+    invalidateSession();
+    void queryClient.invalidateQueries({ queryKey: ["notes"] });
+    void queryClient.invalidateQueries({ queryKey: ["suggestions"] });
+  }, [invalidateTabs, invalidateSession, queryClient]);
+
+  const activateTabMutation = useMutation({
+    mutationFn: (id: string) => readerApi.activateTab(id),
+    onSuccess: invalidateAfterTabChange,
+    onError: (error) => {
+      showError("Switch tab", error);
+    },
+  });
+
+  const closeTabMutation = useMutation({
+    mutationFn: (id: string) => readerApi.closeTab(id),
+    onSuccess: invalidateAfterTabChange,
+    onError: (error) => {
+      showError("Close tab", error);
+    },
+  });
+
+  const openDocumentMutation = useMutation({
+    mutationFn: (path: string) => readerApi.openDocument(path),
+    onSuccess: (_data, path) => {
+      invalidateAfterTabChange();
+      invalidateRecents();
+      const homeDirectory = activeSessionQuery.data?.homeDirectory;
+      showSuccess(`Opened ${formatDisplayPath(path, homeDirectory)}`);
+      callbacks.onOpened?.(path);
+    },
+    onError: (error) => {
+      showError("Open document", error);
+    },
+  });
+
+  const pickDocumentMutation = useMutation({
+    mutationFn: () => pickDocumentFlow(readerApi),
+    onSuccess: (path) => {
+      if (path) openDocumentMutation.mutate(path);
+    },
+    onError: (error) => {
+      showError("Pick document", error);
+    },
+  });
+
+  const saveDroppedDocumentMutation = useMutation({
+    mutationFn: (input: SaveDroppedDocumentInput) => saveDroppedDocumentFlow(readerApi, input),
+    onSuccess: (outcome) => {
+      if (outcome.kind !== "saved") return;
+      invalidateAfterTabChange();
+      invalidateRecents();
+      showSuccess("Document saved");
+      callbacks.onSaved?.();
+    },
+    onError: (error) => {
+      showError("Save dropped file", error);
+    },
+  });
+
+  const loadNotesMutation = useMutation({
+    mutationFn: () => loadNotesFlow(readerApi),
+    onSuccess: (outcome) => {
+      if (outcome.kind !== "loaded") return;
+      invalidateAfterTabChange();
+      showSuccess("Notes loaded");
+      callbacks.onNotesLoaded?.();
+    },
+    onError: (error) => {
+      showError("Load notes", error);
+    },
+  });
+
+  return {
+    tabs: tabsQuery.data?.tabs ?? [],
+    activeId,
+    activeDocument: activeSessionQuery.data?.document ?? null,
+    homeDirectory: activeSessionQuery.data?.homeDirectory,
+    recents: recentsQuery.data ?? [],
+    activateTab: (id) => {
+      activateTabMutation.mutate(id);
+    },
+    closeTab: (id) => {
+      closeTabMutation.mutate(id);
+    },
+    open: (path) => {
+      openDocumentMutation.mutate(path);
+    },
+    pick: () => {
+      pickDocumentMutation.mutate();
+    },
+    saveDropped: (input) => {
+      saveDroppedDocumentMutation.mutate(input);
+    },
+    load: async () => {
+      await loadNotesMutation.mutateAsync();
+    },
+    refresh: () => {
+      invalidateTabs();
+      invalidateSession();
+      invalidateRecents();
+      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+      void queryClient.invalidateQueries({ queryKey: ["suggestions"] });
+    },
+    isOpening: pickDocumentMutation.isPending || openDocumentMutation.isPending,
+    isSavingDropped: saveDroppedDocumentMutation.isPending,
+    isLoadingNotes: loadNotesMutation.isPending,
   };
 }

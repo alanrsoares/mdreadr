@@ -18,8 +18,15 @@ export type SessionSnapshot = {
 };
 
 export type OpenDocumentResult = { path: string; content: string };
-export type LoadNotesResult = { notes: Note[]; document?: DocumentRef | null };
+export type LoadNotesResult = {
+  notes: Note[];
+  document?: DocumentRef | null;
+  tabId: string | null;
+};
 export type ApiResult<T> = { data: T | null; error: unknown };
+
+export type TabSummary = { id: string; document: DocumentRef };
+export type TabsResult = { tabs: TabSummary[]; activeId: string | null };
 
 export type ReaderApi = {
   getSession(): Promise<SessionSnapshot>;
@@ -36,6 +43,9 @@ export type ReaderApi = {
   saveNotes(input: SaveNotesInput): Promise<void>;
   loadNotes(path: string): Promise<LoadNotesResult>;
   saveDocument(path: string, content: string): Promise<void>;
+  getTabs(): Promise<TabsResult>;
+  activateTab(id: string): Promise<SessionSnapshot>;
+  closeTab(id: string): Promise<TabsResult>;
   log(message: string): void; // fire-and-forget diagnostics
 };
 
@@ -172,10 +182,24 @@ export const createTreatyReaderApi = (): ReaderApi => ({
     return {
       notes: data.notes,
       document: "document" in data ? (data.document ?? null) : null,
+      tabId: "tabId" in data ? (data.tabId ?? null) : null,
     };
   },
   async saveDocument(path, content) {
     unwrap(await api.documents.save.post({ path, content }));
+  },
+  async getTabs() {
+    const data = unwrap(await api.documents.tabs.get());
+    return data;
+  },
+  async activateTab(id) {
+    const data = unwrap(await api.documents.tabs({ id }).activate.post());
+    if (!data || "error" in data) throw new Error("Failed to activate tab");
+    return data;
+  },
+  async closeTab(id) {
+    const data = unwrap(await api.documents.tabs({ id }).close.post());
+    return data;
   },
   log(message) {
     void api.log.post({ message }).catch(() => {});
