@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.1](https://github.com/alanrsoares/mdreadr/compare/v0.5.0...v0.5.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* patch desktop entry env vars in Linux installer ([5ae826a](https://github.com/alanrsoares/mdreadr/commit/5ae826af32afe7d0fcfd701faa45c01102b49d77))
+* patch desktop entry env vars in Linux installer ([3b1abd7](https://github.com/alanrsoares/mdreadr/commit/3b1abd76aeef1a09d3566eac5df2ac6a2ca7c681))
+* **webview:** encode tab ids before building Eden Treaty tab routes ([85acc52](https://github.com/alanrsoares/mdreadr/commit/85acc52ff596194c5c5cc5336e96e9c83eb076d0))
+
 ## [0.5.0](https://github.com/alanrsoares/mdreadr/compare/v0.4.1...v0.5.0) (2026-07-23)
 
 
