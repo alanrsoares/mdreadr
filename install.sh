@@ -202,6 +202,19 @@ install_linux() {
     chmod +x "$TMP_DIR/installer"
     say "» running the ${APP} installer (extracts to ~/.local/share, adds a desktop entry)…"
     (cd "$TMP_DIR" && ./installer)
+
+    # WebKitGTK on Wayland renders a blank window without these; patch the
+    # desktop entry so launching from an app menu/launcher works too.
+    DESKTOP_FILE="$HOME/.local/share/applications/${APP}.desktop"
+    if [ -f "$DESKTOP_FILE" ]; then
+      sed -i 's|Exec="|Exec=env GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 "|' "$DESKTOP_FILE"
+    fi
+    mkdir -p "$BIN_DIR"
+    printf '#!/bin/sh\nexport GDK_BACKEND=x11\nexport WEBKIT_DISABLE_DMABUF_RENDERER=1\nexec "%s/.local/share/dev.mdreadr.app/%s/app/bin/launcher" "$@"\n' \
+      "$HOME" "$CHANNEL" >"$BIN_DIR/$APP"
+    chmod +x "$BIN_DIR/$APP"
+    path_hint
+
     say "✓ installed via the ${APP} installer"
     return
   fi
