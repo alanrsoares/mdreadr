@@ -193,12 +193,15 @@ export const createTreatyReaderApi = (): ReaderApi => ({
     return data;
   },
   async activateTab(id) {
-    const data = unwrap(await api.documents.tabs({ id }).activate.post());
+    // Eden Treaty joins path params with "/" but never URL-encodes them, so a
+    // tab id containing slashes (it's a resolved filesystem path) must be
+    // pre-encoded into a single path segment ourselves.
+    const data = unwrap(await api.documents.tabs({ id: encodeURIComponent(id) }).activate.post());
     if (!data || "error" in data) throw new Error("Failed to activate tab");
     return data;
   },
   async closeTab(id) {
-    const data = unwrap(await api.documents.tabs({ id }).close.post());
+    const data = unwrap(await api.documents.tabs({ id: encodeURIComponent(id) }).close.post());
     return data;
   },
   log(message) {

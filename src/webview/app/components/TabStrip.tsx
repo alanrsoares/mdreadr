@@ -1,12 +1,7 @@
 import { Icon } from "@astryxdesign/core/Icon";
+import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { XMarkIcon } from "../icons.ts";
-import {
-  TabStripCloseButton,
-  TabStripDirtyDot,
-  TabStripItem,
-  TabStripLabel,
-  TabStripRow,
-} from "../ui/layout.tsx";
+import { TabStripCloseButton, TabStripDirtyDot } from "../ui/layout.tsx";
 
 export type TabStripEntry = { id: string; label: string };
 
@@ -22,31 +17,38 @@ export function TabStrip({ tabs, activeId, dirtyIds, onActivate, onRequestClose 
   if (tabs.length === 0) return null;
 
   return (
-    <TabStripRow role="tablist" aria-label="Open documents">
+    <TabList
+      value={activeId ?? ""}
+      onChange={onActivate}
+      size="sm"
+      hasDivider
+      aria-label="Open documents"
+      className="overflow-x-auto bg-(--color-background-surface) px-2"
+    >
       {tabs.map((tab) => (
-        <TabStripItem
+        <Tab
           key={tab.id}
-          type="button"
-          role="tab"
-          title={tab.label}
-          aria-selected={tab.id === activeId}
-          $active={tab.id === activeId}
-          onClick={() => onActivate(tab.id)}
-        >
-          <TabStripLabel>{tab.label}</TabStripLabel>
-          {dirtyIds.has(tab.id) ? <TabStripDirtyDot aria-hidden /> : null}
-          <TabStripCloseButton
-            role="button"
-            aria-label={`Close ${tab.label}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onRequestClose(tab.id);
-            }}
-          >
-            <Icon icon={XMarkIcon} size="sm" />
-          </TabStripCloseButton>
-        </TabStripItem>
+          className="group"
+          value={tab.id}
+          label={tab.label}
+          endContent={
+            <>
+              {dirtyIds.has(tab.id) ? <TabStripDirtyDot aria-hidden /> : null}
+              <TabStripCloseButton
+                role="button"
+                tabIndex={-1}
+                aria-label={`Close ${tab.label}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRequestClose(tab.id);
+                }}
+              >
+                <Icon icon={XMarkIcon} size="sm" />
+              </TabStripCloseButton>
+            </>
+          }
+        />
       ))}
-    </TabStripRow>
+    </TabList>
   );
 }
