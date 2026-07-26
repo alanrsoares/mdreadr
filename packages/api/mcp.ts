@@ -16,7 +16,12 @@ import {
   setNoteStatus,
 } from "../domain/index.ts";
 import { documentSession } from "./document-session.ts";
-import { isSaveNotesPathAllowed, writeTextFile } from "./documents.ts";
+import {
+  isSupportedDocumentPath,
+  isWorkspacePathAllowed,
+  toDocumentHttpError,
+  writeTextFile,
+} from "./documents.ts";
 import { sessionStore } from "./session.ts";
 
 const authorInputSchema = {
@@ -108,6 +113,21 @@ function registerHandlers(mcpServer: Server) {
         inputSchema: {
           type: "object",
           properties: {},
+        },
+      },
+      {
+        name: "open_document",
+        description:
+          "Switch mdreadr to a Markdown file by path, making it the current document. Reopening an already-open path just activates its tab (notes/suggestions on it are preserved). Path must be a .md/.markdown file inside the home directory tree (home, ~/Documents, ~/Desktop, or the currently open document's directory). Use this after creating or updating a file the user wants reviewed in mdreadr — it unblocks the workflow where the human would otherwise have to open the file manually.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            path: {
+              type: "string",
+              description: "Absolute path to the Markdown file to open.",
+            },
+          },
+          required: ["path"],
         },
       },
       {
@@ -333,6 +353,60 @@ function registerHandlers(mcpServer: Server) {
           ],
         };
       }
+      case "open_document": {
+        const args = request.params.arguments as unknown as { path: string };
+        if (!isSupportedDocumentPath(args.path)) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  error: `Unsupported document type: ${args.path}`,
+                  code: "UnsupportedDocumentType",
+                }),
+              },
+            ],
+          };
+        }
+        const currentDocumentPath = sessionStore.snapshot().document?.path ?? null;
+        if (!isWorkspacePathAllowed(args.path, currentDocumentPath)) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  error: `Path not allowed: ${args.path}`,
+                  code: "PathNotAllowed",
+                }),
+              },
+            ],
+          };
+        }
+        const result = await documentSession.open(args.path);
+        if (isErr(result)) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(toDocumentHttpError(result.error)),
+              },
+            ],
+          };
+        }
+        documentSession.triggerChange();
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                path: result.value.path,
+                content: result.value.content,
+                latestSeq: sessionStore.latestSeq(),
+              }),
+            },
+          ],
+        };
+      }
       case "get_session_notes": {
         const args = (request.params.arguments ?? {}) as { verbose?: boolean };
         const notes = sessionStore.getNotes();
@@ -446,7 +520,7 @@ function registerHandlers(mcpServer: Server) {
       case "save_session_notes": {
         const args = request.params.arguments as { path: string };
         const documentPath = sessionStore.snapshot().document?.path ?? null;
-        if (!isSaveNotesPathAllowed(args.path, documentPath)) {
+        if (!isWorkspacePathAllowed(args.path, documentPath)) {
           return {
             content: [
               {
