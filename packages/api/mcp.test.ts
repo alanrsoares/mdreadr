@@ -140,14 +140,14 @@ describe("MCP Server", () => {
   // Because the actual JSON-RPC over SSE is tricky to mock without a client,
   // we could test the mcpServer tool execution directly.
   it("registers tools correctly", async () => {
-    const { mcpServer } = await import("./mcp.ts");
+    const { mcpServer } = await import("./mcp/index.ts");
     // Unfortunately, the MCP SDK doesn't expose an easy way to just "list tools"
     // synchronously without a transport, but we know it boots up and connects.
     expect(mcpServer).toBeDefined();
   });
 
   it("exposes typed author and anchor schemas, plus the block-read tool", async () => {
-    const { mcpServer } = await import("./mcp.ts");
+    const { mcpServer } = await import("./mcp/index.ts");
     const listHandler = (
       mcpServer as unknown as {
         _requestHandlers: Map<
@@ -198,7 +198,7 @@ describe("MCP Server", () => {
   });
 
   it("propose_edit adds a pending Suggestion to the session", async () => {
-    const { mcpServer } = await import("./mcp.ts");
+    const { mcpServer } = await import("./mcp/index.ts");
     const callHandler = (
       mcpServer as unknown as {
         _requestHandlers: Map<
@@ -236,7 +236,7 @@ describe("MCP Server", () => {
 
   describe("journal / wait_for_activity", () => {
     async function callTool(name: string, args: Record<string, unknown>) {
-      const { mcpServer } = await import("./mcp.ts");
+      const { mcpServer } = await import("./mcp/index.ts");
       const handler = (
         mcpServer as unknown as {
           _requestHandlers: Map<
@@ -314,7 +314,7 @@ describe("MCP Server", () => {
 
   describe("compact note payloads", () => {
     async function callTool(name: string, args: Record<string, unknown>) {
-      const { mcpServer } = await import("./mcp.ts");
+      const { mcpServer } = await import("./mcp/index.ts");
       const handler = (
         mcpServer as unknown as {
           _requestHandlers: Map<
@@ -396,7 +396,7 @@ describe("MCP Server", () => {
 
   describe("save_session_notes path scoping", () => {
     async function callSaveSessionNotes(path: string) {
-      const { mcpServer } = await import("./mcp.ts");
+      const { mcpServer } = await import("./mcp/index.ts");
       const handler = (
         mcpServer as unknown as {
           _requestHandlers: Map<
@@ -448,7 +448,7 @@ describe("MCP Server", () => {
 
   describe("open_document", () => {
     async function callTool(name: string, args: Record<string, unknown>) {
-      const { mcpServer } = await import("./mcp.ts");
+      const { mcpServer } = await import("./mcp/index.ts");
       const handler = (
         mcpServer as unknown as {
           _requestHandlers: Map<
@@ -536,7 +536,7 @@ describe("MCP Server", () => {
 
   describe("HITL loop improvements", () => {
     async function callTool(name: string, args: Record<string, unknown>) {
-      const { mcpServer } = await import("./mcp.ts");
+      const { mcpServer } = await import("./mcp/index.ts");
       const handler = (
         mcpServer as unknown as {
           _requestHandlers: Map<
