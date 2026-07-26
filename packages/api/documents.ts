@@ -96,6 +96,11 @@ export function isWorkspacePathAllowed(
   return workspaceRoots(referenceDocumentPath, home).some((root) => isWithinRoot(resolved, root));
 }
 
+/** Shared "path rejected by `isWorkspacePathAllowed`" error, returned by both `save_session_notes` and MCP `open_document`. */
+export function toPathNotAllowedError(path: string): { error: string; code: string } {
+  return { error: `Path not allowed: ${path}`, code: "PathNotAllowed" };
+}
+
 const SUPPORTED_DOCUMENT_EXTENSIONS = [".md", ".markdown"];
 
 /** MCP `open_document` only opens Markdown files; the app itself has no such restriction (native dialogs, drag-and-drop, argv). */

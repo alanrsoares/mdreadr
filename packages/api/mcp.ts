@@ -20,6 +20,7 @@ import {
   isSupportedDocumentPath,
   isWorkspacePathAllowed,
   toDocumentHttpError,
+  toPathNotAllowedError,
   writeTextFile,
 } from "./documents.ts";
 import { sessionStore } from "./session.ts";
@@ -73,6 +74,11 @@ function toNoteSummary(note: Note) {
         }
       : null,
   };
+}
+
+/** Wraps a tool result payload in the MCP `content` envelope. */
+function toolJson(payload: unknown): { content: Array<{ type: "text"; text: string }> } {
+  return { content: [{ type: "text", text: JSON.stringify(payload) }] };
 }
 
 /** Compact row for suggestion listings: status + where it lands, without the full replacement text. */
@@ -356,56 +362,25 @@ function registerHandlers(mcpServer: Server) {
       case "open_document": {
         const args = request.params.arguments as unknown as { path: string };
         if (!isSupportedDocumentPath(args.path)) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  error: `Unsupported document type: ${args.path}`,
-                  code: "UnsupportedDocumentType",
-                }),
-              },
-            ],
-          };
+          return toolJson({
+            error: `Unsupported document type: ${args.path}`,
+            code: "UnsupportedDocumentType",
+          });
         }
         const currentDocumentPath = sessionStore.snapshot().document?.path ?? null;
         if (!isWorkspacePathAllowed(args.path, currentDocumentPath)) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  error: `Path not allowed: ${args.path}`,
-                  code: "PathNotAllowed",
-                }),
-              },
-            ],
-          };
+          return toolJson(toPathNotAllowedError(args.path));
         }
         const result = await documentSession.open(args.path);
         if (isErr(result)) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify(toDocumentHttpError(result.error)),
-              },
-            ],
-          };
+          return toolJson(toDocumentHttpError(result.error));
         }
         documentSession.triggerChange();
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                path: result.value.path,
-                content: result.value.content,
-                latestSeq: sessionStore.latestSeq(),
-              }),
-            },
-          ],
-        };
+        return toolJson({
+          path: result.value.path,
+          content: result.value.content,
+          latestSeq: sessionStore.latestSeq(),
+        });
       }
       case "get_session_notes": {
         const args = (request.params.arguments ?? {}) as { verbose?: boolean };
@@ -521,17 +496,7 @@ function registerHandlers(mcpServer: Server) {
         const args = request.params.arguments as { path: string };
         const documentPath = sessionStore.snapshot().document?.path ?? null;
         if (!isWorkspacePathAllowed(args.path, documentPath)) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  error: `Path not allowed: ${args.path}`,
-                  code: "PathNotAllowed",
-                }),
-              },
-            ],
-          };
+          return toolJson(toPathNotAllowedError(args.path));
         }
         const notes = sessionStore.getNotes();
         const document = sessionStore.snapshot().document ?? undefined;
