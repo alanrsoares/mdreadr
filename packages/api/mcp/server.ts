@@ -1,46 +1,19 @@
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { nowIso } from "../../domain/index.ts";
-import { activityToolHandlers, activityTools } from "./activity-tools.ts";
-import { documentToolHandlers, documentTools } from "./document-tools.ts";
-import { noteToolHandlers, noteTools } from "./note-tools.ts";
-import { suggestionToolHandlers, suggestionTools } from "./suggestion-tools.ts";
-
-const tools = [...documentTools, ...noteTools, ...suggestionTools, ...activityTools];
-const toolHandlers = {
-  ...documentToolHandlers,
-  ...noteToolHandlers,
-  ...suggestionToolHandlers,
-  ...activityToolHandlers,
-};
+import { registerActivityTools } from "./activity-tools.ts";
+import { registerDocumentTools } from "./document-tools.ts";
+import { registerNoteTools } from "./note-tools.ts";
+import { registerSuggestionTools } from "./suggestion-tools.ts";
 
 function createMcpServer(): Server {
-  const server = new Server(
-    {
-      name: "mdreadr",
-      version: "0.1.0",
-    },
-    {
-      capabilities: {
-        tools: {},
-      },
-    },
-  );
-  registerHandlers(server);
-  return server;
-}
-
-function registerHandlers(mcpServer: Server) {
-  mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
-
-  mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const handler = toolHandlers[request.params.name];
-    if (!handler) {
-      throw new Error(`Tool not found: ${request.params.name}`);
-    }
-    return handler(request.params.arguments ?? {});
-  });
+  const server = new McpServer({ name: "mdreadr", version: "0.1.0" });
+  registerDocumentTools(server);
+  registerNoteTools(server);
+  registerSuggestionTools(server);
+  registerActivityTools(server);
+  return server.server;
 }
 
 /** Test-only entry point: handlers registered but never connected to a transport. */

@@ -614,9 +614,28 @@ describe("MCP Server", () => {
     });
 
     it("get_suggestion throws for an unknown id", async () => {
-      await expect(callTool("get_suggestion", { suggestionId: "nope" })).rejects.toThrow(
-        "Suggestion not found: nope",
+      const { mcpServer } = await import("./mcp/index.ts");
+      const handler = (
+        mcpServer as unknown as {
+          _requestHandlers: Map<
+            string,
+            (
+              request: unknown,
+              extra: unknown,
+            ) => Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }>
+          >;
+        }
+      )._requestHandlers.get("tools/call");
+      if (!handler) throw new Error("tools/call handler not registered");
+      const result = await handler(
+        {
+          method: "tools/call",
+          params: { name: "get_suggestion", arguments: { suggestionId: "nope" } },
+        },
+        {},
       );
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain("Suggestion not found: nope");
     });
 
     it("events carry an entity summary and responses include latestSeq", async () => {
