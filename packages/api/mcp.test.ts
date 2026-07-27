@@ -140,14 +140,14 @@ describe("MCP Server", () => {
   // Because the actual JSON-RPC over SSE is tricky to mock without a client,
   // we could test the mcpServer tool execution directly.
   it("registers tools correctly", async () => {
-    const { mcpServer } = await import("./mcp.ts");
+    const { mcpServer } = await import("./mcp/index.ts");
     // Unfortunately, the MCP SDK doesn't expose an easy way to just "list tools"
     // synchronously without a transport, but we know it boots up and connects.
     expect(mcpServer).toBeDefined();
   });
 
   it("exposes typed author and anchor schemas, plus the block-read tool", async () => {
-    const { mcpServer } = await import("./mcp.ts");
+    const { mcpServer } = await import("./mcp/index.ts");
     const listHandler = (
       mcpServer as unknown as {
         _requestHandlers: Map<
@@ -198,7 +198,7 @@ describe("MCP Server", () => {
   });
 
   it("propose_edit adds a pending Suggestion to the session", async () => {
-    const { mcpServer } = await import("./mcp.ts");
+    const { mcpServer } = await import("./mcp/index.ts");
     const callHandler = (
       mcpServer as unknown as {
         _requestHandlers: Map<
@@ -236,7 +236,7 @@ describe("MCP Server", () => {
 
   describe("journal / wait_for_activity", () => {
     async function callTool(name: string, args: Record<string, unknown>) {
-      const { mcpServer } = await import("./mcp.ts");
+      const { mcpServer } = await import("./mcp/index.ts");
       const handler = (
         mcpServer as unknown as {
           _requestHandlers: Map<
@@ -314,7 +314,7 @@ describe("MCP Server", () => {
 
   describe("compact note payloads", () => {
     async function callTool(name: string, args: Record<string, unknown>) {
-      const { mcpServer } = await import("./mcp.ts");
+      const { mcpServer } = await import("./mcp/index.ts");
       const handler = (
         mcpServer as unknown as {
           _requestHandlers: Map<
@@ -396,7 +396,7 @@ describe("MCP Server", () => {
 
   describe("save_session_notes path scoping", () => {
     async function callSaveSessionNotes(path: string) {
-      const { mcpServer } = await import("./mcp.ts");
+      const { mcpServer } = await import("./mcp/index.ts");
       const handler = (
         mcpServer as unknown as {
           _requestHandlers: Map<
@@ -446,9 +446,97 @@ describe("MCP Server", () => {
     });
   });
 
+  describe("open_document", () => {
+    async function callTool(name: string, args: Record<string, unknown>) {
+      const { mcpServer } = await import("./mcp/index.ts");
+      const handler = (
+        mcpServer as unknown as {
+          _requestHandlers: Map<
+            string,
+            (
+              request: unknown,
+              extra: unknown,
+            ) => Promise<{ content: Array<{ type: string; text: string }> }>
+          >;
+        }
+      )._requestHandlers.get("tools/call");
+      if (!handler) throw new Error("tools/call handler not registered");
+      const result = await handler({ method: "tools/call", params: { name, arguments: args } }, {});
+      const first = result.content[0];
+      if (!first) throw new Error("expected tool result content");
+      return JSON.parse(first.text);
+    }
+
+    let dir: string;
+
+    beforeEach(async () => {
+      dir = await mkdtemp(join(tmpdir(), "mdreadr-open-document-test-"));
+      sessionStore.setDocument({ path: join(dir, "current.md") }, "# current");
+    });
+
+    afterEach(async () => {
+      sessionStore.clearDocument();
+      await rm(dir, { recursive: true, force: true });
+    });
+
+    it("opens a Markdown file, making it the current document", async () => {
+      const target = join(dir, "briefing.md");
+      await Bun.write(target, "# Briefing\n\nBody text.");
+
+      const opened = await callTool("open_document", { path: target });
+      expect(opened.path).toBe(target);
+      expect(opened.content).toBe("# Briefing\n\nBody text.");
+
+      const current = await callTool("get_current_document", {});
+      expect(current.path).toBe(target);
+      expect(current.content).toBe("# Briefing\n\nBody text.");
+
+      const { blocks } = await callTool("get_document_blocks", {});
+      type DocBlockKind = { kind: string };
+      expect(blocks.map((block: DocBlockKind) => block.kind)).toEqual(["heading", "paragraph"]);
+    });
+
+    it("returns a structured error for a non-existent file", async () => {
+      const target = join(dir, "missing.md");
+      const result = await callTool("open_document", { path: target });
+      expect(result).toEqual({
+        error: `Document not found: ${target}`,
+        code: "DocumentNotFound",
+      });
+    });
+
+    it("rejects a path outside the workspace root", async () => {
+      const result = await callTool("open_document", { path: "/etc/mdreadr-open-test.md" });
+      expect(result).toEqual({
+        error: "Path not allowed: /etc/mdreadr-open-test.md",
+        code: "PathNotAllowed",
+      });
+    });
+
+    it("rejects an unsupported file type", async () => {
+      const target = join(dir, "notes.txt");
+      await Bun.write(target, "plain text");
+      const result = await callTool("open_document", { path: target });
+      expect(result).toEqual({
+        error: `Unsupported document type: ${target}`,
+        code: "UnsupportedDocumentType",
+      });
+    });
+
+    it("reopening an already-open path keeps it current", async () => {
+      const target = join(dir, "briefing.md");
+      await Bun.write(target, "# Briefing");
+      await callTool("open_document", { path: target });
+
+      sessionStore.setDocument({ path: join(dir, "current.md") }, "# current");
+      const reopened = await callTool("open_document", { path: target });
+      expect(reopened.path).toBe(target);
+    });
+  });
+
   describe("HITL loop improvements", () => {
     async function callTool(name: string, args: Record<string, unknown>) {
-      const { mcpServer } = await import("./mcp.ts");
+      const { mcpServer } = await import("./mcp/index.ts");
       const handler = (
         mcpServer as unknown as {
           _requestHandlers: Map<
@@ -526,9 +614,28 @@ describe("MCP Server", () => {
     });
 
     it("get_suggestion throws for an unknown id", async () => {
-      await expect(callTool("get_suggestion", { suggestionId: "nope" })).rejects.toThrow(
-        "Suggestion not found: nope",
+      const { mcpServer } = await import("./mcp/index.ts");
+      const handler = (
+        mcpServer as unknown as {
+          _requestHandlers: Map<
+            string,
+            (
+              request: unknown,
+              extra: unknown,
+            ) => Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }>
+          >;
+        }
+      )._requestHandlers.get("tools/call");
+      if (!handler) throw new Error("tools/call handler not registered");
+      const result = await handler(
+        {
+          method: "tools/call",
+          params: { name: "get_suggestion", arguments: { suggestionId: "nope" } },
+        },
+        {},
       );
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain("Suggestion not found: nope");
     });
 
     it("events carry an entity summary and responses include latestSeq", async () => {

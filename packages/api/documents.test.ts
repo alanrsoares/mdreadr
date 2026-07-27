@@ -3,7 +3,8 @@ import {
   buildMacOpenScript,
   buildMacSaveScript,
   escapeAppleScriptString,
-  isSaveNotesPathAllowed,
+  isSupportedDocumentPath,
+  isWorkspacePathAllowed,
   toAppleScriptTypeList,
   toZenityFileFilters,
 } from "./documents.ts";
@@ -59,32 +60,43 @@ test("buildMacSaveScript handles bare filenames", () => {
 
 const HOME = "/Users/testuser";
 
-test("isSaveNotesPathAllowed accepts a path inside the open Document's directory", () => {
-  expect(isSaveNotesPathAllowed("/opt/project/notes.json", "/opt/project/doc.md", HOME)).toBe(true);
+test("isWorkspacePathAllowed accepts a path inside the open Document's directory", () => {
+  expect(isWorkspacePathAllowed("/opt/project/notes.json", "/opt/project/doc.md", HOME)).toBe(true);
 });
 
-test("isSaveNotesPathAllowed accepts a nested path inside the Document's directory", () => {
-  expect(isSaveNotesPathAllowed("/opt/project/sub/notes.json", "/opt/project/doc.md", HOME)).toBe(
+test("isWorkspacePathAllowed accepts a nested path inside the Document's directory", () => {
+  expect(isWorkspacePathAllowed("/opt/project/sub/notes.json", "/opt/project/doc.md", HOME)).toBe(
     true,
   );
 });
 
-test("isSaveNotesPathAllowed rejects a path outside the Document's directory and home", () => {
-  expect(isSaveNotesPathAllowed("/opt/other/notes.json", "/opt/project/doc.md", HOME)).toBe(false);
+test("isWorkspacePathAllowed rejects a path outside the Document's directory and home", () => {
+  expect(isWorkspacePathAllowed("/opt/other/notes.json", "/opt/project/doc.md", HOME)).toBe(false);
 });
 
-test("isSaveNotesPathAllowed rejects a sibling directory that merely shares a prefix", () => {
-  expect(isSaveNotesPathAllowed("/opt/project-evil/notes.json", "/opt/project/doc.md", HOME)).toBe(
+test("isWorkspacePathAllowed rejects a sibling directory that merely shares a prefix", () => {
+  expect(isWorkspacePathAllowed("/opt/project-evil/notes.json", "/opt/project/doc.md", HOME)).toBe(
     false,
   );
 });
 
-test("isSaveNotesPathAllowed accepts paths under Documents, Desktop, and home itself", () => {
-  expect(isSaveNotesPathAllowed(`${HOME}/Documents/notes.json`, null, HOME)).toBe(true);
-  expect(isSaveNotesPathAllowed(`${HOME}/Desktop/notes.json`, null, HOME)).toBe(true);
-  expect(isSaveNotesPathAllowed(`${HOME}/notes.json`, null, HOME)).toBe(true);
+test("isWorkspacePathAllowed accepts paths under Documents, Desktop, and home itself", () => {
+  expect(isWorkspacePathAllowed(`${HOME}/Documents/notes.json`, null, HOME)).toBe(true);
+  expect(isWorkspacePathAllowed(`${HOME}/Desktop/notes.json`, null, HOME)).toBe(true);
+  expect(isWorkspacePathAllowed(`${HOME}/notes.json`, null, HOME)).toBe(true);
 });
 
-test("isSaveNotesPathAllowed rejects paths outside home when no Document is open", () => {
-  expect(isSaveNotesPathAllowed("/etc/passwd", null, HOME)).toBe(false);
+test("isWorkspacePathAllowed rejects paths outside home when no Document is open", () => {
+  expect(isWorkspacePathAllowed("/etc/passwd", null, HOME)).toBe(false);
+});
+
+test("isSupportedDocumentPath accepts .md and .markdown, case-insensitively", () => {
+  expect(isSupportedDocumentPath("/opt/project/doc.md")).toBe(true);
+  expect(isSupportedDocumentPath("/opt/project/DOC.MD")).toBe(true);
+  expect(isSupportedDocumentPath("/opt/project/doc.markdown")).toBe(true);
+});
+
+test("isSupportedDocumentPath rejects other extensions", () => {
+  expect(isSupportedDocumentPath("/opt/project/doc.txt")).toBe(false);
+  expect(isSupportedDocumentPath("/opt/project/doc")).toBe(false);
 });

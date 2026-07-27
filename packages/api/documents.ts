@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
 import type { PickFileInput } from "@mdreadr/domain";
+import { matchTag } from "@onrails/pattern/tag";
 import { ResultAsync } from "@onrails/result";
 import { touchRecent } from "./recents.ts";
 
@@ -71,37 +72,51 @@ export const resolveAssetPath = (documentPath: string, src: string): string =>
 const isWithinRoot = (target: string, root: string): boolean =>
   target === root || target.startsWith(root + sep);
 
-/**
- * Scopes writes (e.g. `save_session_notes`) to the currently open Document's
- * directory or common user directories, mirroring the asset-read scoping in
- * `documentSession.isAssetAllowed` — an agent shouldn't be able to write a file
- * anywhere the app process can reach.
- */
-export function isSaveNotesPathAllowed(
-  targetPath: string,
-  documentPath: string | null,
-  home: string = homedir(),
-): boolean {
-  const resolved = resolve(targetPath);
-  const roots = [
-    documentPath ? dirname(resolve(documentPath)) : null,
+function workspaceRoots(referenceDocumentPath: string | null, home: string): string[] {
+  return [
+    referenceDocumentPath ? dirname(resolve(referenceDocumentPath)) : null,
     join(home, "Documents"),
     join(home, "Desktop"),
     home,
   ].filter((root): root is string => root !== null);
-  return roots.some((root) => isWithinRoot(resolved, root));
+}
+
+/**
+ * Scopes agent-driven filesystem access (`save_session_notes`, MCP `open_document`)
+ * to a reference Document's directory or common user directories, mirroring the
+ * asset-read scoping in `documentSession.isAssetAllowed` — an agent shouldn't be
+ * able to read or write a file anywhere the app process can reach.
+ */
+export function isWorkspacePathAllowed(
+  targetPath: string,
+  referenceDocumentPath: string | null,
+  home: string = homedir(),
+): boolean {
+  const resolved = resolve(targetPath);
+  return workspaceRoots(referenceDocumentPath, home).some((root) => isWithinRoot(resolved, root));
+}
+
+/** Shared "path rejected by `isWorkspacePathAllowed`" error, returned by both `save_session_notes` and MCP `open_document`. */
+export function toPathNotAllowedError(path: string): { error: string; code: string } {
+  return { error: `Path not allowed: ${path}`, code: "PathNotAllowed" };
+}
+
+const SUPPORTED_DOCUMENT_EXTENSIONS = [".md", ".markdown"];
+
+/** MCP `open_document` only opens Markdown files; the app itself has no such restriction (native dialogs, drag-and-drop, argv). */
+export function isSupportedDocumentPath(path: string): boolean {
+  const lower = path.toLowerCase();
+  return SUPPORTED_DOCUMENT_EXTENSIONS.some((extension) => lower.endsWith(extension));
 }
 
 export function toDocumentHttpError(error: DocumentError): {
   error: string;
   code: string;
 } {
-  switch (error._tag) {
-    case "DocumentNotFound":
-      return { error: `Document not found: ${error.path}`, code: error._tag };
-    case "DocumentReadFailed":
-      return { error: error.message, code: error._tag };
-  }
+  return matchTag(error, {
+    DocumentNotFound: (e) => ({ error: `Document not found: ${e.path}`, code: e._tag }),
+    DocumentReadFailed: (e) => ({ error: e.message, code: e._tag }),
+  });
 }
 
 export const writeTextFile = (

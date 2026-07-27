@@ -47,7 +47,7 @@ import {
   getConnectedClients,
   handleMcpRequest,
   MAX_WAIT_TIMEOUT_MS,
-} from "./mcp.ts";
+} from "./mcp/index.ts";
 import { readRecents, toRecentsHttpError } from "./recents.ts";
 import { sessionStore } from "./session.ts";
 
