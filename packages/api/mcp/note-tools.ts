@@ -13,7 +13,7 @@ import {
 import { documentSession } from "../document-session.ts";
 import { isWorkspacePathAllowed, toPathNotAllowedError, writeTextFile } from "../documents.ts";
 import { sessionStore } from "../session.ts";
-import { toNoteSummary, toolJson } from "./shared.ts";
+import { getOrThrow, toNoteSummary, toolJson } from "./shared.ts";
 
 export function registerNoteTools(server: McpServer): void {
   server.registerTool(
@@ -41,10 +41,7 @@ export function registerNoteTools(server: McpServer): void {
       inputSchema: { noteId: z.string() },
     },
     ({ noteId }) => {
-      const note = sessionStore.getNotes().find((n) => n.id === noteId);
-      if (!note) {
-        throw new Error(`Note not found: ${noteId}`);
-      }
+      const note = getOrThrow(sessionStore.getNotes(), noteId, "Note");
       return toolJson(note);
     },
   );
@@ -85,11 +82,7 @@ export function registerNoteTools(server: McpServer): void {
       inputSchema: { noteId: z.string(), ...AddReplyBodySchema.shape },
     },
     ({ noteId, body, author }) => {
-      const notes = sessionStore.getNotes();
-      const note = notes.find((n) => n.id === noteId);
-      if (!note) {
-        throw new Error(`Note not found: ${noteId}`);
-      }
+      const note = getOrThrow(sessionStore.getNotes(), noteId, "Note");
       const updatedNote = addReply(note, { body, author });
       sessionStore.noteReplied(updatedNote);
       documentSession.triggerChange();
@@ -110,11 +103,7 @@ export function registerNoteTools(server: McpServer): void {
       inputSchema: { noteId: z.string(), status: NoteStatusSchema },
     },
     ({ noteId, status }) => {
-      const notes = sessionStore.getNotes();
-      const note = notes.find((n) => n.id === noteId);
-      if (!note) {
-        throw new Error(`Note not found: ${noteId}`);
-      }
+      const note = getOrThrow(sessionStore.getNotes(), noteId, "Note");
       const updatedNote = setNoteStatus(note, status);
       sessionStore.noteStatusChanged(updatedNote);
       documentSession.triggerChange();

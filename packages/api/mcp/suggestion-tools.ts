@@ -3,7 +3,7 @@ import { z } from "zod";
 import { AuthorSchema, CreateSuggestionBodySchema, createSuggestion } from "../../domain/index.ts";
 import { documentSession } from "../document-session.ts";
 import { sessionStore } from "../session.ts";
-import { toolJson, toSuggestionSummary } from "./shared.ts";
+import { getOrThrow, toolJson, toSuggestionSummary } from "./shared.ts";
 
 export function registerSuggestionTools(server: McpServer): void {
   server.registerTool(
@@ -70,10 +70,7 @@ export function registerSuggestionTools(server: McpServer): void {
       inputSchema: { suggestionId: z.string() },
     },
     ({ suggestionId }) => {
-      const suggestion = sessionStore.getSuggestions().find((item) => item.id === suggestionId);
-      if (!suggestion) {
-        throw new Error(`Suggestion not found: ${suggestionId}`);
-      }
+      const suggestion = getOrThrow(sessionStore.getSuggestions(), suggestionId, "Suggestion");
       return toolJson(suggestion);
     },
   );

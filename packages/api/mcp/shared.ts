@@ -1,10 +1,24 @@
+import { z } from "zod";
 import type { Note, Suggestion } from "../../domain/index.ts";
 
 export const DEFAULT_WAIT_TIMEOUT_MS = 25_000;
 export const MAX_WAIT_TIMEOUT_MS = 600_000;
 export const REPLY_PREVIEW_LENGTH = 140;
 
+export const sinceSeqSchema = z
+  .number()
+  .describe("The highest journal seq already seen. Use 0 to catch everything.");
+
 export type ToolResult = { content: Array<{ type: "text"; text: string }> };
+
+/** Finds an entity by id in a list, or throws a uniform "<label> not found: <id>" error. */
+export function getOrThrow<T extends { id: string }>(items: T[], id: string, label: string): T {
+  const item = items.find((entry) => entry.id === id);
+  if (!item) {
+    throw new Error(`${label} not found: ${id}`);
+  }
+  return item;
+}
 
 /** Wraps a tool result payload in the MCP `content` envelope. */
 export function toolJson(payload: unknown): ToolResult {

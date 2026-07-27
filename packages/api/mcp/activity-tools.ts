@@ -1,7 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { sessionStore } from "../session.ts";
-import { DEFAULT_WAIT_TIMEOUT_MS, MAX_WAIT_TIMEOUT_MS, toolJson } from "./shared.ts";
+import {
+  DEFAULT_WAIT_TIMEOUT_MS,
+  MAX_WAIT_TIMEOUT_MS,
+  sinceSeqSchema,
+  toolJson,
+} from "./shared.ts";
 
 export function registerActivityTools(server: McpServer): void {
   server.registerTool(
@@ -10,9 +15,7 @@ export function registerActivityTools(server: McpServer): void {
       description:
         "Long-poll for session activity (notes, replies, status changes, suggestions) newer than sinceSeq. Resolves immediately if activity already happened, otherwise waits up to timeoutMs (default 25000, capped at 600000) before resolving with an empty events list. Call again with the highest seq seen to keep watching. For watching without holding an MCP call open, prefer the HTTP endpoint GET /events/wait?sinceSeq=N&timeoutMs=M on the same server (e.g. from a background curl): it blocks the same way and exits when activity lands.",
       inputSchema: {
-        sinceSeq: z
-          .number()
-          .describe("The highest journal seq already seen. Use 0 to catch everything."),
+        sinceSeq: sinceSeqSchema,
         timeoutMs: z
           .number()
           .optional()
@@ -37,11 +40,7 @@ export function registerActivityTools(server: McpServer): void {
     {
       description:
         "Non-blocking catch-up read of journal entries newer than sinceSeq. Each event carries a `summary` of the entity it touched (note kind/status/last-author, or suggestion status), so you can act without a follow-up read. Response also includes `latestSeq`. Use this to resume after a reconnect instead of waiting.",
-      inputSchema: {
-        sinceSeq: z
-          .number()
-          .describe("The highest journal seq already seen. Use 0 to catch everything."),
-      },
+      inputSchema: { sinceSeq: sinceSeqSchema },
     },
     ({ sinceSeq }) => {
       return toolJson({
