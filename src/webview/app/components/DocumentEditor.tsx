@@ -20,7 +20,6 @@ export const DocumentEditor = ({ value, onChange }: DocumentEditorProps) => {
         color: "var(--color-text-primary)",
         fontFamily: "var(--font-family-code)",
         fontSize: "0.95rem",
-        borderRadius: "var(--radius-container)",
         border: "1px solid var(--color-border)",
         minHeight: "70vh",
       },

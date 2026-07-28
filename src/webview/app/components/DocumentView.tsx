@@ -44,14 +44,16 @@ export const DocumentView = ({
       {chromeEnd ? <ReaderChromeEnd>{chromeEnd}</ReaderChromeEnd> : null}
     </ReaderDocumentChrome>
 
-    <ReaderDocumentBody className="reader-document-body" key={viewMode}>
+    <ReaderDocumentBody className="reader-document-body p-0" key={viewMode}>
       {viewMode === "preview" ? (
-        <MarkdownView
-          content={content}
-          documentPath={documentPath}
-          notes={notes}
-          onPinBlock={onPinBlock}
-        />
+        <div className="px-8 py-6">
+          <MarkdownView
+            content={content}
+            documentPath={documentPath}
+            notes={notes}
+            onPinBlock={onPinBlock}
+          />
+        </div>
       ) : (
         <DocumentEditor value={editorValue} onChange={onEditorChange} />
       )}
