@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/alanrsoares/mdreadr/compare/v0.5.1...v0.6.0) (2026-07-28)
+
+
+### Features
+
+* **mcp:** add open_document tool to switch the current document by path ([358b34d](https://github.com/alanrsoares/mdreadr/commit/358b34d2141b58c0a1e92617d3d68857d143f95e))
+
+
+### Bug Fixes
+
+* **reader:** restore height chain so TOC sidebar stays pinned on scroll ([5eee8e6](https://github.com/alanrsoares/mdreadr/commit/5eee8e66a62b1fb3cc8628e79670d8b3c1ea7e56))
+
 ## [0.5.1](https://github.com/alanrsoares/mdreadr/compare/v0.5.0...v0.5.1) (2026-07-23)
 
 
