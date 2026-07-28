@@ -313,7 +313,7 @@ export function ReaderPage() {
           />
         </EmptyState>
       ) : (
-        <>
+        <div className="flex h-full min-h-0 flex-col">
           <TabStrip
             tabs={tabStripEntries}
             activeId={effectiveActiveId}
@@ -322,42 +322,44 @@ export function ReaderPage() {
             onRequestClose={handleRequestCloseTab}
           />
 
-          {tabs.tabs.map((tab) => (
-            <div key={tab.id} hidden={effectiveActiveId !== tab.id}>
-              <ReaderTab
-                ref={(handle) => {
-                  tabRefs.current[tab.id] = handle;
-                }}
-                readerApi={readerApi}
-                tabId={tab.id}
-                isActive={effectiveActiveId === tab.id}
-                notesSidebar={notesSidebar}
-                onOpenPath={handleOpenPath}
-                onDropUnsaved={handleDropUnsaved}
-                onDirtyChange={handleDirtyChange}
-                onAnnounce={setLiveMessage}
-                onLoadNotes={tabs.load}
-                isLoadingNotes={tabs.isLoadingNotes}
-              />
-            </div>
-          ))}
+          <div className="min-h-0 flex-1">
+            {tabs.tabs.map((tab) => (
+              <div key={tab.id} className="h-full" hidden={effectiveActiveId !== tab.id}>
+                <ReaderTab
+                  ref={(handle) => {
+                    tabRefs.current[tab.id] = handle;
+                  }}
+                  readerApi={readerApi}
+                  tabId={tab.id}
+                  isActive={effectiveActiveId === tab.id}
+                  notesSidebar={notesSidebar}
+                  onOpenPath={handleOpenPath}
+                  onDropUnsaved={handleDropUnsaved}
+                  onDirtyChange={handleDirtyChange}
+                  onAnnounce={setLiveMessage}
+                  onLoadNotes={tabs.load}
+                  isLoadingNotes={tabs.isLoadingNotes}
+                />
+              </div>
+            ))}
 
-          {unsavedDrop ? (
-            <div hidden={effectiveActiveId !== UNSAVED_TAB_ID}>
-              <UnsavedReaderTab
-                key={unsavedDrop.key}
-                name={unsavedDrop.name}
-                content={unsavedDrop.content}
-                notesSidebar={notesSidebar}
-                isSaving={tabs.isSavingDropped}
-                onOpenPath={handleOpenPath}
-                onDropUnsaved={handleDropUnsaved}
-                onDirtyChange={handleDirtyChange}
-                onSaveAs={handleSaveAs}
-              />
-            </div>
-          ) : null}
-        </>
+            {unsavedDrop ? (
+              <div className="h-full" hidden={effectiveActiveId !== UNSAVED_TAB_ID}>
+                <UnsavedReaderTab
+                  key={unsavedDrop.key}
+                  name={unsavedDrop.name}
+                  content={unsavedDrop.content}
+                  notesSidebar={notesSidebar}
+                  isSaving={tabs.isSavingDropped}
+                  onOpenPath={handleOpenPath}
+                  onDropUnsaved={handleDropUnsaved}
+                  onDirtyChange={handleDirtyChange}
+                  onSaveAs={handleSaveAs}
+                />
+              </div>
+            ) : null}
+          </div>
+        </div>
       )}
 
       <AlertDialog
