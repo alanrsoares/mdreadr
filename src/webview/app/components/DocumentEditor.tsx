@@ -22,11 +22,10 @@ export const DocumentEditor = ({ value, onChange }: DocumentEditorProps) => {
         fontSize: "0.95rem",
         border: "1px solid var(--color-border)",
         minHeight: "70vh",
+        padding: "24px 16px",
       },
       "&.cm-focused": {
         outline: "none",
-        borderColor: "var(--color-text-accent)",
-        boxShadow: "0 0 0 2px color-mix(in srgb, var(--color-text-accent) 20%, transparent)",
       },
       ".cm-scroller": {
         overflow: "auto",
