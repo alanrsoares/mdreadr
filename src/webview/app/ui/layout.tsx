@@ -16,19 +16,19 @@ export const ReaderNotesAside = tw.aside(
   "min-w-0 overflow-auto border-[var(--color-border)] border-l bg-[var(--color-background-surface)] transition-[box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] data-[pending=true]:shadow-[inset_3px_0_0_0_var(--color-text-accent)]",
 );
 
-export const ReaderContent = tw.div`mx-auto w-full max-w-[820px]`;
+export const ReaderContent = tw.div`mx-auto min-h-full w-full max-w-[820px]`;
 
 export const ReaderSheet = tw.article(
   // No overflow clip here: it would become the sticky context for
   // ReaderDocumentChrome, which must stick to ReaderMain's scroll instead.
-  "min-h-full rounded-none border border-(--color-border) bg-(--reader-paper-bg) shadow-(--shadow-low) transition-[box-shadow] duration-(--duration-fast) ease-(--ease-standard) hover:shadow-(--shadow-med)",
+  "flex min-h-full flex-col rounded-none border border-(--color-border) bg-(--reader-paper-bg) shadow-(--shadow-low) transition-[box-shadow] duration-(--duration-fast) ease-(--ease-standard) hover:shadow-(--shadow-med)",
 );
 
 export const ReaderDocumentChrome = tw.header(
-  "sticky top-0 z-10 border-[var(--color-border)] border-b bg-[var(--reader-chrome-bg)] px-8 py-4 backdrop-blur-sm",
+  "sticky top-0 z-10 shrink-0 border-[var(--color-border)] border-b bg-[var(--reader-chrome-bg)] px-8 py-4 backdrop-blur-sm",
 );
 
-export const ReaderDocumentBody = tw.div`px-8 pt-6 pb-14`;
+export const ReaderDocumentBody = tw.div`min-h-0 flex-1 px-8 pt-6 pb-14`;
 
 export const ReaderChromeControls = tw.div`mx-auto flex w-fit items-center justify-center gap-2`;
 

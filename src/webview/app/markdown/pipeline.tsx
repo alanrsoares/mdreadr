@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AlignBlock } from "./align-block.tsx";
 import { DANGEROUS_URL_PATTERN, type ImageSrcResolver } from "./assets.ts";
 import { BadgeRow, linkedBadgePlugin, parseBadgeBlock } from "./badges.tsx";
+import { D2Chart } from "./d2.tsx";
 import { createInlineHtmlPlugins } from "./inline-html.tsx";
 import { inlineMathPlugin, MathBlock } from "./math.tsx";
 import { MermaidChart } from "./mermaid.tsx";
@@ -19,6 +20,7 @@ type RenderSpecialFenceOptions = { skip?: readonly string[] };
 const SPECIAL_FENCES: Record<string, SpecialFenceRenderer> = {
   align: (code, ctx) => <AlignBlock code={code} resolveImageSrc={ctx.resolveImageSrc} />,
   mermaid: (code) => <MermaidChart chart={code} />,
+  d2: (code) => <D2Chart chart={code} />,
   math: (code) => <MathBlock tex={code} />,
   badges: (code) => {
     const badges = parseBadgeBlock(code);

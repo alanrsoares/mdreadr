@@ -4,7 +4,7 @@ import { encodeLinkedBadge, LINKED_BADGE_TOKEN_SOURCE } from "./preprocess.ts";
 
 describe("isSpecialFence", () => {
   test("true for the special fence languages", () => {
-    for (const language of ["align", "mermaid", "math", "badges"]) {
+    for (const language of ["align", "mermaid", "d2", "math", "badges"]) {
       expect(isSpecialFence(language)).toBe(true);
     }
   });

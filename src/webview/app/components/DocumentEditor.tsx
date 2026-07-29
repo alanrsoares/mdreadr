@@ -21,7 +21,7 @@ export const DocumentEditor = ({ value, onChange }: DocumentEditorProps) => {
         fontFamily: "var(--font-family-code)",
         fontSize: "0.95rem",
         border: "1px solid var(--color-border)",
-        minHeight: "70vh",
+        height: "100%",
         padding: "24px 16px",
       },
       "&.cm-focused": {
@@ -60,6 +60,7 @@ export const DocumentEditor = ({ value, onChange }: DocumentEditorProps) => {
     <ReaderEditor>
       <CodeMirror
         value={value}
+        height="100%"
         extensions={[markdown(), editorTheme]}
         onChange={onChange}
         theme={isDark ? "dark" : "light"}

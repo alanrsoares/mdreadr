@@ -1,17 +1,13 @@
 import { useEffect, useState } from "react";
 import { DiagramViewer } from "./diagram-viewer.tsx";
 
-function mermaidTheme(): "dark" | "neutral" {
-  if (typeof document === "undefined") return "neutral";
-  const mode = document.documentElement.getAttribute("data-theme");
-  if (mode === "dark") return "dark";
-  if (mode === "light") return "neutral";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "neutral";
+function d2Theme(): { themeID: number; darkThemeID: number } {
+  return { themeID: 0, darkThemeID: 200 };
 }
 
-type MermaidChartProps = { chart: string };
+type D2ChartProps = { chart: string };
 
-export function MermaidChart({ chart }: MermaidChartProps) {
+export function D2Chart({ chart }: D2ChartProps) {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [svgContent, setSvgContent] = useState<string | null>(null);
@@ -24,12 +20,12 @@ export function MermaidChart({ chart }: MermaidChartProps) {
 
     void (async () => {
       try {
-        const mermaid = await import("mermaid");
-        mermaid.default.initialize({ startOnLoad: false, theme: mermaidTheme() });
-        const id = `mermaid-${crypto.randomUUID()}`;
-        const result = await mermaid.default.render(id, chart);
+        const { D2 } = await import("@terrastruct/d2");
+        const d2 = new D2();
+        const { diagram, renderOptions } = await d2.compile(chart);
+        const svg = await d2.render(diagram, { ...d2Theme(), ...renderOptions });
         if (!cancelled) {
-          setSvgContent(result.svg);
+          setSvgContent(svg);
           setState("ready");
         }
       } catch (error) {
@@ -50,7 +46,7 @@ export function MermaidChart({ chart }: MermaidChartProps) {
       state={state}
       svgContent={svgContent}
       errorMessage={errorMessage}
-      label="Mermaid Diagram"
+      label="D2 Diagram"
     />
   );
 }
