@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/alanrsoares/mdreadr/compare/v0.6.0...v0.7.0) (2026-07-29)
+
+
+### Features
+
+* **markdown:** add D2 diagram support, extract shared diagram viewer ([fc74312](https://github.com/alanrsoares/mdreadr/commit/fc74312840bb7c7b2d20d56174eaadc70ecdd240))
+
 ## [0.6.0](https://github.com/alanrsoares/mdreadr/compare/v0.5.1...v0.6.0) (2026-07-28)
 
 
