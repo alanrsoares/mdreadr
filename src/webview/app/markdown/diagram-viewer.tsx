@@ -6,7 +6,7 @@ import {
   MinusIcon,
   PlusIcon,
 } from "@heroicons/react/24/outline";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MermaidBlock as DiagramFrame } from "../ui/layout.tsx";
 
 export type DiagramState = "loading" | "ready" | "error";
@@ -18,6 +18,28 @@ export type DiagramViewerProps = {
   /** e.g. "Mermaid Diagram" / "D2 Diagram" — used for aria labels + dialog title. */
   label: string;
 };
+
+/** Prepares SVG for full-screen view by ensuring viewBox exists and overriding restrictive inline dimensions. */
+export function prepareModalSvg(container: HTMLElement) {
+  if (!container?.querySelector) return;
+  const svg = container.querySelector("svg");
+  if (!svg) return;
+
+  if (!svg.getAttribute("viewBox")) {
+    const w = svg.getAttribute("width") || svg.getBoundingClientRect().width;
+    const h = svg.getAttribute("height") || svg.getBoundingClientRect().height;
+    const numW = parseFloat(String(w));
+    const numH = parseFloat(String(h));
+    if (!Number.isNaN(numW) && !Number.isNaN(numH) && numW > 0 && numH > 0) {
+      svg.setAttribute("viewBox", `0 0 ${numW} ${numH}`);
+    }
+  }
+
+  svg.style.maxWidth = "100%";
+  svg.style.maxHeight = "100%";
+  svg.style.width = "100%";
+  svg.style.height = "100%";
+}
 
 /** Shared zoom/pan/modal chrome around a rendered diagram SVG. */
 export function DiagramViewer({ state, svgContent, errorMessage, label }: DiagramViewerProps) {
@@ -49,27 +71,28 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
     }
   }, [state, svgContent]);
 
-  // Sync SVG content to modal container
+  // Sync SVG content to modal container & prepare scaling
   useEffect(() => {
     if (isExpanded && svgContent && modalContainerRef.current) {
       modalContainerRef.current.innerHTML = svgContent;
+      prepareModalSvg(modalContainerRef.current);
     }
   }, [isExpanded, svgContent]);
 
   // Zoom helpers
-  const zoomIn = () => setZoom((z) => Math.min(z * 1.25, 8));
-  const zoomOut = () => setZoom((z) => Math.max(z / 1.25, 0.2));
-  const reset = () => {
+  const zoomIn = useCallback(() => setZoom((z) => Math.min(z * 1.25, 8)), []);
+  const zoomOut = useCallback(() => setZoom((z) => Math.max(z / 1.25, 0.2)), []);
+  const reset = useCallback(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
-  };
+  }, []);
 
-  const modalZoomIn = () => setModalZoom((z) => Math.min(z * 1.25, 8));
-  const modalZoomOut = () => setModalZoom((z) => Math.max(z / 1.25, 0.2));
-  const modalReset = () => {
+  const modalZoomIn = useCallback(() => setModalZoom((z) => Math.min(z * 1.25, 8)), []);
+  const modalZoomOut = useCallback(() => setModalZoom((z) => Math.max(z / 1.25, 0.2)), []);
+  const modalReset = useCallback(() => {
     setModalZoom(1);
     setModalPan({ x: 0, y: 0 });
-  };
+  }, []);
 
   // Dragging handlers (Inline)
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -80,17 +103,25 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
     initialPan.current = { ...pan };
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  useEffect(() => {
     if (!isDragging) return;
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
-    setPan({
-      x: initialPan.current.x + dx,
-      y: initialPan.current.y + dy,
-    });
-  };
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      setPan({
+        x: initialPan.current.x + dx,
+        y: initialPan.current.y + dy,
+      });
+    };
+    const handleWindowMouseUp = () => setIsDragging(false);
 
-  const handleMouseUp = () => setIsDragging(false);
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+    };
+  }, [isDragging]);
 
   // Wheel Zoom handler (Inline)
   const handleWheel = (e: React.WheelEvent) => {
@@ -113,26 +144,91 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
     modalInitialPan.current = { ...modalPan };
   };
 
-  const handleModalMouseMove = (e: React.MouseEvent) => {
+  useEffect(() => {
     if (!isModalDragging) return;
-    const dx = e.clientX - modalDragStart.current.x;
-    const dy = e.clientY - modalDragStart.current.y;
-    setModalPan({
-      x: modalInitialPan.current.x + dx,
-      y: modalInitialPan.current.y + dy,
-    });
-  };
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - modalDragStart.current.x;
+      const dy = e.clientY - modalDragStart.current.y;
+      setModalPan({
+        x: modalInitialPan.current.x + dx,
+        y: modalInitialPan.current.y + dy,
+      });
+    };
+    const handleWindowMouseUp = () => setIsModalDragging(false);
 
-  const handleModalMouseUp = () => setIsModalDragging(false);
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+    };
+  }, [isModalDragging]);
 
-  // Wheel Zoom handler (Modal)
+  // Keyboard navigation for Modal view
+  useEffect(() => {
+    if (!isExpanded) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        modalZoomIn();
+      } else if (e.key === "-" || e.key === "_") {
+        e.preventDefault();
+        modalZoomOut();
+      } else if (e.key === "0" || e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        modalReset();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setModalPan((p) => ({ ...p, x: p.x + 40 }));
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setModalPan((p) => ({ ...p, x: p.x - 40 }));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setModalPan((p) => ({ ...p, y: p.y + 40 }));
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setModalPan((p) => ({ ...p, y: p.y - 40 }));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isExpanded, modalReset, modalZoomIn, modalZoomOut]);
+
+  // Wheel Zoom / Trackpad Pan handler (Modal)
   const handleModalWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    const zoomFactor = 1.1;
-    if (e.deltaY < 0) {
-      setModalZoom((z) => Math.min(z * zoomFactor, 8));
+    if (e.ctrlKey || e.metaKey) {
+      const zoomFactor = 1.1;
+      if (e.deltaY < 0) {
+        setModalZoom((z) => Math.min(z * zoomFactor, 8));
+      } else {
+        setModalZoom((z) => Math.max(z / zoomFactor, 0.2));
+      }
     } else {
-      setModalZoom((z) => Math.max(z / zoomFactor, 0.2));
+      setModalPan((p) => ({
+        x: p.x - e.deltaX,
+        y: p.y - e.deltaY,
+      }));
+    }
+  };
+
+  // Double click toggle zoom
+  const handleModalDoubleClick = () => {
+    if (modalZoom !== 1 || modalPan.x !== 0 || modalPan.y !== 0) {
+      modalReset();
+    } else {
+      setModalZoom(2.5);
     }
   };
 
@@ -191,7 +287,7 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
 
         {state === "ready" && (isHovered || isDragging) && (
           <div className="pointer-events-none absolute bottom-2 left-2 z-10 rounded bg-zinc-900/5 px-1.5 py-0.5 text-[10px] text-zinc-400 backdrop-blur dark:bg-zinc-100/5 dark:text-zinc-500">
-            {isDragging ? "Panning..." : "Drag to pan • Cmd/Ctrl + Scroll to zoom"}
+            {isDragging ? "Panning…" : "Drag to pan • Cmd/Ctrl + Scroll to zoom"}
           </div>
         )}
 
@@ -199,9 +295,6 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
           aria-busy={state === "loading"}
           className="relative flex min-h-[150px] cursor-grab select-none items-center justify-center active:cursor-grabbing"
           onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
           onWheel={handleWheel}
         >
           {state === "loading" ? (
@@ -229,27 +322,27 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
           subtitle={`Zoom: ${Math.round(modalZoom * 100)}%`}
           onOpenChange={setIsExpanded}
           endContent={
-            <div className="flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950 p-1">
+            <div className="flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-100 p-1 dark:border-zinc-800 dark:bg-zinc-900">
               <IconButton
-                icon={<PlusIcon className="size-4 text-(--color-on-dark)" />}
+                icon={<PlusIcon className="h-4 w-4" />}
                 label="Zoom In"
-                tooltip="Zoom In"
+                tooltip="Zoom In (+)"
                 variant="ghost"
                 size="sm"
                 onClick={modalZoomIn}
               />
               <IconButton
-                icon={<MinusIcon className="size-4 text-(--color-on-dark)" />}
+                icon={<MinusIcon className="h-4 w-4" />}
                 label="Zoom Out"
-                tooltip="Zoom Out"
+                tooltip="Zoom Out (-)"
                 variant="ghost"
                 size="sm"
                 onClick={modalZoomOut}
               />
               <IconButton
-                icon={<ArrowPathIcon className="size-4 text-(--color-on-dark)" />}
+                icon={<ArrowPathIcon className="h-4 w-4" />}
                 label="Reset View"
-                tooltip="Reset View"
+                tooltip="Reset View (0)"
                 variant="ghost"
                 size="sm"
                 onClick={modalReset}
@@ -259,23 +352,29 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
         />
 
         <div
-          className="flex min-h-0 flex-1 cursor-grab items-center justify-center overflow-hidden active:cursor-grabbing"
+          className="relative flex min-h-0 flex-1 cursor-grab select-none items-center justify-center overflow-hidden p-6 active:cursor-grabbing sm:p-8"
           onMouseDown={handleModalMouseDown}
-          onMouseMove={handleModalMouseMove}
-          onMouseUp={handleModalMouseUp}
-          onMouseLeave={handleModalMouseUp}
+          onDoubleClick={handleModalDoubleClick}
           onWheel={handleModalWheel}
           role="application"
           aria-label="Interactive Diagram Canvas"
         >
           <div
             ref={modalContainerRef}
-            className="transition-transform duration-75 ease-out [&>svg]:h-auto [&>svg]:w-full [&>svg]:max-w-full"
+            className="[&>svg]:!h-full [&>svg]:!w-full [&>svg]:!max-h-full [&>svg]:!max-w-full flex h-full w-full items-center justify-center transition-transform duration-75 ease-out [&>svg]:overflow-visible"
             style={{
               transform: `translate(${modalPan.x}px, ${modalPan.y}px) scale(${modalZoom})`,
               transformOrigin: "center center",
             }}
           />
+
+          <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-md border border-zinc-200 bg-white/80 px-2.5 py-1 text-xs text-zinc-600 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-400">
+            {isModalDragging
+              ? "Panning…"
+              : modalZoom === 1 && modalPan.x === 0 && modalPan.y === 0
+                ? "Fitted to screen • Drag or scroll to pan • +/- to zoom • Double-click to expand"
+                : `Zoom: ${Math.round(modalZoom * 100)}% • Double-click or press 0 to reset`}
+          </div>
         </div>
       </Dialog>
     </>
