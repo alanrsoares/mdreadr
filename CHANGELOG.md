@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/alanrsoares/mdreadr/compare/v0.7.0...v0.8.0) (2026-08-08)
+
+
+### Features
+
+* **ui:** scale diagram preview to fit in fullscreen ([e23a48a](https://github.com/alanrsoares/mdreadr/commit/e23a48a79ca103cd4949a46b3ff3375e2ccb7c19))
+
 ## [0.7.0](https://github.com/alanrsoares/mdreadr/compare/v0.6.0...v0.7.0) (2026-07-29)
 
 
