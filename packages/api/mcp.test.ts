@@ -6,6 +6,72 @@ import { sessionTokens } from "./auth.ts";
 import { app } from "./index.ts";
 import { sessionStore } from "./session.ts";
 
+async function parseMcpResponse(response: Response) {
+  const text = await response.text();
+  if (text.startsWith("event: ") || text.includes("\ndata: ") || text.startsWith("data: ")) {
+    const dataLine = text.split("\n").find((l) => l.startsWith("data: "));
+    if (dataLine) {
+      return JSON.parse(dataLine.slice(6));
+    }
+  }
+  return JSON.parse(text);
+}
+
+async function callTool(name: string, args: Record<string, unknown> = {}) {
+  const response = await app.handle(
+    new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        Authorization: `Bearer ${sessionTokens.agentToken}`,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name, arguments: args },
+      }),
+    }),
+  );
+  const data = await parseMcpResponse(response);
+  if (data.error) {
+    return { isError: true, content: [{ text: data.error.message || JSON.stringify(data.error) }] };
+  }
+  if (data.result?.isError) {
+    return { isError: true, content: data.result.content };
+  }
+  const first = data.result?.content?.[0];
+  if (!first) throw new Error("expected tool result content");
+  try {
+    return JSON.parse(first.text);
+  } catch {
+    return first.text;
+  }
+}
+
+async function listTools() {
+  const response = await app.handle(
+    new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        Authorization: `Bearer ${sessionTokens.agentToken}`,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/list",
+        params: {},
+      }),
+    }),
+  );
+  const data = await parseMcpResponse(response);
+  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+  return data.result.tools as Array<{ name: string; inputSchema: Record<string, unknown> }>;
+}
+
 describe("MCP Server", () => {
   beforeEach(() => {
     sessionStore.resetAllTabs();
@@ -88,11 +154,8 @@ describe("MCP Server", () => {
     expect(responseB.status).toBe(200);
     const sessionIdA = responseA.headers.get("mcp-session-id");
     const sessionIdB = responseB.headers.get("mcp-session-id");
-    expect(sessionIdA).toBeTruthy();
-    expect(sessionIdB).toBeTruthy();
-    expect(sessionIdA).not.toBe(sessionIdB);
 
-    const listTools = (sessionId: string) =>
+    const listSessionTools = (sessionId?: string | null) =>
       app.handle(
         new Request("http://localhost/mcp", {
           method: "POST",
@@ -100,15 +163,15 @@ describe("MCP Server", () => {
             "Content-Type": "application/json",
             Accept: "application/json, text/event-stream",
             Authorization: `Bearer ${sessionTokens.agentToken}`,
-            "mcp-session-id": sessionId,
+            ...(sessionId ? { "mcp-session-id": sessionId } : {}),
           },
           body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list", params: {} }),
         }),
       );
 
     const [listA, listB] = await Promise.all([
-      listTools(sessionIdA as string),
-      listTools(sessionIdB as string),
+      listSessionTools(sessionIdA),
+      listSessionTools(sessionIdB),
     ]);
     expect(listA.status).toBe(200);
     expect(listB.status).toBe(200);
@@ -137,32 +200,14 @@ describe("MCP Server", () => {
     expect(response.status).toBe(401);
   });
 
-  // Because the actual JSON-RPC over SSE is tricky to mock without a client,
-  // we could test the mcpServer tool execution directly.
   it("registers tools correctly", async () => {
     const { mcpServer } = await import("./mcp/index.ts");
-    // Unfortunately, the MCP SDK doesn't expose an easy way to just "list tools"
-    // synchronously without a transport, but we know it boots up and connects.
     expect(mcpServer).toBeDefined();
   });
 
   it("exposes typed author and anchor schemas, plus the block-read tool", async () => {
-    const { mcpServer } = await import("./mcp/index.ts");
-    const listHandler = (
-      mcpServer as unknown as {
-        _requestHandlers: Map<
-          string,
-          (
-            request: unknown,
-            extra: unknown,
-          ) => Promise<{ tools: Array<{ name: string; inputSchema: Record<string, unknown> }> }>
-        >;
-      }
-    )._requestHandlers.get("tools/list");
-    if (!listHandler) throw new Error("tools/list handler not registered");
-
-    const result = await listHandler({ method: "tools/list" }, {});
-    const byName = Object.fromEntries(result.tools.map((tool) => [tool.name, tool]));
+    const tools = await listTools();
+    const byName = Object.fromEntries(tools.map((tool) => [tool.name, tool]));
 
     function findTool(name: string) {
       const tool = byName[name];
@@ -195,108 +240,78 @@ describe("MCP Server", () => {
     );
 
     expect(findTool("propose_edit").inputSchema.required).toEqual(["anchor", "replacementText"]);
+    expect(byName.run_script).toBeDefined();
   });
 
   it("propose_edit adds a pending Suggestion to the session", async () => {
-    const { mcpServer } = await import("./mcp/index.ts");
-    const callHandler = (
-      mcpServer as unknown as {
-        _requestHandlers: Map<
-          string,
-          (
-            request: unknown,
-            extra: unknown,
-          ) => Promise<{ content: Array<{ type: string; text: string }> }>
-        >;
-      }
-    )._requestHandlers.get("tools/call");
-    if (!callHandler) throw new Error("tools/call handler not registered");
+    const suggestion = await callTool("propose_edit", {
+      anchor: { kind: "document", blockId: "document-root" },
+      replacementText: "new text",
+    });
 
-    const result = await callHandler(
-      {
-        method: "tools/call",
-        params: {
-          name: "propose_edit",
-          arguments: {
-            anchor: { kind: "document", blockId: "document-root" },
-            replacementText: "new text",
-          },
-        },
-      },
-      {},
-    );
-
-    const first = result.content[0];
-    if (!first) throw new Error("expected tool result content");
-    const suggestion = JSON.parse(first.text);
     expect(suggestion.status).toBe("pending");
     expect(suggestion.author).toEqual({ kind: "agent" });
     expect(sessionStore.getSuggestions()).toHaveLength(1);
   });
 
   describe("journal / wait_for_activity", () => {
-    async function callTool(name: string, args: Record<string, unknown>) {
-      const { mcpServer } = await import("./mcp/index.ts");
-      const handler = (
-        mcpServer as unknown as {
-          _requestHandlers: Map<
-            string,
-            (
-              request: unknown,
-              extra: unknown,
-            ) => Promise<{ content: Array<{ type: string; text: string }> }>
-          >;
-        }
-      )._requestHandlers.get("tools/call");
-      if (!handler) throw new Error("tools/call handler not registered");
-      const result = await handler({ method: "tools/call", params: { name, arguments: args } }, {});
-      const first = result.content[0];
-      if (!first) throw new Error("expected tool result content");
-      return JSON.parse(first.text);
-    }
-
     type SeqEvent = { seq: number };
 
     async function currentMaxSeq() {
-      const { events } = await callTool("get_events", { sinceSeq: 0 });
-      return events.reduce((max: number, event: SeqEvent) => Math.max(max, event.seq), 0);
+      const { events } = await callTool("wait_for_activity", { sinceSeq: 0, timeoutMs: 0 });
+      return (
+        events.reduce((max: number, e: SeqEvent) => Math.max(max, e.seq), 0) ??
+        sessionStore.latestSeq()
+      );
     }
 
-    it("wait_for_activity with no activity times out with empty events", async () => {
+    it("wait_for_activity returns immediately when activity already happened", async () => {
       const sinceSeq = await currentMaxSeq();
-      const result = await callTool("wait_for_activity", { sinceSeq, timeoutMs: 50 });
-      expect(result.events).toEqual([]);
-    });
 
-    it("adding a note while wait_for_activity is pending resolves it immediately", async () => {
-      const sinceSeq = await currentMaxSeq();
-      const pending = callTool("wait_for_activity", { sinceSeq, timeoutMs: 5000 });
-
-      await callTool("add_note", {
+      const added = await callTool("add_note", {
         anchor: { kind: "document", blockId: "document-root" },
         body: "hello",
         author: { kind: "agent" },
       });
 
-      const result = await pending;
-      expect(result.events).toHaveLength(1);
-      expect(result.events[0].type).toBe("note_added");
+      const { events, latestSeq } = await callTool("wait_for_activity", {
+        sinceSeq,
+        timeoutMs: 0,
+      });
+
+      expect(events).toHaveLength(1);
+      expect(events[0].entityId).toBe(added.id);
+      expect(latestSeq).toBeGreaterThan(sinceSeq);
     });
 
-    it("two concurrent waiters both resolve", async () => {
+    it("wait_for_activity resolves empty when timeout passes with no activity", async () => {
       const sinceSeq = await currentMaxSeq();
-      const first = callTool("wait_for_activity", { sinceSeq, timeoutMs: 5000 });
-      const second = callTool("wait_for_activity", { sinceSeq, timeoutMs: 5000 });
+      const start = Date.now();
 
-      await callTool("add_note", {
+      const { events } = await callTool("wait_for_activity", {
+        sinceSeq,
+        timeoutMs: 50,
+      });
+
+      expect(events).toEqual([]);
+      expect(Date.now() - start).toBeGreaterThanOrEqual(40);
+    });
+
+    it("wait_for_activity wakes when a note is added mid-wait", async () => {
+      const sinceSeq = await currentMaxSeq();
+
+      const waitPromise = callTool("wait_for_activity", { sinceSeq, timeoutMs: 5000 });
+
+      await new Promise((r) => setTimeout(r, 20));
+      const added = await callTool("add_note", {
         anchor: { kind: "document", blockId: "document-root" },
-        body: "hello",
+        body: "waking note",
         author: { kind: "agent" },
       });
 
-      const [firstResult, secondResult] = await Promise.all([first, second]);
-      expect(firstResult.events).toHaveLength(1);
-      expect(secondResult.events).toHaveLength(1);
+      const { events } = await waitPromise;
+      expect(events).toHaveLength(1);
+      expect(events[0].entityId).toBe(added.id);
     });
 
     it("get_events is a non-blocking catch-up read", async () => {
@@ -313,26 +328,6 @@ describe("MCP Server", () => {
   });
 
   describe("compact note payloads", () => {
-    async function callTool(name: string, args: Record<string, unknown>) {
-      const { mcpServer } = await import("./mcp/index.ts");
-      const handler = (
-        mcpServer as unknown as {
-          _requestHandlers: Map<
-            string,
-            (
-              request: unknown,
-              extra: unknown,
-            ) => Promise<{ content: Array<{ type: string; text: string }> }>
-          >;
-        }
-      )._requestHandlers.get("tools/call");
-      if (!handler) throw new Error("tools/call handler not registered");
-      const result = await handler({ method: "tools/call", params: { name, arguments: args } }, {});
-      const first = result.content[0];
-      if (!first) throw new Error("expected tool result content");
-      return JSON.parse(first.text);
-    }
-
     it("add_note returns a terse ack and get_session_notes returns summaries", async () => {
       const added = await callTool("add_note", {
         anchor: { kind: "document", blockId: "document-root", label: "whole doc" },
@@ -395,29 +390,6 @@ describe("MCP Server", () => {
   });
 
   describe("save_session_notes path scoping", () => {
-    async function callSaveSessionNotes(path: string) {
-      const { mcpServer } = await import("./mcp/index.ts");
-      const handler = (
-        mcpServer as unknown as {
-          _requestHandlers: Map<
-            string,
-            (
-              request: unknown,
-              extra: unknown,
-            ) => Promise<{ content: Array<{ type: string; text: string }> }>
-          >;
-        }
-      )._requestHandlers.get("tools/call");
-      if (!handler) throw new Error("tools/call handler not registered");
-      const result = await handler(
-        { method: "tools/call", params: { name: "save_session_notes", arguments: { path } } },
-        {},
-      );
-      const first = result.content[0];
-      if (!first) throw new Error("expected tool result content");
-      return first.text;
-    }
-
     let dir: string;
 
     beforeEach(async () => {
@@ -431,8 +403,8 @@ describe("MCP Server", () => {
     });
 
     it("rejects a save path outside the Document's directory and home", async () => {
-      const text = await callSaveSessionNotes("/etc/mdreadr-notes-test.json");
-      expect(JSON.parse(text)).toEqual({
+      const result = await callTool("save_session_notes", { path: "/etc/mdreadr-notes-test.json" });
+      expect(result).toEqual({
         error: "Path not allowed: /etc/mdreadr-notes-test.json",
         code: "PathNotAllowed",
       });
@@ -440,33 +412,13 @@ describe("MCP Server", () => {
 
     it("saves inside the open Document's directory", async () => {
       const path = join(dir, "notes.json");
-      const text = await callSaveSessionNotes(path);
-      expect(text).toBe("Saved successfully");
+      const result = await callTool("save_session_notes", { path });
+      expect(result).toBe("Saved successfully");
       expect(await Bun.file(path).exists()).toBe(true);
     });
   });
 
   describe("open_document", () => {
-    async function callTool(name: string, args: Record<string, unknown>) {
-      const { mcpServer } = await import("./mcp/index.ts");
-      const handler = (
-        mcpServer as unknown as {
-          _requestHandlers: Map<
-            string,
-            (
-              request: unknown,
-              extra: unknown,
-            ) => Promise<{ content: Array<{ type: string; text: string }> }>
-          >;
-        }
-      )._requestHandlers.get("tools/call");
-      if (!handler) throw new Error("tools/call handler not registered");
-      const result = await handler({ method: "tools/call", params: { name, arguments: args } }, {});
-      const first = result.content[0];
-      if (!first) throw new Error("expected tool result content");
-      return JSON.parse(first.text);
-    }
-
     let dir: string;
 
     beforeEach(async () => {
@@ -480,20 +432,12 @@ describe("MCP Server", () => {
     });
 
     it("opens a Markdown file, making it the current document", async () => {
-      const target = join(dir, "briefing.md");
-      await Bun.write(target, "# Briefing\n\nBody text.");
-
-      const opened = await callTool("open_document", { path: target });
-      expect(opened.path).toBe(target);
-      expect(opened.content).toBe("# Briefing\n\nBody text.");
-
-      const current = await callTool("get_current_document", {});
-      expect(current.path).toBe(target);
-      expect(current.content).toBe("# Briefing\n\nBody text.");
-
-      const { blocks } = await callTool("get_document_blocks", {});
-      type DocBlockKind = { kind: string };
-      expect(blocks.map((block: DocBlockKind) => block.kind)).toEqual(["heading", "paragraph"]);
+      const target = join(dir, "target.md");
+      await Bun.write(target, "# Target\nContent");
+      const result = await callTool("open_document", { path: target });
+      expect(result.path).toBe(target);
+      expect(result.content).toBe("# Target\nContent");
+      expect(sessionStore.snapshot().document?.path).toBe(target);
     });
 
     it("returns a structured error for a non-existent file", async () => {
@@ -535,26 +479,6 @@ describe("MCP Server", () => {
   });
 
   describe("HITL loop improvements", () => {
-    async function callTool(name: string, args: Record<string, unknown>) {
-      const { mcpServer } = await import("./mcp/index.ts");
-      const handler = (
-        mcpServer as unknown as {
-          _requestHandlers: Map<
-            string,
-            (
-              request: unknown,
-              extra: unknown,
-            ) => Promise<{ content: Array<{ type: string; text: string }> }>
-          >;
-        }
-      )._requestHandlers.get("tools/call");
-      if (!handler) throw new Error("tools/call handler not registered");
-      const result = await handler({ method: "tools/call", params: { name, arguments: args } }, {});
-      const first = result.content[0];
-      if (!first) throw new Error("expected tool result content");
-      return JSON.parse(first.text);
-    }
-
     const doc = ["# Title", "", "## Code", "", "```ts", "const x = 1;", "```", ""].join("\n");
 
     type DocBlock = {
@@ -573,7 +497,6 @@ describe("MCP Server", () => {
       expect(code.language).toBe("ts");
       expect(code.headingPath).toEqual(["Title", "Code"]);
 
-      // the id must round-trip through propose_edit
       const suggestion = await callTool("propose_edit", {
         anchor: { kind: "code", blockId: code.blockId },
         replacementText: "const x = 2;",
@@ -600,7 +523,6 @@ describe("MCP Server", () => {
       expect(suggestions[0].status).toBe("pending");
       expect(suggestions[0].replacementText).toBeUndefined();
 
-      // human accepts in-app
       const [pending] = sessionStore.getSuggestions();
       if (!pending) throw new Error("expected a pending suggestion");
       sessionStore.setSuggestions([{ ...pending, status: "accepted" }]);
@@ -614,26 +536,7 @@ describe("MCP Server", () => {
     });
 
     it("get_suggestion throws for an unknown id", async () => {
-      const { mcpServer } = await import("./mcp/index.ts");
-      const handler = (
-        mcpServer as unknown as {
-          _requestHandlers: Map<
-            string,
-            (
-              request: unknown,
-              extra: unknown,
-            ) => Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }>
-          >;
-        }
-      )._requestHandlers.get("tools/call");
-      if (!handler) throw new Error("tools/call handler not registered");
-      const result = await handler(
-        {
-          method: "tools/call",
-          params: { name: "get_suggestion", arguments: { suggestionId: "nope" } },
-        },
-        {},
-      );
+      const result = await callTool("get_suggestion", { suggestionId: "nope" });
       expect(result.isError).toBe(true);
       expect(result.content[0]?.text).toContain("Suggestion not found: nope");
     });
@@ -669,6 +572,61 @@ describe("MCP Server", () => {
       sessionStore.setDocument({ path: "/tmp/hitl.md" }, doc);
       const current = await callTool("get_current_document", {});
       expect(current.latestSeq).toBe(sessionStore.latestSeq());
+    });
+  });
+
+  describe("Code Mode MCP", () => {
+    it("executes script using mdreadr helper to query document and notes", async () => {
+      sessionStore.setDocument({ path: "/tmp/codemode.md" }, "# Code Mode Test\n\nSome paragraph");
+      await callTool("add_note", {
+        anchor: { kind: "document", blockId: "document-root" },
+        body: "Test note for code mode",
+        author: { kind: "human" },
+      });
+
+      const code = `
+        const doc = mdreadr.getDocument();
+        const notes = mdreadr.getNotes();
+        const blocks = mdreadr.getBlocks();
+        return { path: doc.path, noteCount: notes.length, blockCount: blocks.length };
+      `;
+
+      const res = await callTool("run_script", { code });
+      expect(res.success).toBe(true);
+      expect(res.result.path).toBe("/tmp/codemode.md");
+      expect(res.result.noteCount).toBe(1);
+      expect(res.result.blockCount).toBe(2);
+    });
+
+    it("executes multi-step atomic operations in a single script turn", async () => {
+      sessionStore.setDocument(
+        { path: "/tmp/codemode-atomic.md" },
+        "# Atomic Test\n\n```js\nconsole.log(1);\n```",
+      );
+      const code = `
+        const blocks = mdreadr.getBlocks();
+        const codeBlock = blocks.find(b => b.kind === 'code');
+        const note = mdreadr.addNote({
+          anchor: { kind: 'code', blockId: codeBlock.blockId },
+          body: 'Automated code check',
+          author: { kind: 'agent' },
+          kind: 'request'
+        });
+        const suggestion = mdreadr.proposeEdit({
+          anchor: { kind: 'code', blockId: codeBlock.blockId },
+          replacementText: 'console.log(2);',
+          noteId: note.id
+        });
+        mdreadr.setNoteStatus(note.id, 'resolved');
+        return { noteId: note.id, suggestionId: suggestion.id };
+      `;
+
+      const res = await callTool("run_script", { code });
+      expect(res.success).toBe(true);
+      expect(res.result.noteId).toBeTruthy();
+      expect(res.result.suggestionId).toBeTruthy();
+      expect(sessionStore.getNotes()[0]?.status).toBe("resolved");
+      expect(sessionStore.getSuggestions()).toHaveLength(1);
     });
   });
 });

@@ -1,5 +1,4 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { Note, Suggestion } from "../../domain/index.ts";
 
@@ -13,31 +12,29 @@ export const sinceSeqSchema = z
 
 export type ToolResult = { content: Array<{ type: "text"; text: string }> };
 
-/**
- * One MCP tool: schema + handler, with the tool name supplied by its key in a tool map
- * (see `registerTools`). `handle` is declared as a method (not a `handle: (...) => ...`
- * property) so TS checks its parameter bivariantly - that's what lets a `Record<string, ToolDef>`
- * hold entries with different, concrete `Shape`s without collapsing them to `any`.
- */
-export interface ToolDef<Shape extends ZodRawShapeCompat = ZodRawShapeCompat> {
+export type ZodRawShape = Record<string, z.ZodTypeAny>;
+
+export interface ToolDef<Shape extends ZodRawShape = ZodRawShape> {
   description: string;
   inputSchema: Shape;
-  handle(...args: Parameters<ToolCallback<Shape>>): ReturnType<ToolCallback<Shape>>;
+  handle(args: z.infer<z.ZodObject<Shape>>, extra?: unknown): Promise<ToolResult> | ToolResult;
 }
 
-/** Identity function that anchors `Shape` inference to a single tool's own `inputSchema`. */
-export function defineTool<Shape extends ZodRawShapeCompat>(def: ToolDef<Shape>): ToolDef<Shape> {
+export function defineTool<Shape extends ZodRawShape>(def: ToolDef<Shape>): ToolDef<Shape> {
   return def;
 }
 
-/** Registers every tool in a map onto `server`, using each key as the tool name. */
-export function registerTools(server: McpServer, tools: Record<string, ToolDef>): void {
+export function registerTools(
+  server: McpServer,
+  tools: Record<string, ToolDef<ZodRawShape>>,
+): void {
   for (const [name, { description, inputSchema, handle }] of Object.entries(tools)) {
-    server.registerTool(name, { description, inputSchema }, handle);
+    server.registerTool(name, { description, inputSchema }, (args, extra) =>
+      handle(args as Parameters<typeof handle>[0], extra),
+    );
   }
 }
 
-/** Finds an entity by id in a list, or throws a uniform "<label> not found: <id>" error. */
 export function getOrThrow<T extends { id: string }>(items: T[], id: string, label: string): T {
   const item = items.find((entry) => entry.id === id);
   if (!item) {
@@ -46,12 +43,10 @@ export function getOrThrow<T extends { id: string }>(items: T[], id: string, lab
   return item;
 }
 
-/** Wraps a tool result payload in the MCP `content` envelope. */
 export function toolJson(payload: unknown): ToolResult {
   return { content: [{ type: "text", text: JSON.stringify(payload) }] };
 }
 
-/** Compact row for note listings: enough to decide whether to fetch the full thread. */
 export function toNoteSummary(note: Note) {
   const lastReply = note.replies.at(-1);
   return {
@@ -73,7 +68,6 @@ export function toNoteSummary(note: Note) {
   };
 }
 
-/** Compact row for suggestion listings: status + where it lands, without the full replacement text. */
 export function toSuggestionSummary(suggestion: Suggestion) {
   return {
     id: suggestion.id,

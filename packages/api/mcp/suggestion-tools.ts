@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { AuthorSchema, CreateSuggestionBodySchema, createSuggestion } from "../../domain/index.ts";
 import { documentSession } from "../document-session.ts";

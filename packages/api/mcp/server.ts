@@ -1,39 +1,23 @@
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import { nowIso } from "../../domain/index.ts";
 import { registerActivityTools } from "./activity-tools.ts";
+import { registerCodeModeTools } from "./code-mode-tools.ts";
 import { registerDocumentTools } from "./document-tools.ts";
 import { registerNoteTools } from "./note-tools.ts";
 import { registerSuggestionTools } from "./suggestion-tools.ts";
 
-function createMcpServer(): Server {
-  const server = new McpServer({ name: "mdreadr", version: "0.1.0" });
+export function createMcpServer(): McpServer {
+  const server = new McpServer({ name: "mdreadr", version: "0.8.0" });
   registerDocumentTools(server);
   registerNoteTools(server);
   registerSuggestionTools(server);
   registerActivityTools(server);
-  return server.server;
+  registerCodeModeTools(server);
+  return server;
 }
 
 /** Test-only entry point: handlers registered but never connected to a transport. */
 export const mcpServer = createMcpServer();
-
-type McpSession = {
-  server: Server;
-  transport: WebStandardStreamableHTTPServerTransport;
-  connectedAt: string;
-  lastSeenAt: number;
-};
-
-/**
- * How long a session may go without a routed request before it is treated as
- * gone. Streamable-HTTP clients rarely send an explicit DELETE on disconnect
- * (the SDK only does so via `terminateSession()`), and the transport gives no
- * disconnect callback — so "connected" means "made a request within this
- * window". mdreadr agents long-poll `wait_for_activity` at <=25s, staying live.
- */
-const CLIENT_STALE_MS = 60_000;
 
 /** A live MCP client session, as surfaced to the webview status indicator. */
 export type ConnectedClient = {
@@ -43,54 +27,39 @@ export type ConnectedClient = {
   connectedAt: string;
 };
 
+type TrackedSession = {
+  id: string;
+  name: string | null;
+  version: string | null;
+  connectedAt: string;
+  lastSeenAt: number;
+};
+
+const CLIENT_STALE_MS = 60_000;
+const trackedSessions = new Map<string, TrackedSession>();
+
 /**
  * Active MCP client sessions, newest first. Prunes sessions idle longer than
- * `CLIENT_STALE_MS` as a side effect, then reads clientInfo captured at `initialize`.
+ * `CLIENT_STALE_MS` as a side effect.
  */
 export function getConnectedClients(): ConnectedClient[] {
   const cutoff = Date.now() - CLIENT_STALE_MS;
-  for (const [id, session] of sessions) {
+  for (const [id, session] of trackedSessions) {
     if (session.lastSeenAt < cutoff) {
-      sessions.delete(id);
+      trackedSessions.delete(id);
     }
   }
-  return [...sessions.entries()]
-    .map(([id, session]) => {
-      const info = session.server.getClientVersion();
-      return {
-        id,
-        name: info?.name ?? null,
-        version: info?.version ?? null,
-        connectedAt: session.connectedAt,
-      };
-    })
+  return [...trackedSessions.values()]
+    .map(({ id, name, version, connectedAt }) => ({
+      id,
+      name,
+      version,
+      connectedAt,
+    }))
     .sort((a, b) => b.connectedAt.localeCompare(a.connectedAt));
 }
 
-/**
- * The SDK's Server/transport pair is single-session (Server.connect() throws if
- * called twice). Each real client session gets its own Server+transport instance,
- * keyed by the SDK-generated session id, instead of one global transport reset
- * between requests (which clobbered concurrent clients' state).
- */
-const sessions = new Map<string, McpSession>();
-
-function createSession(): McpSession {
-  const server = createMcpServer();
-  let session: McpSession;
-  const transport = new WebStandardStreamableHTTPServerTransport({
-    sessionIdGenerator: () => crypto.randomUUID(),
-    onsessioninitialized: (sessionId) => {
-      sessions.set(sessionId, { ...session, connectedAt: nowIso(), lastSeenAt: Date.now() });
-    },
-    onsessionclosed: (sessionId) => {
-      sessions.delete(sessionId);
-    },
-  });
-  session = { server, transport, connectedAt: nowIso(), lastSeenAt: Date.now() };
-  server.connect(transport).catch(console.error);
-  return session;
-}
+const mcpHandler = createMcpHandler(() => createMcpServer());
 
 function normalizeMcpRequest(request: Request): Request {
   const accept = request.headers.get("accept");
@@ -102,21 +71,53 @@ function normalizeMcpRequest(request: Request): Request {
   return request;
 }
 
-/** Routes a request to its session's transport by `mcp-session-id`, creating a fresh session for header-less (i.e. initialize) requests. */
+/** Track client session details from incoming requests. */
+function trackRequestSession(request: Request, bodyText?: string): void {
+  const sessionId = request.headers.get("mcp-session-id");
+  const now = Date.now();
+
+  if (sessionId) {
+    const existing = trackedSessions.get(sessionId);
+    if (existing) {
+      existing.lastSeenAt = now;
+      return;
+    }
+  }
+
+  if (bodyText) {
+    try {
+      const parsed = JSON.parse(bodyText);
+      if (parsed.method === "initialize") {
+        const id = sessionId ?? crypto.randomUUID();
+        const clientInfo = parsed.params?.clientInfo;
+        trackedSessions.set(id, {
+          id,
+          name: clientInfo?.name ?? null,
+          version: clientInfo?.version ?? null,
+          connectedAt: nowIso(),
+          lastSeenAt: now,
+        });
+      }
+    } catch {
+      // Non-JSON body
+    }
+  }
+}
+
+/** Routes a request through MCP SDK v2 createMcpHandler. */
 export async function handleMcpRequest(request: Request): Promise<Response> {
   const req = normalizeMcpRequest(request);
-  const sessionId = req.headers.get("mcp-session-id");
-  if (sessionId) {
-    const existing = sessions.get(sessionId);
-    if (!existing) {
-      return new Response(JSON.stringify({ error: "Session not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      });
+
+  // Clone request body to inspect initialize params without consuming stream
+  let bodyText: string | undefined;
+  if (req.method === "POST") {
+    try {
+      bodyText = await req.clone().text();
+    } catch {
+      // body already consumed
     }
-    existing.lastSeenAt = Date.now();
-    return existing.transport.handleRequest(req);
   }
-  const { transport } = createSession();
-  return transport.handleRequest(req);
+
+  trackRequestSession(req, bodyText);
+  return mcpHandler.fetch(req);
 }
