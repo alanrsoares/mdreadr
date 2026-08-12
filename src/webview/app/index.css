@@ -233,7 +233,7 @@ body,
 }
 
 .reader-prose table {
-  font-size: var(--font-size-sm);
+  font-size: 0.9em;
 }
 
 .reader-prose .reader-badge-link {

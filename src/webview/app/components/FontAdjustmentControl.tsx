@@ -116,7 +116,7 @@ export function FontAdjustmentControl({ viewMode = "preview" }: FontAdjustmentCo
           size="sm"
           isDisabled={currentSize <= 12}
           icon={
-            <span className="select-none font-semibold text-(--color-text-secondary) text-xs">
+            <span className="select-none font-semibold text-(--color-text-secondary) text-xs transition-colors hover:text-(--color-text-primary)">
               A-
             </span>
           }
@@ -226,7 +226,7 @@ export function FontAdjustmentControl({ viewMode = "preview" }: FontAdjustmentCo
           size="sm"
           isDisabled={currentSize >= 24}
           icon={
-            <span className="select-none font-semibold text-(--color-text-secondary) text-sm">
+            <span className="select-none font-semibold text-(--color-text-secondary) text-sm transition-colors hover:text-(--color-text-primary)">
               A+
             </span>
           }
