@@ -1,14 +1,14 @@
 import { Icon } from "@astryxdesign/core/Icon";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
-import { ComputerDesktopIcon, MoonIcon, SunIcon } from "../icons.ts";
+import { MoonIcon, SunIcon } from "../icons.ts";
 import { useColorScheme } from "../theme/ColorSchemeContext.tsx";
 
 export function ColorSchemeToggle() {
   const { colorScheme, setColorScheme } = useColorScheme();
 
   const handleSchemeChange = (next: string) => {
-    if (next === "light" || next === "dark" || next === "system") {
+    if (next === "light" || next === "dark") {
       setColorScheme(next);
     }
   };
@@ -35,14 +35,6 @@ export function ColorSchemeToggle() {
           label="Dark mode"
           isLabelHidden
           icon={<Icon icon={MoonIcon} size="sm" />}
-        />
-      </Tooltip>
-      <Tooltip content="System preference">
-        <SegmentedControlItem
-          value="system"
-          label="System preference"
-          isLabelHidden
-          icon={<Icon icon={ComputerDesktopIcon} size="sm" />}
         />
       </Tooltip>
     </SegmentedControl>

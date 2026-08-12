@@ -11,6 +11,7 @@ import { createRoot } from "react-dom/client";
 import { AppProviders } from "./app/providers.tsx";
 import { router } from "./app/router.tsx";
 import { ColorSchemeProvider } from "./app/theme/ColorSchemeContext.tsx";
+import { FontSettingsProvider } from "./app/theme/FontSettingsContext.tsx";
 
 const root = document.getElementById("root");
 if (!root) {
@@ -20,9 +21,11 @@ if (!root) {
 createRoot(root).render(
   <StrictMode>
     <ColorSchemeProvider>
-      <AppProviders>
-        <RouterProvider router={router} />
-      </AppProviders>
+      <FontSettingsProvider>
+        <AppProviders>
+          <RouterProvider router={router} />
+        </AppProviders>
+      </FontSettingsProvider>
     </ColorSchemeProvider>
   </StrictMode>,
 );

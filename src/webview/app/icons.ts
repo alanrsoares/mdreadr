@@ -1,10 +1,10 @@
 export {
+  AdjustmentsHorizontalIcon,
   ArrowDownTrayIcon,
   ArrowPathIcon,
   CodeBracketIcon,
   Cog6ToothIcon,
   CommandLineIcon,
-  ComputerDesktopIcon,
   DocumentTextIcon,
   EyeIcon,
   KeyIcon,
