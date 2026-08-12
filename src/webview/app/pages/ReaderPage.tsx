@@ -109,6 +109,20 @@ export function ReaderPage() {
     },
   });
 
+  // Smart auto-collapse notes sidebar on narrow viewports / split screen
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1024px)");
+    const handleViewportChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      if (e.matches && !notesSidebar.isCollapsed) {
+        notesSidebar.collapse();
+      }
+    };
+
+    handleViewportChange(mediaQuery);
+    mediaQuery.addEventListener("change", handleViewportChange);
+    return () => mediaQuery.removeEventListener("change", handleViewportChange);
+  }, [notesSidebar]);
+
   const effectiveActiveId = isUnsavedActive && unsavedDrop ? UNSAVED_TAB_ID : tabs.activeId;
   const activeDocumentPath = isUnsavedActive ? undefined : tabs.activeDocument?.path;
 

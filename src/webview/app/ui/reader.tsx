@@ -5,29 +5,17 @@ export const ReaderArticle = tw.article`reader-prose w-full min-w-0`;
 const headingTypography =
   "scroll-mt-20 font-[family-name:var(--font-family-heading)] text-[var(--color-text-primary)]";
 
-export const ReaderH1 = tw.h1(
-  `${headingTypography} text-[length:var(--font-size-2xl)] font-semibold leading-[1.33]`,
-);
+export const ReaderH1 = tw.h1(`${headingTypography} text-[2.125em] font-semibold leading-[1.25]`);
 
-export const ReaderH2 = tw.h2(
-  `${headingTypography} text-[length:var(--font-size-xl)] font-semibold leading-[1.4]`,
-);
+export const ReaderH2 = tw.h2(`${headingTypography} text-[1.625em] font-semibold leading-[1.3]`);
 
-export const ReaderH3 = tw.h3(
-  `${headingTypography} text-[length:var(--font-size-lg)] font-bold leading-[1.41]`,
-);
+export const ReaderH3 = tw.h3(`${headingTypography} text-[1.35em] font-bold leading-[1.35]`);
 
-export const ReaderH4 = tw.h4(
-  `${headingTypography} text-[length:var(--font-size-base)] font-bold leading-[1.43]`,
-);
+export const ReaderH4 = tw.h4(`${headingTypography} text-[1.15em] font-bold leading-[1.4]`);
 
-export const ReaderH5 = tw.h5(
-  `${headingTypography} text-[length:var(--font-size-sm)] font-semibold leading-[1.67]`,
-);
+export const ReaderH5 = tw.h5(`${headingTypography} text-[1em] font-semibold leading-[1.5]`);
 
-export const ReaderH6 = tw.h6(
-  `${headingTypography} text-[length:var(--font-size-xs)] font-semibold leading-[1.6]`,
-);
+export const ReaderH6 = tw.h6(`${headingTypography} text-[0.875em] font-semibold leading-[1.5]`);
 
 export const readerHeadingByLevel = {
   1: ReaderH1,
@@ -39,7 +27,7 @@ export const readerHeadingByLevel = {
 } as const;
 
 export const ReaderParagraph = tw.div(
-  "text-[length:var(--text-body-size)] leading-[var(--text-body-leading)] text-[var(--color-text-primary)]",
+  "max-w-[68ch] text-[length:var(--text-body-size)] leading-[var(--text-body-leading)] text-[var(--color-text-primary)]",
 );
 
 export const ReaderCodeWrap = tw.div`min-w-0`;

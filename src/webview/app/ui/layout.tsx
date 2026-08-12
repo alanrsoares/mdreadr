@@ -16,7 +16,9 @@ export const ReaderNotesAside = tw.aside(
   "min-w-0 overflow-auto border-[var(--color-border)] border-l bg-[var(--color-background-surface)] transition-[box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] data-[pending=true]:shadow-[inset_3px_0_0_0_var(--color-text-accent)]",
 );
 
-export const ReaderContent = tw.div`mx-auto min-h-full w-full max-w-[820px]`;
+export const ReaderContent = tw.div(
+  "mx-auto min-h-full w-full max-w-[min(100%,clamp(640px,68vw,920px))]",
+);
 
 export const ReaderSheet = tw.article(
   // No overflow clip here: it would become the sticky context for
@@ -25,14 +27,16 @@ export const ReaderSheet = tw.article(
 );
 
 export const ReaderDocumentChrome = tw.header(
-  "sticky top-0 z-10 shrink-0 border-[var(--color-border)] border-b bg-[var(--reader-chrome-bg)] px-8 py-4 backdrop-blur-sm",
+  "sticky top-0 z-10 shrink-0 border-[var(--color-border)] border-b bg-[var(--reader-chrome-bg)] px-4 py-3.5 backdrop-blur-sm sm:px-6 md:px-8",
 );
 
-export const ReaderDocumentBody = tw.div`min-h-0 flex-1 px-8 pt-6 pb-14`;
+export const ReaderDocumentBody = tw.div`min-h-0 flex-1 px-4 pt-4 pb-12 sm:px-6 sm:pt-6 sm:pb-14 md:px-8`;
 
 export const ReaderChromeControls = tw.div`mx-auto flex w-fit items-center justify-center gap-2`;
 
-export const ReaderChromeEnd = tw.div("absolute right-8 top-1/2 -translate-y-1/2");
+export const ReaderChromeEnd = tw.div(
+  "absolute right-4 top-1/2 -translate-y-1/2 sm:right-6 md:right-8",
+);
 
 export const ReaderBadgeRow = tw.div`flex flex-wrap items-center gap-1.5`;
 

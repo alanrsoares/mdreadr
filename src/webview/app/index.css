@@ -19,13 +19,12 @@ body,
 
 /* Reader prose — literary body on the paper sheet */
 .reader-prose {
-  --text-body-size: 1.0625rem;
   --text-body-leading: 1.7;
   --reader-block-gap: 0.75rem;
   --reader-heading-major-gap: 0.75rem;
   --reader-heading-minor-gap: 0.25rem;
   font-family: var(--reader-prose-family);
-  font-size: var(--text-body-size);
+  font-size: var(--text-body-size, 1.0625rem);
   line-height: var(--text-body-leading);
 }
 

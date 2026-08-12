@@ -10,6 +10,13 @@ export type FontSettings = {
   editorFontFamily: EditorFontFamily;
 };
 
+export const MIN_FONT_SIZE = 12;
+export const MAX_FONT_SIZE = 24;
+
+export function clampFontSize(size: number): number {
+  return Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, size));
+}
+
 const STORAGE_KEY = "mdreadr-font-settings";
 
 export const DEFAULT_FONT_SETTINGS: FontSettings = {
@@ -19,40 +26,41 @@ export const DEFAULT_FONT_SETTINGS: FontSettings = {
   editorFontFamily: "mono",
 };
 
+export function parseStoredFontSettings(stored: string | null): FontSettings {
+  if (!stored) return DEFAULT_FONT_SETTINGS;
+  try {
+    const parsed = JSON.parse(stored);
+    return {
+      readerFontSize:
+        typeof parsed.readerFontSize === "number"
+          ? clampFontSize(parsed.readerFontSize)
+          : DEFAULT_FONT_SETTINGS.readerFontSize,
+      readerFontFamily:
+        parsed.readerFontFamily === "serif" ||
+        parsed.readerFontFamily === "sans" ||
+        parsed.readerFontFamily === "mono"
+          ? parsed.readerFontFamily
+          : DEFAULT_FONT_SETTINGS.readerFontFamily,
+      editorFontSize:
+        typeof parsed.editorFontSize === "number"
+          ? clampFontSize(parsed.editorFontSize)
+          : DEFAULT_FONT_SETTINGS.editorFontSize,
+      editorFontFamily:
+        parsed.editorFontFamily === "mono" || parsed.editorFontFamily === "sans"
+          ? parsed.editorFontFamily
+          : DEFAULT_FONT_SETTINGS.editorFontFamily,
+    };
+  } catch {
+    return DEFAULT_FONT_SETTINGS;
+  }
+}
+
 function readStoredFontSettings(): FontSettings {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return {
-        readerFontSize:
-          typeof parsed.readerFontSize === "number" &&
-          parsed.readerFontSize >= 12 &&
-          parsed.readerFontSize <= 24
-            ? parsed.readerFontSize
-            : DEFAULT_FONT_SETTINGS.readerFontSize,
-        readerFontFamily:
-          parsed.readerFontFamily === "serif" ||
-          parsed.readerFontFamily === "sans" ||
-          parsed.readerFontFamily === "mono"
-            ? parsed.readerFontFamily
-            : DEFAULT_FONT_SETTINGS.readerFontFamily,
-        editorFontSize:
-          typeof parsed.editorFontSize === "number" &&
-          parsed.editorFontSize >= 12 &&
-          parsed.editorFontSize <= 24
-            ? parsed.editorFontSize
-            : DEFAULT_FONT_SETTINGS.editorFontSize,
-        editorFontFamily:
-          parsed.editorFontFamily === "mono" || parsed.editorFontFamily === "sans"
-            ? parsed.editorFontFamily
-            : DEFAULT_FONT_SETTINGS.editorFontFamily,
-      };
-    }
+    return parseStoredFontSettings(localStorage.getItem(STORAGE_KEY));
   } catch {
-    // Fall back on storage error
+    return DEFAULT_FONT_SETTINGS;
   }
-  return DEFAULT_FONT_SETTINGS;
 }
 
 export function persistFontSettings(settings: FontSettings): void {
@@ -66,12 +74,18 @@ export function persistFontSettings(settings: FontSettings): void {
 export const fontSettingsContainer = defineContainer("font-settings", {
   state: readStoredFontSettings(),
   actions: (on) => ({
-    readerFontSizeChanged: on<number>((s, readerFontSize) => ({ ...s, readerFontSize })),
+    readerFontSizeChanged: on<number>((s, size) => ({
+      ...s,
+      readerFontSize: clampFontSize(size),
+    })),
     readerFontFamilyChanged: on<ReaderFontFamily>((s, readerFontFamily) => ({
       ...s,
       readerFontFamily,
     })),
-    editorFontSizeChanged: on<number>((s, editorFontSize) => ({ ...s, editorFontSize })),
+    editorFontSizeChanged: on<number>((s, size) => ({
+      ...s,
+      editorFontSize: clampFontSize(size),
+    })),
     editorFontFamilyChanged: on<EditorFontFamily>((s, editorFontFamily) => ({
       ...s,
       editorFontFamily,

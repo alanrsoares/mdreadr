@@ -30,6 +30,9 @@ export const DocumentEditor = ({ value, onChange }: DocumentEditorProps) => {
             height: "100%",
             padding: "24px 16px",
           },
+          ".cm-content, .cm-gutter": {
+            fontSize: `${editorFontSize}px`,
+          },
           "&.cm-focused": {
             outline: "none",
           },
@@ -65,7 +68,7 @@ export const DocumentEditor = ({ value, onChange }: DocumentEditorProps) => {
   );
 
   return (
-    <ReaderEditor style={{ fontFamily }}>
+    <ReaderEditor style={{ fontFamily, fontSize: `${editorFontSize}px` }}>
       <CodeMirror
         value={value}
         height="100%"

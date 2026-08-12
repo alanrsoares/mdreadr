@@ -1,3 +1,4 @@
+import { HStack } from "@astryxdesign/core/HStack";
 import type { BlockAnchor, Note } from "@mdreadr/domain";
 import type { CSSProperties, ReactNode } from "react";
 import { getReaderFontFamilyCss, useFontSettings } from "../theme/FontSettingsContext.tsx";
@@ -52,14 +53,18 @@ export const DocumentView = ({
       <ReaderDocumentChrome>
         <ReaderChromeControls>
           <DocumentViewModeSwitch value={viewMode} onChange={onViewModeChange} />
-          <FontAdjustmentControl />
         </ReaderChromeControls>
-        {chromeEnd ? <ReaderChromeEnd>{chromeEnd}</ReaderChromeEnd> : null}
+        <ReaderChromeEnd>
+          <HStack gap={2} vAlign="center">
+            <FontAdjustmentControl viewMode={viewMode} />
+            {chromeEnd}
+          </HStack>
+        </ReaderChromeEnd>
       </ReaderDocumentChrome>
 
       <ReaderDocumentBody className="reader-document-body p-0" key={viewMode}>
         {viewMode === "preview" ? (
-          <div className="px-8 py-6" style={readerStyles}>
+          <div className="px-4 py-4 sm:px-6 sm:py-6 md:px-8" style={readerStyles}>
             <MarkdownView
               content={content}
               documentPath={documentPath}
