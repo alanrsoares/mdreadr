@@ -10,10 +10,7 @@ function readCollapsedPreference(): boolean {
   } catch {
     // ignore storage errors
   }
-  if (typeof window !== "undefined" && window.innerWidth >= 1200) {
-    return false;
-  }
-  return true;
+  return false;
 }
 
 export function persistCollapsedPreference(isCollapsed: boolean): void {
@@ -28,5 +25,6 @@ export const recentsSidebarContainer = defineContainer("recents-sidebar", {
   state: { isCollapsed: readCollapsedPreference() },
   actions: (on) => ({
     collapsedChanged: on<boolean>((_s, isCollapsed) => ({ isCollapsed })),
+    collapsedToggled: on((s) => ({ isCollapsed: !s.isCollapsed })),
   }),
 });

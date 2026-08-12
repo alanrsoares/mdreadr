@@ -7,6 +7,7 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { useResizable } from "@astryxdesign/core/Resizable";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
+import { useContainer, useStoreValues } from "@re-reduced/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppLogo } from "../components/AppLogo.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
@@ -15,8 +16,9 @@ import { McpSettingsDialog } from "../components/McpSettingsDialog.tsx";
 import { formatDisplayPath, pathFileName } from "../components/path-display.ts";
 import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
 import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
+import { recentsSidebarContainer } from "../components/recents-sidebar-container.ts";
 import { TabStrip } from "../components/TabStrip.tsx";
-import { Cog6ToothIcon, ViewColumnsIcon } from "../icons.ts";
+import { Bars3Icon, Cog6ToothIcon, ViewColumnsIcon } from "../icons.ts";
 import { createTreatyReaderApi } from "../session/reader-api.ts";
 import { useDocumentTabs } from "../session/useReaderSession.ts";
 import { EmptyState } from "../ui/layout.tsx";
@@ -75,6 +77,9 @@ function ReaderDocumentTopNavHeading({
 }
 
 export function ReaderPage() {
+  const recentsStore = useContainer(recentsSidebarContainer);
+  const { isCollapsed: isRecentsCollapsed } = useStoreValues(recentsStore);
+
   const notesSidebar = useResizable({
     defaultSize: 280,
     minSizePx: 220,
@@ -282,6 +287,13 @@ export function ReaderPage() {
                 variant="ghost"
                 icon={<Icon icon={Cog6ToothIcon} size="sm" />}
                 onClick={() => setIsMcpSettingsOpen(true)}
+              />
+              <IconButton
+                label={isRecentsCollapsed ? "Show recents sidebar" : "Hide recents sidebar"}
+                tooltip={isRecentsCollapsed ? "Show recents sidebar" : "Hide recents sidebar"}
+                variant={isRecentsCollapsed ? "ghost" : "secondary"}
+                icon={<Icon icon={Bars3Icon} size="sm" />}
+                onClick={recentsStore.actions.collapsedToggled}
               />
               <IconButton
                 label={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}

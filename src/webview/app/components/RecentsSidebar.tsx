@@ -118,6 +118,7 @@ export function RecentsSidebar({
       collapsible={{
         isCollapsed,
         onCollapsedChange: store.actions.collapsedChanged,
+        hasButton: true,
       }}
       resizable={{
         autoSaveId: "mdreadr-recents-sidebar",
