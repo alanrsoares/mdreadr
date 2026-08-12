@@ -1,6 +1,6 @@
 import tw from "@styled-cva/react";
 
-export const ReaderArticle = tw.article`reader-prose w-full min-w-0`;
+export const ReaderArticle = tw.article`reader-prose w-full min-w-0 font-[family-name:var(--reader-prose-family)]`;
 
 const headingTypography =
   "scroll-mt-20 font-[family-name:var(--font-family-heading)] text-[var(--color-text-primary)]";
@@ -27,7 +27,7 @@ export const readerHeadingByLevel = {
 } as const;
 
 export const ReaderParagraph = tw.div(
-  "max-w-[68ch] text-[length:var(--text-body-size)] leading-[var(--text-body-leading)] text-[var(--color-text-primary)]",
+  "max-w-[68ch] font-[family-name:var(--reader-prose-family)] text-[length:var(--text-body-size)] leading-[var(--text-body-leading)] text-[var(--color-text-primary)]",
 );
 
 export const ReaderCodeWrap = tw.div`min-w-0`;

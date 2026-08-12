@@ -18,12 +18,21 @@ body,
 }
 
 /* Reader prose — literary body on the paper sheet */
+.reader-prose,
+.reader-prose p,
+.reader-prose li,
+.reader-prose blockquote,
+.reader-prose td,
+.reader-prose th,
+.reader-prose div:not(.reader-kbd) {
+  font-family: var(--reader-prose-family);
+}
+
 .reader-prose {
   --text-body-leading: 1.7;
   --reader-block-gap: 0.75rem;
   --reader-heading-major-gap: 0.75rem;
   --reader-heading-minor-gap: 0.25rem;
-  font-family: var(--reader-prose-family);
   font-size: var(--text-body-size, 1.0625rem);
   line-height: var(--text-body-leading);
 }
