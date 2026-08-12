@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/alanrsoares/mdreadr/compare/v0.8.0...v0.9.0) (2026-08-12)
+
+
+### Features
+
+* **ui:** add font adjustment UX & theme toggle ([5860a31](https://github.com/alanrsoares/mdreadr/commit/5860a31e6d71ee33470b37c4a867793d3776bd22))
+
 ## [0.8.0](https://github.com/alanrsoares/mdreadr/compare/v0.7.0...v0.8.0) (2026-08-08)
 
 
