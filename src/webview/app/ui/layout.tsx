@@ -35,7 +35,7 @@ export const ReaderDocumentBody = tw.div`min-h-0 flex-1 px-4 pt-4 pb-12 sm:px-6 
 export const ReaderChromeControls = tw.div`mx-auto flex w-fit items-center justify-center gap-2`;
 
 export const ReaderChromeEnd = tw.div(
-  "absolute right-4 top-1/2 -translate-y-1/2 sm:right-6 md:right-8",
+  "absolute right-4 top-1/2 -translate-y-1/2 sm:right-2 md:right-3.5",
 );
 
 export const ReaderBadgeRow = tw.div`flex flex-wrap items-center gap-1.5`;

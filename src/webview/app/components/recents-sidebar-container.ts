@@ -10,6 +10,9 @@ function readCollapsedPreference(): boolean {
   } catch {
     // ignore storage errors
   }
+  if (typeof window !== "undefined" && window.innerWidth >= 1200) {
+    return false;
+  }
   return true;
 }
 

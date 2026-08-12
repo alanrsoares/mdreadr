@@ -68,7 +68,12 @@ export const DocumentEditor = ({ value, onChange }: DocumentEditorProps) => {
   );
 
   return (
-    <ReaderEditor style={{ fontFamily, fontSize: `${editorFontSize}px` }}>
+    <ReaderEditor
+      style={{
+        fontFamily,
+        fontSize: `${editorFontSize}px`,
+      }}
+    >
       <CodeMirror
         value={value}
         height="100%"

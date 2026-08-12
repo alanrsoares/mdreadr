@@ -9,7 +9,7 @@ import {
 } from "@astryxdesign/core/SideNav";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useContainer, useStoreValues, useWatch } from "@re-reduced/react";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { DocumentTextIcon } from "../icons.ts";
 import { formatDisplayPath, formatRecentMenuLabels, pathFileName } from "./path-display.ts";
 import {
@@ -93,6 +93,20 @@ export function RecentsSidebar({
   const store = useContainer(recentsSidebarContainer);
   const { isCollapsed } = useStoreValues(store);
   useWatch(store, (s) => s.isCollapsed.value, persistCollapsedPreference);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width >= 1280 && isCollapsed) {
+        store.actions.collapsedChanged(false);
+      }
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isCollapsed, store]);
+
   const menuLabels = useMemo(() => formatRecentMenuLabels(paths), [paths]);
   const displayPaths = useMemo(
     () => new Map(paths.map((path) => [path, formatDisplayPath(path, homeDirectory)])),

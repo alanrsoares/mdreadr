@@ -109,18 +109,20 @@ export function ReaderPage() {
     },
   });
 
-  // Smart auto-collapse notes sidebar on narrow viewports / split screen
+  // Smart sidebar auto-expansion when screen has enough horizontal room
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(max-width: 1024px)");
-    const handleViewportChange = (e: MediaQueryListEvent | MediaQueryList) => {
-      if (e.matches && !notesSidebar.isCollapsed) {
+    const handleViewportChange = () => {
+      const width = window.innerWidth;
+      if (width > 1024 && notesSidebar.isCollapsed) {
+        notesSidebar.expand();
+      } else if (width <= 1024 && !notesSidebar.isCollapsed) {
         notesSidebar.collapse();
       }
     };
 
-    handleViewportChange(mediaQuery);
-    mediaQuery.addEventListener("change", handleViewportChange);
-    return () => mediaQuery.removeEventListener("change", handleViewportChange);
+    handleViewportChange();
+    window.addEventListener("resize", handleViewportChange);
+    return () => window.removeEventListener("resize", handleViewportChange);
   }, [notesSidebar]);
 
   const effectiveActiveId = isUnsavedActive && unsavedDrop ? UNSAVED_TAB_ID : tabs.activeId;
