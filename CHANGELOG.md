@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.10.0](https://github.com/alanrsoares/mdreadr/compare/v0.9.0...v0.10.0) (2026-08-12)
+
+
+### Features
+
+* mcp code mode ([08db392](https://github.com/alanrsoares/mdreadr/commit/08db392d80b219f1e281fb0fa810e6c7f4766a4a))
+* **ui:** add top-right font size UX and fluid scaling ([b09ce71](https://github.com/alanrsoares/mdreadr/commit/b09ce7164823b8c05540d33ddfb82d3ffb46d8f4))
+* **ui:** auto-expand sidebars when screen has horizontal room ([0b73d99](https://github.com/alanrsoares/mdreadr/commit/0b73d9910cd8bd06e7f87c3a948f18788d7a80f1))
+* **ui:** refine table font scaling and button feedback ([9772205](https://github.com/alanrsoares/mdreadr/commit/9772205e893777808ca144f504ff04820918ed9d))
+
+
+### Bug Fixes
+
+* **ui:** enforce reader prose font family on body elements ([72c7b23](https://github.com/alanrsoares/mdreadr/commit/72c7b234481539582eade6c902f1dd43a6a5dd56))
+
 ## [0.9.0](https://github.com/alanrsoares/mdreadr/compare/v0.8.0...v0.9.0) (2026-08-12)
 
 
