@@ -89,8 +89,9 @@ export class SessionStore {
   }
 
   private bucketFor(documentId: string | null): NoteSuggestionBucket {
-    if (documentId === null) return { notes: this.noDocNotes, suggestions: this.noDocSuggestions };
-    return this.tabs.get(documentId) ?? { notes: [], suggestions: [] };
+    return documentId === null
+      ? { notes: this.noDocNotes, suggestions: this.noDocSuggestions }
+      : (this.tabs.get(documentId) ?? { notes: [], suggestions: [] });
   }
 
   private get notes(): Note[] {
@@ -262,26 +263,28 @@ export class SessionStore {
     const bucket = this.bucketFor(entry.documentId);
     if (entry.type.startsWith("suggestion_")) {
       const suggestion = bucket.suggestions.find((item) => item.id === entry.entityId);
-      if (!suggestion) return null;
-      return {
-        entity: "suggestion",
-        status: suggestion.status,
-        blockId: suggestion.anchor.blockId,
-        noteId: suggestion.noteId,
-        author: suggestion.author.kind,
-      };
+      return !suggestion
+        ? null
+        : {
+            entity: "suggestion",
+            status: suggestion.status,
+            blockId: suggestion.anchor.blockId,
+            noteId: suggestion.noteId,
+            author: suggestion.author.kind,
+          };
     }
     const note = bucket.notes.find((item) => item.id === entry.entityId);
-    if (!note) return null;
-    return {
-      entity: "note",
-      kind: note.kind,
-      status: note.status,
-      blockId: note.anchor.blockId,
-      label: note.anchor.label,
-      replies: note.replies.length,
-      lastAuthor: note.replies.at(-1)?.author.kind,
-    };
+    return !note
+      ? null
+      : {
+          entity: "note",
+          kind: note.kind,
+          status: note.status,
+          blockId: note.anchor.blockId,
+          label: note.anchor.label,
+          replies: note.replies.length,
+          lastAuthor: note.replies.at(-1)?.author.kind,
+        };
   }
 
   /** `getEvents`, with each entry's entity summary attached. */

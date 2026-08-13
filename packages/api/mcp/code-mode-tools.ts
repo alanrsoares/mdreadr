@@ -55,116 +55,112 @@ const MAX_STACK_SIZE_BYTES = 1024 * 1024; // 1MB max stack
 const MAX_LOG_LINES = 100;
 const MAX_LOG_LINE_CHARS = 1000;
 
-export function createMdreadrSandboxApi() {
-  return {
-    getDocument: () => {
-      const snapshot = sessionStore.snapshot();
-      return {
-        path: snapshot.document?.path ?? null,
-        content: snapshot.documentContent ?? null,
-        latestSeq: sessionStore.latestSeq(),
-      };
-    },
+export const createMdreadrSandboxApi = () => ({
+  getDocument: () => {
+    const snapshot = sessionStore.snapshot();
+    return {
+      path: snapshot.document?.path ?? null,
+      content: snapshot.documentContent ?? null,
+      latestSeq: sessionStore.latestSeq(),
+    };
+  },
 
-    getBlocks: () => {
-      const snapshot = sessionStore.snapshot();
-      return snapshot.documentContent ? listDocumentBlocks(snapshot.documentContent) : [];
-    },
+  getBlocks: () => {
+    const snapshot = sessionStore.snapshot();
+    return snapshot.documentContent ? listDocumentBlocks(snapshot.documentContent) : [];
+  },
 
-    getBlock: (anchor: BlockAnchor) => {
-      const snapshot = sessionStore.snapshot();
-      return snapshot.documentContent
-        ? (resolveBlockText(snapshot.documentContent, anchor) ?? null)
-        : null;
-    },
+  getBlock: (anchor: BlockAnchor) => {
+    const snapshot = sessionStore.snapshot();
+    return snapshot.documentContent
+      ? (resolveBlockText(snapshot.documentContent, anchor) ?? null)
+      : null;
+  },
 
-    getNotes: (filter?: GetNotesFilter) => {
-      let notes = sessionStore.getNotes();
-      if (filter?.status) {
-        notes = notes.filter((n) => n.status === filter.status);
-      }
-      if (filter?.kind) {
-        notes = notes.filter((n) => n.kind === filter.kind);
-      }
-      return notes;
-    },
+  getNotes: (filter?: GetNotesFilter) => {
+    let notes = sessionStore.getNotes();
+    if (filter?.status) {
+      notes = notes.filter((n) => n.status === filter.status);
+    }
+    if (filter?.kind) {
+      notes = notes.filter((n) => n.kind === filter.kind);
+    }
+    return notes;
+  },
 
-    getNote: (id: string) => {
-      return sessionStore.getNotes().find((n) => n.id === id) ?? null;
-    },
+  getNote: (id: string) => sessionStore.getNotes().find((n) => n.id === id) ?? null,
 
-    addNote: (params: AddNoteParams) => {
-      const note = createNote(
-        {
-          anchor: params.anchor,
-          body: params.body,
-          author: params.author as Author,
-          kind: params.kind,
-        },
-        sessionStore.snapshot().document ?? undefined,
-      );
-      sessionStore.addNote(note);
-      documentSession.triggerChange();
-      return note;
-    },
+  addNote: (params: AddNoteParams) => {
+    const note = createNote(
+      {
+        anchor: params.anchor,
+        body: params.body,
+        author: params.author as Author,
+        kind: params.kind,
+      },
+      sessionStore.snapshot().document ?? undefined,
+    );
+    sessionStore.addNote(note);
+    documentSession.triggerChange();
+    return note;
+  },
 
-    addReply: (noteId: string, params: AddReplyParams) => {
-      const note = sessionStore.getNotes().find((n) => n.id === noteId);
-      if (!note) throw new Error(`Note not found: ${noteId}`);
-      const updatedNote = addReply(note, { body: params.body, author: params.author as Author });
-      sessionStore.noteReplied(updatedNote);
-      documentSession.triggerChange();
-      return updatedNote;
-    },
+  addReply: (noteId: string, params: AddReplyParams) => {
+    const note = sessionStore.getNotes().find((n) => n.id === noteId);
+    if (!note) throw new Error(`Note not found: ${noteId}`);
+    const updatedNote = addReply(note, { body: params.body, author: params.author as Author });
+    sessionStore.noteReplied(updatedNote);
+    documentSession.triggerChange();
+    return updatedNote;
+  },
 
-    setNoteStatus: (noteId: string, status: "open" | "resolved" | "wontfix") => {
-      const note = sessionStore.getNotes().find((n) => n.id === noteId);
-      if (!note) throw new Error(`Note not found: ${noteId}`);
-      const updatedNote = setNoteStatus(note, status);
-      sessionStore.noteStatusChanged(updatedNote);
-      documentSession.triggerChange();
-      return updatedNote;
-    },
+  setNoteStatus: (noteId: string, status: "open" | "resolved" | "wontfix") => {
+    const note = sessionStore.getNotes().find((n) => n.id === noteId);
+    if (!note) throw new Error(`Note not found: ${noteId}`);
+    const updatedNote = setNoteStatus(note, status);
+    sessionStore.noteStatusChanged(updatedNote);
+    documentSession.triggerChange();
+    return updatedNote;
+  },
 
-    proposeEdit: (params: ProposeEditParams) => {
-      const suggestion = createSuggestion(
-        {
-          anchor: params.anchor,
-          replacementText: params.replacementText,
-          noteId: params.noteId,
-          author: (params.author as Author) ?? { kind: "agent" },
-        },
-        sessionStore.snapshot().document ?? undefined,
-      );
-      sessionStore.addSuggestion(suggestion);
-      documentSession.triggerChange();
-      return suggestion;
-    },
+  proposeEdit: (params: ProposeEditParams) => {
+    const suggestion = createSuggestion(
+      {
+        anchor: params.anchor,
+        replacementText: params.replacementText,
+        noteId: params.noteId,
+        author: (params.author as Author) ?? { kind: "agent" },
+      },
+      sessionStore.snapshot().document ?? undefined,
+    );
+    sessionStore.addSuggestion(suggestion);
+    documentSession.triggerChange();
+    return suggestion;
+  },
 
-    getSuggestions: (filter?: GetSuggestionsFilter) => {
-      let suggestions = sessionStore.getSuggestions();
-      if (filter?.status) {
-        suggestions = suggestions.filter((s) => s.status === filter.status);
-      }
-      return suggestions;
-    },
+  getSuggestions: (filter?: GetSuggestionsFilter) => {
+    let suggestions = sessionStore.getSuggestions();
+    if (filter?.status) {
+      suggestions = suggestions.filter((s) => s.status === filter.status);
+    }
+    return suggestions;
+  },
 
-    saveNotes: async (path: string) => {
-      const documentPath = sessionStore.snapshot().document?.path ?? null;
-      if (!isWorkspacePathAllowed(path, documentPath)) {
-        throw new Error(toPathNotAllowedError(path).error);
-      }
-      const notes = sessionStore.getNotes();
-      const document = sessionStore.snapshot().document ?? undefined;
-      const content = JSON.stringify(buildNotesFilePayload(document, notes), null, 2);
-      const result = await writeTextFile(path, content);
-      if (isErr(result)) {
-        throw new Error(`Failed to save notes: ${result.error.message}`);
-      }
-      return true;
-    },
-  };
-}
+  saveNotes: async (path: string) => {
+    const documentPath = sessionStore.snapshot().document?.path ?? null;
+    if (!isWorkspacePathAllowed(path, documentPath)) {
+      throw new Error(toPathNotAllowedError(path).error);
+    }
+    const notes = sessionStore.getNotes();
+    const document = sessionStore.snapshot().document ?? undefined;
+    const content = JSON.stringify(buildNotesFilePayload(document, notes), null, 2);
+    const result = await writeTextFile(path, content);
+    if (isErr(result)) {
+      throw new Error(`Failed to save notes: ${result.error.message}`);
+    }
+    return true;
+  },
+});
 
 export type CodeModeResult = {
   success: boolean;

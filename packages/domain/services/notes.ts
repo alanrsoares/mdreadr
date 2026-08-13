@@ -94,9 +94,10 @@ export function backfillNoteDocument(file: NotesFile): NotesFile {
 
 /** Shared shape for both the `/notes/save` route and the `save_session_notes`
  * MCP tool, so the two never drift into incompatible notes.json shapes again. */
-export function buildNotesFilePayload(document: DocumentRef | undefined, notes: Note[]): NotesFile {
-  return { schemaVersion: NOTES_SCHEMA_VERSION, document, notes };
-}
+export const buildNotesFilePayload = (
+  document: DocumentRef | undefined,
+  notes: Note[],
+): NotesFile => ({ schemaVersion: NOTES_SCHEMA_VERSION, document, notes });
 
 export const formatAuthorLabel = (author: Author): string =>
   match(author.kind)

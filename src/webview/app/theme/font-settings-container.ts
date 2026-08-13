@@ -20,14 +20,11 @@ export const MIN_LINE_HEIGHT = 1.3;
 export const MAX_LINE_HEIGHT = 2.2;
 export const LINE_HEIGHT_STEP = 0.05;
 
-function clampNumber(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min;
-  return Math.max(min, Math.min(max, value));
-}
+const clampNumber = (value: number, min: number, max: number): number =>
+  !Number.isFinite(value) ? min : Math.max(min, Math.min(max, value));
 
-export function clampFontSize(size: number): number {
-  return clampNumber(size, MIN_FONT_SIZE, MAX_FONT_SIZE);
-}
+export const clampFontSize = (size: number): number =>
+  clampNumber(size, MIN_FONT_SIZE, MAX_FONT_SIZE);
 
 export function clampLineHeight(leading: number): number {
   // Round to the slider step so drags can't persist float noise (1.7000000000000002).

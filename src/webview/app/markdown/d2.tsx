@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { DiagramViewer } from "./diagram-viewer.tsx";
 
-function d2Theme(): { themeID: number; darkThemeID: number } {
-  return { themeID: 0, darkThemeID: 200 };
-}
+const d2Theme = (): { themeID: number; darkThemeID: number } => ({ themeID: 0, darkThemeID: 200 });
 
 type D2ChartProps = { chart: string };
 

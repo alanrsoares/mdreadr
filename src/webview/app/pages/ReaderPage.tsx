@@ -440,10 +440,8 @@ function ReaderPageContent() {
   );
 }
 
-export function ReaderPage() {
-  return (
-    <RecentsSidebarProvider>
-      <ReaderPageContent />
-    </RecentsSidebarProvider>
-  );
-}
+export const ReaderPage = () => (
+  <RecentsSidebarProvider>
+    <ReaderPageContent />
+  </RecentsSidebarProvider>
+);

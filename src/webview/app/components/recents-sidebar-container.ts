@@ -5,9 +5,7 @@ export const STORAGE_KEY = "mdreadr-recents-sidebar-collapsed";
 
 /** Accepts both the JSON the interpreter writes and the `"true"`/`"false"`
  *  strings written before persistence moved into the container. */
-export function parseStoredCollapsed(raw: unknown): boolean {
-  return raw === true || raw === "true";
-}
+export const parseStoredCollapsed = (raw: unknown): boolean => raw === true || raw === "true";
 
 export const recentsSidebarContainer = defineContainer("recents-sidebar", {
   state: { isCollapsed: readStoredJson(STORAGE_KEY, parseStoredCollapsed) },

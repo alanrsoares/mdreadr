@@ -20,9 +20,7 @@ export interface ToolDef<Shape extends ZodRawShape = ZodRawShape> {
   handle(args: z.infer<z.ZodObject<Shape>>, extra?: unknown): Promise<ToolResult> | ToolResult;
 }
 
-export function defineTool<Shape extends ZodRawShape>(def: ToolDef<Shape>): ToolDef<Shape> {
-  return def;
-}
+export const defineTool = <Shape extends ZodRawShape>(def: ToolDef<Shape>): ToolDef<Shape> => def;
 
 export function registerTools(
   server: McpServer,
@@ -43,9 +41,9 @@ export function getOrThrow<T extends { id: string }>(items: T[], id: string, lab
   return item;
 }
 
-export function toolJson(payload: unknown): ToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(payload) }] };
-}
+export const toolJson = (payload: unknown): ToolResult => ({
+  content: [{ type: "text", text: JSON.stringify(payload) }],
+});
 
 export function toNoteSummary(note: Note) {
   const lastReply = note.replies.at(-1);
@@ -68,14 +66,12 @@ export function toNoteSummary(note: Note) {
   };
 }
 
-export function toSuggestionSummary(suggestion: Suggestion) {
-  return {
-    id: suggestion.id,
-    status: suggestion.status,
-    noteId: suggestion.noteId ?? null,
-    anchor: suggestion.anchor.label ?? suggestion.anchor.blockId,
-    blockId: suggestion.anchor.blockId,
-    author: suggestion.author,
-    updatedAt: suggestion.updatedAt,
-  };
-}
+export const toSuggestionSummary = (suggestion: Suggestion) => ({
+  id: suggestion.id,
+  status: suggestion.status,
+  noteId: suggestion.noteId ?? null,
+  anchor: suggestion.anchor.label ?? suggestion.anchor.blockId,
+  blockId: suggestion.anchor.blockId,
+  author: suggestion.author,
+  updatedAt: suggestion.updatedAt,
+});

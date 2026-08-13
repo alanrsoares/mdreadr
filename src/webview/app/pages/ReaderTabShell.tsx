@@ -30,7 +30,7 @@ type ReaderTabShellProps = {
  *   > 1024px  outline 200 | document well | notes (resizable, default 280)
  *   <= 1024px notes collapse (ReaderPage drives it off a media query)
  */
-export function ReaderTabShell({
+export const ReaderTabShell = ({
   notesSidebar,
   outline,
   children,
@@ -39,61 +39,59 @@ export function ReaderTabShell({
   drop,
   isDragOver,
   isNotesPending = false,
-}: ReaderTabShellProps) {
-  return (
-    <Layout
-      height="fill"
-      start={
-        <LayoutPanel
-          width={200}
-          padding={0}
+}: ReaderTabShellProps) => (
+  <Layout
+    height="fill"
+    start={
+      <LayoutPanel
+        width={200}
+        padding={0}
+        hasDivider
+        label="Table of contents"
+        className="bg-(--color-background-surface)"
+      >
+        {outline}
+      </LayoutPanel>
+    }
+    content={
+      <LayoutContent
+        ref={mainRef}
+        padding={0}
+        label="Document"
+        className="relative bg-(--reader-well-bg)"
+        {...drop}
+      >
+        <div
+          aria-hidden
+          className="reader-main-drop-overlay"
+          data-active={isDragOver ? "true" : "false"}
+        >
+          <Stack gap={2} vAlign="center" hAlign="center" className="reader-drop-overlay-content">
+            <Icon icon={ArrowDownTrayIcon} size="lg" />
+            Drop to open
+          </Stack>
+        </div>
+        <ReaderContent>{children}</ReaderContent>
+      </LayoutContent>
+    }
+    end={
+      <>
+        <ResizeHandle
+          resizable={notesSidebar.props}
+          isReversed
           hasDivider
-          label="Table of contents"
-          className="bg-(--color-background-surface)"
-        >
-          {outline}
-        </LayoutPanel>
-      }
-      content={
-        <LayoutContent
-          ref={mainRef}
+          label="Resize notes sidebar"
+        />
+        <LayoutPanel
+          resizable={notesSidebar.props}
           padding={0}
-          label="Document"
-          className="relative bg-(--reader-well-bg)"
-          {...drop}
+          label="Notes"
+          data-pending={isNotesPending ? "true" : "false"}
+          className="reader-notes-panel bg-(--color-background-surface)"
         >
-          <div
-            aria-hidden
-            className="reader-main-drop-overlay"
-            data-active={isDragOver ? "true" : "false"}
-          >
-            <Stack gap={2} vAlign="center" hAlign="center" className="reader-drop-overlay-content">
-              <Icon icon={ArrowDownTrayIcon} size="lg" />
-              Drop to open
-            </Stack>
-          </div>
-          <ReaderContent>{children}</ReaderContent>
-        </LayoutContent>
-      }
-      end={
-        <>
-          <ResizeHandle
-            resizable={notesSidebar.props}
-            isReversed
-            hasDivider
-            label="Resize notes sidebar"
-          />
-          <LayoutPanel
-            resizable={notesSidebar.props}
-            padding={0}
-            label="Notes"
-            data-pending={isNotesPending ? "true" : "false"}
-            className="reader-notes-panel bg-(--color-background-surface)"
-          >
-            {notes}
-          </LayoutPanel>
-        </>
-      }
-    />
-  );
-}
+          {notes}
+        </LayoutPanel>
+      </>
+    }
+  />
+);

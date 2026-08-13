@@ -98,7 +98,7 @@ describe("Code Mode Sandbox (QuickJS WASM)", () => {
 
   it("aborts an infinite loop within timeout budget", async () => {
     const start = Date.now();
-    const res = await executeCodeModeScript(`while (true) {}`, 200);
+    const res = await executeCodeModeScript("while (true) {}", 200);
 
     expect(res.success).toBe(false);
     expect(res.error).toMatch(/interrupted|timed out/);
@@ -113,7 +113,7 @@ describe("Code Mode Sandbox (QuickJS WASM)", () => {
   });
 
   it("handles syntax errors gracefully", async () => {
-    const res = await executeCodeModeScript(`const x = ;`);
+    const res = await executeCodeModeScript("const x = ;");
 
     expect(res.success).toBe(false);
     expect(res.error).toBeDefined();

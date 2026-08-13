@@ -38,12 +38,11 @@ const activityTools = {
     description:
       "Non-blocking catch-up read of journal entries newer than sinceSeq. Each event carries a `summary` of the entity it touched (note kind/status/last-author, or suggestion status), so you can act without a follow-up read. Response also includes `latestSeq`. Use this to resume after a reconnect instead of waiting.",
     inputSchema: { sinceSeq: sinceSeqSchema },
-    handle: ({ sinceSeq }) => {
-      return toolJson({
+    handle: ({ sinceSeq }) =>
+      toolJson({
         events: sessionStore.getEnrichedEvents(sinceSeq),
         latestSeq: sessionStore.latestSeq(),
-      });
-    },
+      }),
   }),
 };
 

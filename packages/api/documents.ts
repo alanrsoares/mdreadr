@@ -72,14 +72,13 @@ export const resolveAssetPath = (documentPath: string, src: string): string =>
 const isWithinRoot = (target: string, root: string): boolean =>
   target === root || target.startsWith(root + sep);
 
-function workspaceRoots(referenceDocumentPath: string | null, home: string): string[] {
-  return [
+const workspaceRoots = (referenceDocumentPath: string | null, home: string): string[] =>
+  [
     referenceDocumentPath ? dirname(resolve(referenceDocumentPath)) : null,
     join(home, "Documents"),
     join(home, "Desktop"),
     home,
   ].filter((root): root is string => root !== null);
-}
 
 /**
  * Scopes agent-driven filesystem access (`save_session_notes`, MCP `open_document`)
@@ -97,9 +96,10 @@ export function isWorkspacePathAllowed(
 }
 
 /** Shared "path rejected by `isWorkspacePathAllowed`" error, returned by both `save_session_notes` and MCP `open_document`. */
-export function toPathNotAllowedError(path: string): { error: string; code: string } {
-  return { error: `Path not allowed: ${path}`, code: "PathNotAllowed" };
-}
+export const toPathNotAllowedError = (path: string): { error: string; code: string } => ({
+  error: `Path not allowed: ${path}`,
+  code: "PathNotAllowed",
+});
 
 const SUPPORTED_DOCUMENT_EXTENSIONS = [".md", ".markdown"];
 
@@ -109,15 +109,16 @@ export function isSupportedDocumentPath(path: string): boolean {
   return SUPPORTED_DOCUMENT_EXTENSIONS.some((extension) => lower.endsWith(extension));
 }
 
-export function toDocumentHttpError(error: DocumentError): {
+export const toDocumentHttpError = (
+  error: DocumentError,
+): {
   error: string;
   code: string;
-} {
-  return matchTag(error, {
+} =>
+  matchTag(error, {
     DocumentNotFound: (e) => ({ error: `Document not found: ${e.path}`, code: e._tag }),
     DocumentReadFailed: (e) => ({ error: e.message, code: e._tag }),
   });
-}
 
 export const writeTextFile = (
   path: string,

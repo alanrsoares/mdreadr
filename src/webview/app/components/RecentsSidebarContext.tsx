@@ -12,13 +12,11 @@ export const RecentsSidebarStore = createContainerContext(recentsSidebarContaine
   interpreters: storageInterpreters,
 });
 
-export function RecentsSidebarProvider({ children }: WithChildren) {
-  return (
-    <RecentsSidebarStore.Provider>
-      <RecentsSidebarWatcher>{children}</RecentsSidebarWatcher>
-    </RecentsSidebarStore.Provider>
-  );
-}
+export const RecentsSidebarProvider = ({ children }: WithChildren) => (
+  <RecentsSidebarStore.Provider>
+    <RecentsSidebarWatcher>{children}</RecentsSidebarWatcher>
+  </RecentsSidebarStore.Provider>
+);
 
 function RecentsSidebarWatcher({ children }: WithChildren) {
   const { collapsedChanged } = RecentsSidebarStore.useContainer();
