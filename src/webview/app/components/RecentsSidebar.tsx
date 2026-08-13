@@ -1,14 +1,18 @@
+import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
+import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import {
   SideNav,
+  SideNavCollapseButton,
   SideNavItem,
   SideNavSection,
   useSideNavCollapse,
 } from "@astryxdesign/core/SideNav";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useMemo, useRef } from "react";
+import packageJson from "../../../../package.json";
 import { DocumentTextIcon } from "../icons.ts";
 import { formatDisplayPath, formatRecentMenuLabels, pathFileName } from "./path-display.ts";
 import { useRecentsSidebar } from "./RecentsSidebarContext.tsx";
@@ -86,6 +90,17 @@ function RecentSideNavItem({
   );
 }
 
+function RecentsSidebarFooter() {
+  const { isCollapsed } = useSideNavCollapse();
+
+  return (
+    <HStack className="w-full" hAlign={isCollapsed ? "center" : "between"} vAlign="center">
+      <SideNavCollapseButton />
+      {isCollapsed ? null : <Badge label={`v${packageJson.version}`} />}
+    </HStack>
+  );
+}
+
 type RecentsSidebarProps = {
   paths: string[];
   selectedPath?: string;
@@ -125,7 +140,7 @@ export function RecentsSidebar({
       collapsible={{
         isCollapsed,
         onCollapsedChange: setCollapsed,
-        hasButton: true,
+        hasButton: false,
       }}
       resizable={{
         autoSaveId: "mdreadr-recents-sidebar",
@@ -140,6 +155,7 @@ export function RecentsSidebar({
           variant={openActionVariant}
         />
       }
+      footerIcons={<RecentsSidebarFooter />}
     >
       <SideNavSection title="Recents">
         {paths.length === 0 ? (

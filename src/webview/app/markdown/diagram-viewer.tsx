@@ -269,7 +269,7 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
               size="sm"
               onClick={reset}
             />
-            <div className="mx-1 h-4 w-[1px] bg-(--color-border)" />
+            <div className="mx-1 h-4 w-px bg-(--color-border)" />
             <IconButton
               icon={<ArrowsPointingOutIcon className="h-4 w-4" />}
               label="Expand to Fullscreen"
