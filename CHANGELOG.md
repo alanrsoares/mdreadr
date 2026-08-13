@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/alanrsoares/mdreadr/compare/v0.10.0...v0.10.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* **ui:** enable collapse toggle and restore button for left sidebar ([a67548d](https://github.com/alanrsoares/mdreadr/commit/a67548dd64c99a724e88412451dbeb6f803700f1))
+
 ## [0.10.0](https://github.com/alanrsoares/mdreadr/compare/v0.9.0...v0.10.0) (2026-08-12)
 
 
