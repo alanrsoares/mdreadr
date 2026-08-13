@@ -8,14 +8,10 @@ import {
   useSideNavCollapse,
 } from "@astryxdesign/core/SideNav";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
-import { useContainer, useStoreValues, useWatch } from "@re-reduced/react";
 import { useMemo, useRef } from "react";
 import { DocumentTextIcon } from "../icons.ts";
 import { formatDisplayPath, formatRecentMenuLabels, pathFileName } from "./path-display.ts";
-import {
-  persistCollapsedPreference,
-  recentsSidebarContainer,
-} from "./recents-sidebar-container.ts";
+import { useRecentsSidebar } from "./RecentsSidebarContext.tsx";
 
 type RecentsSidebarOpenActionProps = {
   onPickDocument: () => void;
@@ -90,9 +86,7 @@ export function RecentsSidebar({
   onPickDocument,
   isOpening = false,
 }: RecentsSidebarProps) {
-  const store = useContainer(recentsSidebarContainer);
-  const { isCollapsed } = useStoreValues(store);
-  useWatch(store, (s) => s.isCollapsed.value, persistCollapsedPreference);
+  const { isCollapsed, setCollapsed } = useRecentsSidebar();
 
   const menuLabels = useMemo(() => formatRecentMenuLabels(paths), [paths]);
   const displayPaths = useMemo(
@@ -104,7 +98,7 @@ export function RecentsSidebar({
     <SideNav
       collapsible={{
         isCollapsed,
-        onCollapsedChange: store.actions.collapsedChanged,
+        onCollapsedChange: setCollapsed,
         hasButton: true,
       }}
       resizable={{

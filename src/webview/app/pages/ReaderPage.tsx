@@ -7,7 +7,6 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { useResizable } from "@astryxdesign/core/Resizable";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
-import { useContainer, useStoreValues } from "@re-reduced/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppLogo } from "../components/AppLogo.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
@@ -16,7 +15,7 @@ import { McpSettingsDialog } from "../components/McpSettingsDialog.tsx";
 import { formatDisplayPath, pathFileName } from "../components/path-display.ts";
 import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
 import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
-import { recentsSidebarContainer } from "../components/recents-sidebar-container.ts";
+import { RecentsSidebarProvider, useRecentsSidebar } from "../components/RecentsSidebarContext.tsx";
 import { TabStrip } from "../components/TabStrip.tsx";
 import { Bars3Icon, Cog6ToothIcon, ViewColumnsIcon } from "../icons.ts";
 import { createTreatyReaderApi } from "../session/reader-api.ts";
@@ -76,9 +75,8 @@ function ReaderDocumentTopNavHeading({
   );
 }
 
-export function ReaderPage() {
-  const recentsStore = useContainer(recentsSidebarContainer);
-  const { isCollapsed: isRecentsCollapsed } = useStoreValues(recentsStore);
+function ReaderPageContent() {
+  const { isCollapsed: isRecentsCollapsed, toggleCollapsed } = useRecentsSidebar();
 
   const notesSidebar = useResizable({
     defaultSize: 280,
@@ -292,7 +290,7 @@ export function ReaderPage() {
                 tooltip={isRecentsCollapsed ? "Show recents sidebar" : "Hide recents sidebar"}
                 variant={isRecentsCollapsed ? "ghost" : "secondary"}
                 icon={<Icon icon={Bars3Icon} size="sm" />}
-                onClick={recentsStore.actions.collapsedToggled}
+                onClick={toggleCollapsed}
               />
               <IconButton
                 label={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
@@ -411,5 +409,13 @@ export function ReaderPage() {
 
       <McpSettingsDialog isOpen={isMcpSettingsOpen} onOpenChange={setIsMcpSettingsOpen} />
     </AppShell>
+  );
+}
+
+export function ReaderPage() {
+  return (
+    <RecentsSidebarProvider>
+      <ReaderPageContent />
+    </RecentsSidebarProvider>
   );
 }
