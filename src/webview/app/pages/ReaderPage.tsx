@@ -114,21 +114,20 @@ export function ReaderPage() {
     },
   });
 
-  // Smart sidebar auto-expansion when screen has enough horizontal room
+  // Auto-collapse / expand notes sidebar on viewport breakpoint crossing (<= 1024px)
   useEffect(() => {
-    const handleViewportChange = () => {
-      const width = window.innerWidth;
-      if (width > 1024 && notesSidebar.isCollapsed) {
-        notesSidebar.expand();
-      } else if (width <= 1024 && !notesSidebar.isCollapsed) {
+    const mediaQuery = window.matchMedia("(max-width: 1024px)");
+    const handleBreakpointChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
         notesSidebar.collapse();
+      } else {
+        notesSidebar.expand();
       }
     };
 
-    handleViewportChange();
-    window.addEventListener("resize", handleViewportChange);
-    return () => window.removeEventListener("resize", handleViewportChange);
-  }, [notesSidebar]);
+    mediaQuery.addEventListener("change", handleBreakpointChange);
+    return () => mediaQuery.removeEventListener("change", handleBreakpointChange);
+  }, [notesSidebar.collapse, notesSidebar.expand]);
 
   const effectiveActiveId = isUnsavedActive && unsavedDrop ? UNSAVED_TAB_ID : tabs.activeId;
   const activeDocumentPath = isUnsavedActive ? undefined : tabs.activeDocument?.path;
