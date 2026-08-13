@@ -1,11 +1,16 @@
-import { createContainerContext, useWatch } from "@re-reduced/react";
+import { createContainerContext } from "@re-reduced/react";
+import { useCallback } from "react";
+import { decodeStored, storageInterpreters, useStorageSync } from "../state/storage.ts";
 import type { WithChildren } from "../types.ts";
 import {
-  persistCollapsedPreference,
+  parseStoredCollapsed,
   recentsSidebarContainer,
+  STORAGE_KEY,
 } from "./recents-sidebar-container.ts";
 
-export const RecentsSidebarStore = createContainerContext(recentsSidebarContainer);
+export const RecentsSidebarStore = createContainerContext(recentsSidebarContainer, {
+  interpreters: storageInterpreters,
+});
 
 export function RecentsSidebarProvider({ children }: WithChildren) {
   return (
@@ -16,8 +21,14 @@ export function RecentsSidebarProvider({ children }: WithChildren) {
 }
 
 function RecentsSidebarWatcher({ children }: WithChildren) {
-  const store = RecentsSidebarStore.use();
-  useWatch(store, (s) => s.isCollapsed.value, persistCollapsedPreference);
+  const { collapsedChanged } = RecentsSidebarStore.useContainer();
+  useStorageSync(
+    STORAGE_KEY,
+    useCallback(
+      (raw) => collapsedChanged(decodeStored(raw, parseStoredCollapsed)),
+      [collapsedChanged],
+    ),
+  );
   return children;
 }
 

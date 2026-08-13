@@ -1,30 +1,24 @@
-import { defineContainer } from "@re-reduced/react";
+import { defineContainer, storageSet } from "@re-reduced/react";
+import { readStoredJson } from "../state/storage.ts";
 
-const STORAGE_KEY = "mdreadr-recents-sidebar-collapsed";
+export const STORAGE_KEY = "mdreadr-recents-sidebar-collapsed";
 
-function readCollapsedPreference(): boolean {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "true") return true;
-    if (stored === "false") return false;
-  } catch {
-    // ignore storage errors
-  }
-  return false;
-}
-
-export function persistCollapsedPreference(isCollapsed: boolean): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, String(isCollapsed));
-  } catch {
-    // ignore storage errors
-  }
+/** Accepts both the JSON the interpreter writes and the `"true"`/`"false"`
+ *  strings written before persistence moved into the container. */
+export function parseStoredCollapsed(raw: unknown): boolean {
+  return raw === true || raw === "true";
 }
 
 export const recentsSidebarContainer = defineContainer("recents-sidebar", {
-  state: { isCollapsed: readCollapsedPreference() },
+  state: { isCollapsed: readStoredJson(STORAGE_KEY, parseStoredCollapsed) },
   actions: (on) => ({
     collapsedChanged: on<boolean>((_s, isCollapsed) => ({ isCollapsed })),
     collapsedToggled: on((s) => ({ isCollapsed: !s.isCollapsed })),
   }),
+  effects: (fx) => [
+    fx.onChange(
+      (s) => s.isCollapsed.value,
+      (isCollapsed) => storageSet(STORAGE_KEY, isCollapsed),
+    ),
+  ],
 });

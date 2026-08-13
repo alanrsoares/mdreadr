@@ -8,8 +8,13 @@ import {
   createReaderInlinePlugins,
   preprocessReaderMarkdown,
 } from "../markdown/pipeline.tsx";
+import { useFontSettings } from "../theme/FontSettingsContext.tsx";
 import { getApiBase } from "../treaty.ts";
 import { ReaderArticle } from "../ui/reader.tsx";
+
+/** 680px at the 17px default — kept as a ratio so the measure stays ~constant
+ *  in characters as the reader font size changes. */
+const MEASURE_EMS = 40;
 
 type MarkdownViewProps = {
   content: string;
@@ -19,6 +24,7 @@ type MarkdownViewProps = {
 };
 
 export function MarkdownView({ content, notes, documentPath, onPinBlock }: MarkdownViewProps) {
+  const { readerFontSize } = useFontSettings();
   const prepared = useMemo(() => preprocessReaderMarkdown(content), [content]);
   const plan = useMemo(() => createAnchorPlan(prepared), [prepared]);
   const notedBlockIds = useMemo(() => new Set(notes.map((note) => note.anchor.blockId)), [notes]);
@@ -46,7 +52,7 @@ export function MarkdownView({ content, notes, documentPath, onPinBlock }: Markd
       <Markdown
         key={content}
         className="reader-flow"
-        contentWidth={680}
+        contentWidth={Math.round(readerFontSize * MEASURE_EMS)}
         autolink="gfm"
         components={components}
         inlinePlugins={inlinePlugins}

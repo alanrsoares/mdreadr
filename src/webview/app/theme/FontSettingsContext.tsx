@@ -1,16 +1,22 @@
-import { createContainerContext, useWatch } from "@re-reduced/react";
+import { createContainerContext } from "@re-reduced/react";
+import { useCallback } from "react";
+import { storageInterpreters, useStorageSync } from "../state/storage.ts";
 import type { WithChildren } from "../types.ts";
 import {
   type EditorFontFamily,
   type FontSettings,
   fontSettingsContainer,
-  persistFontSettings,
+  parseStoredFontSettings,
   type ReaderFontFamily,
+  STORAGE_KEY,
 } from "./font-settings-container.ts";
 
 export type { EditorFontFamily, FontSettings, ReaderFontFamily };
 
-const FontSettingsStore = createContainerContext(fontSettingsContainer);
+// Writes are declared by the container's `effects`; this registry executes them.
+const FontSettingsStore = createContainerContext(fontSettingsContainer, {
+  interpreters: storageInterpreters,
+});
 
 export const FontSettingsProvider = ({ children }: WithChildren) => (
   <FontSettingsStore.Provider>
@@ -19,16 +25,10 @@ export const FontSettingsProvider = ({ children }: WithChildren) => (
 );
 
 function FontSettingsWatcher({ children }: WithChildren) {
-  const store = FontSettingsStore.use();
-  useWatch(
-    store,
-    (s) => ({
-      readerFontSize: s.readerFontSize.value,
-      readerFontFamily: s.readerFontFamily.value,
-      editorFontSize: s.editorFontSize.value,
-      editorFontFamily: s.editorFontFamily.value,
-    }),
-    persistFontSettings,
+  const { settingsReplaced } = FontSettingsStore.useContainer();
+  useStorageSync(
+    STORAGE_KEY,
+    useCallback((raw) => settingsReplaced(parseStoredFontSettings(raw)), [settingsReplaced]),
   );
   return children;
 }
@@ -38,10 +38,12 @@ export function useFontSettings() {
   return {
     readerFontSize: container.readerFontSize,
     readerFontFamily: container.readerFontFamily,
+    readerLineHeight: container.readerLineHeight,
     editorFontSize: container.editorFontSize,
     editorFontFamily: container.editorFontFamily,
     setReaderFontSize: container.readerFontSizeChanged,
     setReaderFontFamily: container.readerFontFamilyChanged,
+    setReaderLineHeight: container.readerLineHeightChanged,
     setEditorFontSize: container.editorFontSizeChanged,
     setEditorFontFamily: container.editorFontFamilyChanged,
     resetDefaults: container.resetDefaults,

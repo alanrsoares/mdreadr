@@ -45,13 +45,19 @@ export const DocumentView = ({
   chromeEnd,
   isActive = true,
 }: DocumentViewProps) => {
-  const { readerFontSize, readerFontFamily } = useFontSettings();
+  const { readerFontSize, readerFontFamily, readerLineHeight } = useFontSettings();
   const readerFontFamilyCss = getReaderFontFamilyCss(readerFontFamily);
 
   const readerStyles = {
     "--text-body-size": `${readerFontSize}px`,
+    "--reader-line-height": readerLineHeight,
+    "--text-body-leading": readerLineHeight,
     "--reader-prose-family": readerFontFamilyCss,
-    "--font-family-heading": readerFontFamilyCss,
+    // Scoped to the prose, not `--font-family-heading`: that token also drives
+    // astryx chrome rendered inside the preview (pin controls, empty states).
+    "--reader-heading-family": readerFontFamilyCss,
+    // Code tracks the reader size instead of staying pinned at the 14px base.
+    "--text-code-size": `${Math.round(readerFontSize * 0.9)}px`,
   } as CSSProperties;
 
   return (

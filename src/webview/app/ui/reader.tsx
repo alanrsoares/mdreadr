@@ -3,7 +3,7 @@ import tw from "@styled-cva/react";
 export const ReaderArticle = tw.article`reader-prose w-full min-w-0 font-[family-name:var(--reader-prose-family)]`;
 
 const headingTypography =
-  "scroll-mt-20 font-[family-name:var(--font-family-heading)] text-[var(--color-text-primary)]";
+  "scroll-mt-20 font-[family-name:var(--reader-heading-family,var(--font-family-heading))] text-[var(--color-text-primary)]";
 
 export const ReaderH1 = tw.h1(`${headingTypography} text-[2.125em] font-semibold leading-[1.25]`);
 
@@ -16,7 +16,7 @@ export const ReaderH4 = tw.h4(`${headingTypography} text-[1.15em] font-bold lead
 // h5/h6 stop shrinking at body size — below that they read as smaller than the
 // prose they introduce. Rank comes from case, colour, and tracking instead.
 const deepHeadingTypography =
-  "scroll-mt-20 font-[family-name:var(--font-family-heading)] text-[1em] uppercase leading-[1.5] tracking-[0.07em]";
+  "scroll-mt-20 font-[family-name:var(--reader-heading-family,var(--font-family-heading))] text-[1em] uppercase leading-[1.5] tracking-[0.07em]";
 
 export const ReaderH5 = tw.h5(
   `${deepHeadingTypography} font-semibold text-[var(--color-text-primary)]`,
@@ -35,8 +35,11 @@ export const readerHeadingByLevel = {
   6: ReaderH6,
 } as const;
 
+// Measure comes from the Markdown container (which scales with the reader font
+// size); a second ch-based cap here fought it — px won at large sizes, ch at
+// small ones, so line length swung across the range.
 export const ReaderParagraph = tw.div(
-  "max-w-[68ch] font-[family-name:var(--reader-prose-family)] text-[length:var(--text-body-size)] leading-[var(--text-body-leading)] text-[var(--color-text-primary)]",
+  "font-[family-name:var(--reader-prose-family)] text-[length:var(--text-body-size)] leading-[var(--text-body-leading)] text-[var(--color-text-primary)]",
 );
 
 export const ReaderCodeWrap = tw.div`min-w-0`;

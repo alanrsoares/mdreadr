@@ -15,6 +15,15 @@ import {
   type ReaderFontFamily,
   useFontSettings,
 } from "../theme/FontSettingsContext.tsx";
+import {
+  clampFontSize,
+  FONT_SIZE_STEP,
+  LINE_HEIGHT_STEP,
+  MAX_FONT_SIZE,
+  MAX_LINE_HEIGHT,
+  MIN_FONT_SIZE,
+  MIN_LINE_HEIGHT,
+} from "../theme/font-settings-container.ts";
 import type { DocumentViewMode } from "./DocumentViewModeSwitch.tsx";
 
 type FontAdjustmentControlProps = {
@@ -33,10 +42,12 @@ export function FontAdjustmentControl({
   const {
     readerFontSize,
     readerFontFamily,
+    readerLineHeight,
     editorFontSize,
     editorFontFamily,
     setReaderFontSize,
     setReaderFontFamily,
+    setReaderLineHeight,
     setEditorFontSize,
     setEditorFontFamily,
     resetDefaults,
@@ -44,22 +55,24 @@ export function FontAdjustmentControl({
 
   const isEdit = viewMode === "edit";
   const currentSize = isEdit ? editorFontSize : readerFontSize;
+  const surface = isEdit ? "editor" : "reader";
+
+  // The setters clamp; these keep the labels honest at the bounds.
+  const nextSizeDown = clampFontSize(currentSize - FONT_SIZE_STEP);
+  const nextSizeUp = clampFontSize(currentSize + FONT_SIZE_STEP);
+
+  const setCurrentSize = useCallback(
+    (size: number) => (isEdit ? setEditorFontSize(size) : setReaderFontSize(size)),
+    [isEdit, setEditorFontSize, setReaderFontSize],
+  );
 
   const handleDecrease = useCallback(() => {
-    if (isEdit) {
-      setEditorFontSize(Math.max(12, editorFontSize - 1));
-    } else {
-      setReaderFontSize(Math.max(12, readerFontSize - 1));
-    }
-  }, [isEdit, editorFontSize, readerFontSize, setEditorFontSize, setReaderFontSize]);
+    setCurrentSize(currentSize - FONT_SIZE_STEP);
+  }, [currentSize, setCurrentSize]);
 
   const handleIncrease = useCallback(() => {
-    if (isEdit) {
-      setEditorFontSize(Math.min(24, editorFontSize + 1));
-    } else {
-      setReaderFontSize(Math.min(24, readerFontSize + 1));
-    }
-  }, [isEdit, editorFontSize, readerFontSize, setEditorFontSize, setReaderFontSize]);
+    setCurrentSize(currentSize + FONT_SIZE_STEP);
+  }, [currentSize, setCurrentSize]);
 
   const handleReaderFamilyChange = (next: string) => {
     if (next === "serif" || next === "sans" || next === "mono") {
@@ -79,6 +92,12 @@ export function FontAdjustmentControl({
     }
   };
 
+  const handleReaderLineHeightChange = (val: number | [number, number]) => {
+    if (typeof val === "number") {
+      setReaderLineHeight(val);
+    }
+  };
+
   const handleEditorSizeChange = (val: number | [number, number]) => {
     if (typeof val === "number") {
       setEditorFontSize(val);
@@ -91,27 +110,30 @@ export function FontAdjustmentControl({
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
 
+      // Cmd+± are not text-entry keys, so the editor is *the* place the
+      // shortcut has to work — bailing on contenteditable disabled it exactly
+      // in edit mode and let webview zoom take the keystroke instead. Only
+      // plain form fields (find bars, dialogs) still opt out.
       const target = event.target;
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable ||
-          target.closest("input, textarea, select, [contenteditable='true']"))
-      ) {
+      if (target instanceof HTMLElement && target.closest("input, textarea, select")) {
         return;
       }
 
       if (event.key === "=" || event.key === "+") {
         event.preventDefault();
         handleIncrease();
-      } else if (event.key === "-") {
+      } else if (event.key === "-" || event.key === "_") {
         event.preventDefault();
         handleDecrease();
+      } else if (event.key === "0") {
+        event.preventDefault();
+        resetDefaults();
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isActive, handleIncrease, handleDecrease]);
+  }, [isActive, handleIncrease, handleDecrease, resetDefaults]);
 
   return (
     <HStack
@@ -119,12 +141,12 @@ export function FontAdjustmentControl({
       vAlign="center"
       className="rounded-(--radius-container) border border-(--color-border) bg-(--color-background-surface) p-0.5 shadow-xs"
     >
-      <Tooltip content={`Decrease font size (${currentSize - 1}px)`}>
+      <Tooltip content={`Decrease ${surface} font size (${nextSizeDown}px)`}>
         <IconButton
-          label="Decrease font size"
+          label={`Decrease ${surface} font size`}
           variant="ghost"
           size="sm"
-          isDisabled={currentSize <= 12}
+          isDisabled={currentSize <= MIN_FONT_SIZE}
           icon={
             <span className="select-none font-semibold text-(--color-text-secondary) text-xs transition-colors hover:text-(--color-text-primary)">
               A-
@@ -145,9 +167,16 @@ export function FontAdjustmentControl({
               <Text type="body" weight="semibold">
                 Font Settings
               </Text>
-              <Button label="Reset font settings" variant="ghost" size="sm" onClick={resetDefaults}>
-                Reset
-              </Button>
+              <Tooltip content="Reset font settings (⌘0)">
+                <Button
+                  label="Reset font settings"
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetDefaults}
+                >
+                  Reset
+                </Button>
+              </Tooltip>
             </HStack>
 
             <Divider />
@@ -156,18 +185,29 @@ export function FontAdjustmentControl({
               <Text type="supporting" color="secondary" weight="semibold">
                 Reader (Preview)
               </Text>
-              <Field label="Font Size" inputID="reader-font-size-slider" width="100%">
-                <Slider
-                  label="Reader Font Size"
-                  min={12}
-                  max={24}
-                  step={1}
-                  value={readerFontSize}
-                  onChange={handleReaderSizeChange}
-                  formatValue={(v) => `${v}px`}
-                  valueDisplay="text"
-                />
-              </Field>
+              {/* Slider renders its own label — a Field wrapper would print it twice. */}
+              <Slider
+                label="Font Size"
+                width="100%"
+                min={MIN_FONT_SIZE}
+                max={MAX_FONT_SIZE}
+                step={FONT_SIZE_STEP}
+                value={readerFontSize}
+                onChange={handleReaderSizeChange}
+                formatValue={(v) => `${v}px`}
+                valueDisplay="text"
+              />
+              <Slider
+                label="Line Height"
+                width="100%"
+                min={MIN_LINE_HEIGHT}
+                max={MAX_LINE_HEIGHT}
+                step={LINE_HEIGHT_STEP}
+                value={readerLineHeight}
+                onChange={handleReaderLineHeightChange}
+                formatValue={(v) => v.toFixed(2)}
+                valueDisplay="text"
+              />
               <Field label="Font Family" inputID="reader-font-family-segmented" width="100%">
                 <SegmentedControl
                   label="Reader font family selection"
@@ -189,18 +229,17 @@ export function FontAdjustmentControl({
               <Text type="supporting" color="secondary" weight="semibold">
                 Editor (Markdown)
               </Text>
-              <Field label="Font Size" inputID="editor-font-size-slider" width="100%">
-                <Slider
-                  label="Editor Font Size"
-                  min={12}
-                  max={24}
-                  step={1}
-                  value={editorFontSize}
-                  onChange={handleEditorSizeChange}
-                  formatValue={(v) => `${v}px`}
-                  valueDisplay="text"
-                />
-              </Field>
+              <Slider
+                label="Font Size"
+                width="100%"
+                min={MIN_FONT_SIZE}
+                max={MAX_FONT_SIZE}
+                step={FONT_SIZE_STEP}
+                value={editorFontSize}
+                onChange={handleEditorSizeChange}
+                formatValue={(v) => `${v}px`}
+                valueDisplay="text"
+              />
               <Field label="Font Family" inputID="editor-font-family-segmented" width="100%">
                 <SegmentedControl
                   label="Editor font family selection"
@@ -217,8 +256,8 @@ export function FontAdjustmentControl({
           </VStack>
         }
       >
-        <Tooltip content={`Font settings (${currentSize}px)`}>
-          <Button label={`Font settings (${currentSize}px)`} variant="ghost" size="sm">
+        <Tooltip content={`Font settings — ${surface} at ${currentSize}px (⌘+ / ⌘- / ⌘0)`}>
+          <Button label={`Font settings, ${surface} at ${currentSize}px`} variant="ghost" size="sm">
             <span className="flex select-none items-center gap-1.5 font-semibold text-xs">
               <span className="font-serif text-sm">aA</span>
               <span className="font-sans text-(--color-text-secondary) text-[11px]">
@@ -229,12 +268,12 @@ export function FontAdjustmentControl({
         </Tooltip>
       </Popover>
 
-      <Tooltip content={`Increase font size (${currentSize + 1}px)`}>
+      <Tooltip content={`Increase ${surface} font size (${nextSizeUp}px)`}>
         <IconButton
-          label="Increase font size"
+          label={`Increase ${surface} font size`}
           variant="ghost"
           size="sm"
-          isDisabled={currentSize >= 24}
+          isDisabled={currentSize >= MAX_FONT_SIZE}
           icon={
             <span className="select-none font-semibold text-(--color-text-secondary) text-sm transition-colors hover:text-(--color-text-primary)">
               A+
