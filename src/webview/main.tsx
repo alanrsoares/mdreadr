@@ -8,6 +8,7 @@ import "./app/index.css";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { installEditBridge } from "./app/editorCommands.ts";
 import { AppProviders } from "./app/providers.tsx";
 import { router } from "./app/router.tsx";
 import { ColorSchemeProvider } from "./app/theme/ColorSchemeContext.tsx";
@@ -17,6 +18,10 @@ const root = document.getElementById("root");
 if (!root) {
   throw new Error("Root element not found");
 }
+
+// Must exist before the native Edit menu can call into it, so install it here
+// rather than from a component effect.
+installEditBridge();
 
 createRoot(root).render(
   <StrictMode>

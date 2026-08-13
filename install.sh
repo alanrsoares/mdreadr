@@ -4,11 +4,8 @@
 #   curl -fsSL https://raw.githubusercontent.com/alanrsoares/mdreadr/main/install.sh | sh
 #   wget -qO-  https://raw.githubusercontent.com/alanrsoares/mdreadr/main/install.sh | sh
 #
-# While the repo is private, authenticate with a token first:
-#   GITHUB_TOKEN=$(gh auth token) sh install.sh
-#
 # Options (env vars):
-#   GITHUB_TOKEN / GH_TOKEN  auth for private repos / rate limits
+#   GITHUB_TOKEN / GH_TOKEN  auth to lift anonymous GitHub API rate limits
 #   MDREADR_VERSION      install a specific tag (e.g. v0.1.0); default: latest release
 #   MDREADR_INSTALL_DIR  macOS: .app destination (default /Applications, falls back
 #                        to ~/Applications); Linux: bundle dir for the tar.zst path
@@ -94,7 +91,7 @@ fi
 
 say "» looking up release (${MDREADR_VERSION:-latest})…"
 RELEASE_JSON=$(fetch "$API_URL") ||
-  fail "no release found. If the repo is private, pass a token:
+  fail "no release found. If you hit the anonymous GitHub API rate limit, pass a token:
        GITHUB_TOKEN=\$(gh auth token) sh install.sh
        Also note: draft releases are invisible — publish one first."
 
@@ -133,6 +130,37 @@ TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/mdreadr-install.XXXXXX")
 trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
 
 # --- macOS: prefer the DMG (hdiutil is always available; zstd is not) --------
+# mdreadr's macOS builds are neither codesigned nor notarized (see
+# electrobun.config.ts). Two consequences we have to undo at install time:
+#
+#   1. Quarantine — anything that arrives via a DMG (or a browser download)
+#      carries com.apple.quarantine, and Gatekeeper hard-blocks unsigned,
+#      unnotarized bundles that have it. There is no right-click-to-Open
+#      escape hatch for these on recent macOS.
+#   2. Missing signature — on Apple Silicon every mach-o must carry at least
+#      an ad-hoc signature or the kernel refuses to exec it. An unsigned
+#      build gets one applied locally here.
+#
+# Both steps are idempotent and local to this machine; neither grants the
+# bundle any trust beyond "the user explicitly installed it".
+prepare_macos_bundle() {
+  bundle="$1"
+
+  if command -v xattr >/dev/null 2>&1; then
+    say "» clearing quarantine…"
+    xattr -dr com.apple.quarantine "$bundle" 2>/dev/null || true
+  fi
+
+  if command -v codesign >/dev/null 2>&1; then
+    if ! codesign -v "$bundle" >/dev/null 2>&1; then
+      say "» applying an ad-hoc signature (build is unsigned)…"
+      codesign --force --deep --sign - "$bundle" >/dev/null 2>&1 ||
+        say "note: ad-hoc signing failed; if ${APP} refuses to launch, run:
+       codesign --force --deep --sign - '$bundle'"
+    fi
+  fi
+}
+
 install_macos() {
   DEST="${MDREADR_INSTALL_DIR:-/Applications}"
   if [ ! -w "$DEST" ]; then
@@ -158,6 +186,7 @@ install_macos() {
     cp -R "$APP_BUNDLE" "$DEST/"
     hdiutil detach -quiet "$MOUNT_DIR"
     trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
+    prepare_macos_bundle "$DEST/$(basename "$APP_BUNDLE")"
     say "✓ installed: $DEST/$(basename "$APP_BUNDLE")"
     return
   fi
@@ -174,6 +203,7 @@ install_macos() {
   say "» installing $(basename "$APP_BUNDLE") into ${DEST}…"
   rm -rf "${DEST:?}/$(basename "$APP_BUNDLE")"
   cp -R "$APP_BUNDLE" "$DEST/"
+  prepare_macos_bundle "$DEST/$(basename "$APP_BUNDLE")"
   say "✓ installed: $DEST/$(basename "$APP_BUNDLE")"
 }
 
@@ -183,8 +213,36 @@ install_macos() {
 #      ~/.local/share and creates a desktop entry with the app icon)
 #   2. .AppImage — single-file executable straight into MDREADR_BIN_DIR
 #   3. .tar.zst — raw bundle; extract and symlink the launcher
+
+# The Linux bundle links against the system WebKitGTK stack and shells out to
+# zenity for open/save dialogs — neither is vendored. Missing them shows up as
+# a window that never appears or dialogs that silently no-op, so name them up
+# front. Warn rather than fail: package names vary by distro and the user may
+# have them under names we don't probe for.
+check_linux_deps() {
+  missing=""
+  command -v zenity >/dev/null 2>&1 || missing="$missing zenity"
+
+  if command -v ldconfig >/dev/null 2>&1; then
+    ldconfig -p 2>/dev/null | grep -q 'libwebkit2gtk-4\.1' ||
+      missing="$missing libwebkit2gtk-4.1"
+    ldconfig -p 2>/dev/null | grep -q 'libgtk-3' ||
+      missing="$missing libgtk-3"
+  fi
+
+  [ -n "$missing" ] || return 0
+
+  say "note: these runtime dependencies look missing:$missing"
+  say "      Debian/Ubuntu: sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0 zenity"
+  say "      Fedora:        sudo dnf install gtk3 webkit2gtk4.1 zenity"
+  say "      Arch:          sudo pacman -S gtk3 webkit2gtk-4.1 zenity"
+  say "      Continuing — ${APP} may not launch until they are installed."
+}
+
 install_linux() {
   BIN_DIR="${MDREADR_BIN_DIR:-$HOME/.local/bin}"
+
+  check_linux_deps
 
   path_hint() {
     case ":$PATH:" in

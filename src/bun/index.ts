@@ -5,6 +5,7 @@ import { toDocumentHttpError } from "../../packages/api/documents.ts";
 import { documentSession, startServer } from "../../packages/api/index.ts";
 import { APP_NAME } from "../../shared/constants.ts";
 import { installCliCommand } from "./installCli.ts";
+import { checkForUpdatesCommand, checkForUpdatesOnLaunch } from "./updater.ts";
 
 let activeApiBase: string | null = null;
 let activeMainWindow: BrowserWindow | null = null;
@@ -124,12 +125,23 @@ function buildApplicationMenu(): void {
     if (action === "install-cli") {
       installCliCommand();
     }
+    if (action === "check-for-updates") {
+      void checkForUpdatesCommand();
+    }
+    if (action === "edit-undo" || action === "edit-redo") {
+      // The bridge is installed by the webview entrypoint; the optional call
+      // keeps a menu click harmless if the menu is somehow up before it.
+      const method = action === "edit-undo" ? "undo" : "redo";
+      activeMainWindow?.webview.executeJavascript(`window.__MDREADR_EDIT__?.${method}()`);
+    }
   });
 
   ApplicationMenu.setApplicationMenu([
     {
       submenu: [
         { label: `About ${APP_NAME}`, role: "about" },
+        { type: "separator" },
+        { label: "Check for Updates…", action: "check-for-updates" },
         { type: "separator" },
         { label: `Install '${APP_NAME}' Command in PATH`, action: "install-cli" },
         { type: "separator" },
@@ -139,8 +151,11 @@ function buildApplicationMenu(): void {
     {
       label: "Edit",
       submenu: [
-        { role: "undo" },
-        { role: "redo" },
+        // Explicit actions rather than the native undo/redo roles — see
+        // src/webview/app/editorCommands.ts for why the responder chain is the
+        // wrong route here.
+        { label: "Undo", action: "edit-undo", accelerator: "CmdOrCtrl+Z" },
+        { label: "Redo", action: "edit-redo", accelerator: "CmdOrCtrl+Shift+Z" },
         { type: "separator" },
         { role: "cut" },
         { role: "copy" },
@@ -218,5 +233,7 @@ mainWindow.webview.on("dom-ready", () => {
     mainWindow.webview.openDevTools();
   }
 });
+
+checkForUpdatesOnLaunch();
 
 console.log(`${APP_NAME} started`);

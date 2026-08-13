@@ -9,6 +9,7 @@ import { DocumentView } from "../components/DocumentView.tsx";
 import { NotesPanel } from "../components/NotesPanel.tsx";
 import { SuggestionsPanel } from "../components/SuggestionsPanel.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
+import { registerEditorView } from "../editorCommands.ts";
 import { useFileDrop } from "../hooks/useFileDrop.ts";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
 import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
@@ -263,6 +264,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
         onEditorChange={onEditorChange}
         onEditorReady={(view) => {
           editorViewRef.current = view;
+          registerEditorView(view);
         }}
         chromeEnd={
           isEditing ? (

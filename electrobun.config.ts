@@ -49,6 +49,10 @@ export default {
     },
   },
   release: {
-    baseUrl: "",
+    // The updater fetches `<baseUrl>/<channel>-<os>-<arch>-update.json` and the
+    // bundle/patch files next to it. GitHub's `releases/latest/download` alias
+    // always resolves to the newest published release's assets, which is
+    // exactly what release.yml uploads — so there's no separate bucket to host.
+    baseUrl: "https://github.com/alanrsoares/mdreadr/releases/latest/download",
   },
 } satisfies ElectrobunConfig;

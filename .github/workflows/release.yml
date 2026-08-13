@@ -30,9 +30,15 @@ jobs:
     strategy:
       matrix:
         include:
+          # macos-latest is Apple Silicon; macos-15-intel keeps Intel Macs
+          # covered (GitHub retired the older macos-13 x64 image).
           - os: macos-latest
             platform: macos
+          - os: macos-15-intel
+            platform: macos
           - os: ubuntu-latest
+            platform: linux
+          - os: ubuntu-24.04-arm
             platform: linux
 
     steps:
@@ -53,7 +59,8 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev zenity
+          # xvfb gives the smoke test a display to open a real window against.
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev zenity xvfb
 
       - name: Install dependencies
         run: bun install
@@ -66,6 +73,12 @@ jobs:
 
       - name: Build Application
         run: bun run build
+
+      # Lint, typecheck, tests and the Vite bundle all pass on a build that
+      # cannot actually start — a bad native bundle, a broken entrypoint, a
+      # missing copied asset. Boot the real artifact and require it to stay up.
+      - name: Smoke test the built app
+        run: bun run scripts/smoke-test.ts
 
       - name: Upload Release Asset
         if: ${{ needs.release-please.outputs.release_created }}
