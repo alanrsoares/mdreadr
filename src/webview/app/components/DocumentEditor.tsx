@@ -9,9 +9,11 @@ import { ReaderEditor } from "../ui/reader.tsx";
 type DocumentEditorProps = {
   value: string;
   onChange: (text: string) => void;
+  /** Handed the live EditorView so callers can drive scrolling (outline jumps). */
+  onEditorReady?: (view: EditorView) => void;
 };
 
-export const DocumentEditor = ({ value, onChange }: DocumentEditorProps) => {
+export const DocumentEditor = ({ value, onChange, onEditorReady }: DocumentEditorProps) => {
   const { mode } = useTheme();
   const isDark = mode === "dark";
   const { editorFontSize, editorFontFamily } = useFontSettings();
@@ -77,7 +79,8 @@ export const DocumentEditor = ({ value, onChange }: DocumentEditorProps) => {
       <CodeMirror
         value={value}
         height="100%"
-        extensions={[markdown(), editorTheme]}
+        extensions={[markdown(), EditorView.lineWrapping, editorTheme]}
+        onCreateEditor={onEditorReady}
         onChange={onChange}
         theme={isDark ? "dark" : "light"}
       />

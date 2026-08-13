@@ -1,4 +1,5 @@
 import { Button } from "@astryxdesign/core/Button";
+import { Timestamp } from "@astryxdesign/core/Timestamp";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import type { Suggestion } from "@mdreadr/domain";
 import { formatAuthorLabel } from "@mdreadr/domain";
@@ -20,12 +21,6 @@ type SuggestionsPanelProps = {
   onReject: (suggestion: Suggestion) => Promise<void>;
   onScrollToAnchor: (blockId: string) => void;
 };
-
-const formatSuggestionTime = (iso: string): string =>
-  new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(iso));
 
 export function SuggestionsPanel({
   suggestions,
@@ -71,7 +66,8 @@ function SuggestionCard({ suggestion, onAccept, onReject, onScrollToAnchor }: Su
         </Tooltip>
       </NoteCardHeader>
       <NoteMeta>
-        {formatAuthorLabel(suggestion.author)} · {formatSuggestionTime(suggestion.createdAt)}
+        {formatAuthorLabel(suggestion.author)} ·{" "}
+        <Timestamp value={suggestion.createdAt} format="auto" isLive />
       </NoteMeta>
       <ReplyBody>{suggestion.replacementText}</ReplyBody>
       <ButtonRow className="mt-2">

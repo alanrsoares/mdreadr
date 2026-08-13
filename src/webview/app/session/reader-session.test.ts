@@ -42,7 +42,15 @@ function createInMemoryReaderApi() {
       return [];
     },
     async openDocument(path) {
-      return { path, content: fakeDocumentContent };
+      return {
+        path,
+        content: fakeDocumentContent,
+        tabs: [{ id: path, document: { path } }],
+        activeId: path,
+        notes: [],
+        suggestions: [],
+        homeDirectory: "/home/test",
+      };
     },
     async createDocument(path, content) {
       return { path, content };

@@ -1,30 +1,21 @@
 import { Button } from "@astryxdesign/core/Button";
-import { Icon } from "@astryxdesign/core/Icon";
-import { type ResizableRegion, ResizeHandle } from "@astryxdesign/core/Resizable";
-import { Stack } from "@astryxdesign/core/Stack";
-import type { Suggestion } from "@mdreadr/domain";
+import type { ResizableRegion } from "@astryxdesign/core/Resizable";
+import { EditorView } from "@codemirror/view";
+import type { Suggestion, TocEntry } from "@mdreadr/domain";
 import { applySuggestion, extractHeadings } from "@mdreadr/domain";
 import { useContainer, useStoreValues } from "@re-reduced/react";
-import type { CSSProperties } from "react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { DocumentView } from "../components/DocumentView.tsx";
 import { NotesPanel } from "../components/NotesPanel.tsx";
 import { SuggestionsPanel } from "../components/SuggestionsPanel.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
+import { useFileDrop } from "../hooks/useFileDrop.ts";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
-import { ArrowDownTrayIcon } from "../icons.ts";
 import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
 import { isDirty } from "../session/document-draft.ts";
 import type { ReaderApi } from "../session/reader-api.ts";
 import { useReaderSession } from "../session/useReaderSession.ts";
-import {
-  EmptyState,
-  ReaderContent,
-  ReaderLayout,
-  ReaderMain,
-  ReaderNotesAside,
-  ReaderPanel,
-} from "../ui/layout.tsx";
+import { ReaderTabShell } from "./ReaderTabShell.tsx";
 import { readerPageContainer } from "./reader-page-container.ts";
 
 type NotesSidebar = ResizableRegion;
@@ -62,8 +53,14 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
   const { showError } = useMutationToast();
   const store = useContainer(readerPageContainer);
   const { pendingAnchor, documentViewMode, isDragOver, draft } = useStoreValues(store);
-  const readerMainRef = useRef<HTMLElement>(null);
-  const dragDepthRef = useRef(0);
+  const readerMainRef = useRef<HTMLDivElement>(null);
+  const editorViewRef = useRef<EditorView | null>(null);
+
+  const drop = useFileDrop({
+    onOpenPath,
+    onDropUnsaved,
+    onDragOverChange: store.actions.dragOverChanged,
+  });
 
   const reader = useReaderSession(readerApi, tabId, isActive, {
     onNoteCreated: () => {
@@ -109,68 +106,6 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
     await reader.saveDocument(documentPath, draft.text);
   }, [documentPath, draft, reader]);
 
-  const onDrop = useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault();
-      dragDepthRef.current = 0;
-      store.actions.dragOverChanged(false);
-
-      const file = event.dataTransfer.files.item(0);
-      if (!file) return;
-
-      const isMarkdown = /\.(md|markdown)$/i.test(file.name);
-      const path = (file as File & { path?: string }).path;
-
-      // Some environments (Electron) expose the real filesystem path on drop.
-      // Electrobun's WKWebView never does — fall through to reading the
-      // File's content directly below.
-      if (path) {
-        if (isMarkdown) onOpenPath(path);
-        return;
-      }
-
-      if (!isMarkdown) {
-        showError("Open dropped file", `"${file.name}" is not a markdown file.`);
-        return;
-      }
-
-      void file
-        .text()
-        .then((text) => onDropUnsaved(file.name, text))
-        .catch(() => showError("Open dropped file", "Could not read the dropped file."));
-    },
-    [onOpenPath, onDropUnsaved, showError, store],
-  );
-
-  const onDragEnter = useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault();
-      if (!event.dataTransfer.types.includes("Files")) return;
-      dragDepthRef.current += 1;
-      store.actions.dragOverChanged(true);
-    },
-    [store],
-  );
-
-  const onDragLeave = useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault();
-      if (!event.dataTransfer.types.includes("Files")) return;
-      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-      if (dragDepthRef.current === 0) {
-        store.actions.dragOverChanged(false);
-      }
-    },
-    [store],
-  );
-
-  const onDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    if (event.dataTransfer.types.includes("Files")) {
-      event.dataTransfer.dropEffect = "copy";
-    }
-  }, []);
-
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!isActive) return;
@@ -202,7 +137,25 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
 
   const notes = reader.notes.data ?? [];
   const suggestions = reader.suggestions.data ?? [];
-  const toc = useMemo(() => extractHeadings(content), [content]);
+  // The outline stays live in edit mode by reading the draft instead of the
+  // saved content, so the column never degrades into an apology.
+  const isEditing = documentViewMode === "edit";
+  const toc = useMemo(
+    () => extractHeadings(isEditing ? editorValue : content),
+    [isEditing, editorValue, content],
+  );
+
+  const onSelectHeadingInEditor = useCallback((entry: TocEntry) => {
+    const view = editorViewRef.current;
+    if (!view) return;
+    const lineNumber = Math.min(entry.line + 1, view.state.doc.lines);
+    const line = view.state.doc.line(lineNumber);
+    view.dispatch({
+      selection: { anchor: line.from },
+      effects: EditorView.scrollIntoView(line.from, { y: "start" }),
+    });
+    view.focus();
+  }, []);
 
   const onScrollToAnchor = useCallback(
     (blockId: string) => {
@@ -247,106 +200,85 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
   );
 
   return (
-    <ReaderLayout
-      aria-label="Document reader"
-      style={{ "--notes-col-width": `${notesSidebar.size}px` } as CSSProperties}
-    >
-      <ReaderPanel>
-        {documentViewMode === "preview" ? (
-          <TocSidebar entries={toc} scrollRootRef={readerMainRef} documentKey={documentPath} />
-        ) : (
-          <EmptyState className="reader-empty-enter">
-            <p>Table of contents is available in preview.</p>
-          </EmptyState>
-        )}
-      </ReaderPanel>
-
-      <ReaderMain
-        ref={readerMainRef}
-        onDragEnter={onDragEnter}
-        onDragLeave={onDragLeave}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
-      >
-        <div
-          aria-hidden
-          className="reader-main-drop-overlay"
-          data-active={isDragOver ? "true" : "false"}
-        >
-          <Stack gap={2} vAlign="center" hAlign="center" className="reader-drop-overlay-content">
-            <Icon icon={ArrowDownTrayIcon} size="lg" />
-            Drop to open
-          </Stack>
-        </div>
-        <ReaderContent>
-          <DocumentView
-            key={tabId}
-            content={content}
-            documentPath={documentPath}
-            notes={notes}
-            viewMode={documentViewMode}
-            onViewModeChange={store.actions.documentViewModeChanged}
-            onPinBlock={(anchor) => {
-              store.actions.pendingAnchorChanged(anchor);
-              flashAnchor(anchor.blockId, "reader-block-pin-flash");
-              onAnnounce(`Pinning note to ${anchor.label ?? anchor.kind}`);
-            }}
-            editorValue={editorValue}
-            onEditorChange={onEditorChange}
-            chromeEnd={
-              documentViewMode === "edit" ? (
-                <Button
-                  label="Save"
-                  variant="primary"
-                  size="sm"
-                  isDisabled={!dirty}
-                  isLoading={reader.isSavingDocument}
-                  onClick={() => {
-                    void saveDraft();
-                  }}
-                />
-              ) : undefined
-            }
+    <ReaderTabShell
+      notesSidebar={notesSidebar}
+      mainRef={readerMainRef}
+      drop={drop}
+      isDragOver={isDragOver}
+      isNotesPending={Boolean(pendingAnchor)}
+      outline={
+        <TocSidebar
+          entries={toc}
+          scrollRootRef={readerMainRef}
+          documentKey={documentPath}
+          onSelect={isEditing ? onSelectHeadingInEditor : undefined}
+        />
+      }
+      notes={
+        <>
+          <SuggestionsPanel
+            suggestions={suggestions}
+            onAccept={onAcceptSuggestion}
+            onReject={onRejectSuggestion}
+            onScrollToAnchor={onScrollToAnchor}
           />
-        </ReaderContent>
-      </ReaderMain>
-
-      <ResizeHandle
-        resizable={notesSidebar.props}
-        isReversed
-        hasDivider
-        label="Resize notes sidebar"
+          <NotesPanel
+            notes={notes}
+            pendingAnchor={pendingAnchor}
+            isSaving={reader.isSaving}
+            isLoadingNotes={isLoadingNotes}
+            isCreatingNote={reader.isCreatingNote}
+            onCreateNote={async (input) => {
+              await reader.createNote(input);
+            }}
+            onAddReply={async (noteId, body) => {
+              await reader.addReply(noteId, body);
+            }}
+            onUpdateStatus={async (noteId, status) => {
+              await reader.setStatus(noteId, status);
+            }}
+            onSaveNotes={async () => {
+              await reader.save();
+            }}
+            onLoadNotes={onLoadNotes}
+            onScrollToAnchor={onScrollToAnchor}
+          />
+        </>
+      }
+    >
+      <DocumentView
+        key={tabId}
+        content={content}
+        documentPath={documentPath}
+        notes={notes}
+        isActive={isActive}
+        viewMode={documentViewMode}
+        onViewModeChange={store.actions.documentViewModeChanged}
+        onPinBlock={(anchor) => {
+          store.actions.pendingAnchorChanged(anchor);
+          flashAnchor(anchor.blockId, "reader-block-pin-flash");
+          onAnnounce(`Pinning note to ${anchor.label ?? anchor.kind}`);
+        }}
+        editorValue={editorValue}
+        onEditorChange={onEditorChange}
+        onEditorReady={(view) => {
+          editorViewRef.current = view;
+        }}
+        chromeEnd={
+          isEditing ? (
+            <Button
+              label="Save"
+              variant="primary"
+              size="sm"
+              isDisabled={!dirty}
+              isLoading={reader.isSavingDocument}
+              onClick={() => {
+                void saveDraft();
+              }}
+            />
+          ) : undefined
+        }
       />
-
-      <ReaderNotesAside data-pending={pendingAnchor ? "true" : "false"}>
-        <SuggestionsPanel
-          suggestions={suggestions}
-          onAccept={onAcceptSuggestion}
-          onReject={onRejectSuggestion}
-          onScrollToAnchor={onScrollToAnchor}
-        />
-        <NotesPanel
-          notes={notes}
-          pendingAnchor={pendingAnchor}
-          isSaving={reader.isSaving}
-          isLoadingNotes={isLoadingNotes}
-          isCreatingNote={reader.isCreatingNote}
-          onCreateNote={async (input) => {
-            await reader.createNote(input);
-          }}
-          onAddReply={async (noteId, body) => {
-            await reader.addReply(noteId, body);
-          }}
-          onUpdateStatus={async (noteId, status) => {
-            await reader.setStatus(noteId, status);
-          }}
-          onSaveNotes={async () => {
-            await reader.save();
-          }}
-          onLoadNotes={onLoadNotes}
-          onScrollToAnchor={onScrollToAnchor}
-        />
-      </ReaderNotesAside>
-    </ReaderLayout>
+    </ReaderTabShell>
   );
 });

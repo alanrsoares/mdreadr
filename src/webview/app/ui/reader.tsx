@@ -13,9 +13,18 @@ export const ReaderH3 = tw.h3(`${headingTypography} text-[1.35em] font-bold lead
 
 export const ReaderH4 = tw.h4(`${headingTypography} text-[1.15em] font-bold leading-[1.4]`);
 
-export const ReaderH5 = tw.h5(`${headingTypography} text-[1em] font-semibold leading-[1.5]`);
+// h5/h6 stop shrinking at body size — below that they read as smaller than the
+// prose they introduce. Rank comes from case, colour, and tracking instead.
+const deepHeadingTypography =
+  "scroll-mt-20 font-[family-name:var(--font-family-heading)] text-[1em] uppercase leading-[1.5] tracking-[0.07em]";
 
-export const ReaderH6 = tw.h6(`${headingTypography} text-[0.875em] font-semibold leading-[1.5]`);
+export const ReaderH5 = tw.h5(
+  `${deepHeadingTypography} font-semibold text-[var(--color-text-primary)]`,
+);
+
+export const ReaderH6 = tw.h6(
+  `${deepHeadingTypography} font-medium text-[var(--color-text-secondary)]`,
+);
 
 export const readerHeadingByLevel = {
   1: ReaderH1,

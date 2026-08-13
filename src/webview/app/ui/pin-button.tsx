@@ -11,14 +11,16 @@ type PinButtonProps = {
 
 export function PinButton({ onPin, anchor }: PinButtonProps) {
   const targetLabel = anchorDisplayLabel(anchor);
-  const tooltip = `Pin note to ${targetLabel}`;
+  // The visible tooltip stays short so it can't cover the block being pinned;
+  // the specific target lives in aria-label, where length is useful.
+  const accessibleLabel = `Pin note to ${targetLabel}`;
 
   return (
-    <Tooltip content={tooltip} placement="start">
+    <Tooltip content="Pin note" placement="start">
       <button
         type="button"
         className="reader-pin-button"
-        aria-label={tooltip}
+        aria-label={accessibleLabel}
         onClick={(event) => {
           event.stopPropagation();
           onPin(anchor);

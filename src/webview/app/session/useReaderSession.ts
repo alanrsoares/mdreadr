@@ -1,9 +1,9 @@
 import type { CreateNoteRequest, DocumentRef, Note, NoteStatus, Suggestion } from "@mdreadr/domain";
 import { type UseQueryResult, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
-import { formatDisplayPath } from "../components/path-display.ts";
+import { pathFileName } from "../components/path-display.ts";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
-import type { ReaderApi, SessionSnapshot, TabSummary } from "./reader-api.ts";
+import type { ReaderApi, SessionSnapshot, TabSummary, TabsResult } from "./reader-api.ts";
 import {
   loadNotesFlow,
   pickDocumentFlow,
@@ -218,6 +218,8 @@ export type DocumentTabs = {
   load: () => Promise<void>;
   refresh: () => void;
   isOpening: boolean;
+  /** Path of the document currently being opened, for per-item pending affordances. */
+  openingPath: string | null;
   isSavingDropped: boolean;
   isLoadingNotes: boolean;
 };
@@ -277,29 +279,98 @@ export function useDocumentTabs(
     void queryClient.invalidateQueries({ queryKey: ["suggestions"] });
   }, [invalidateTabs, invalidateSession, queryClient]);
 
+  // Tab switch/close are pure in-memory work server-side, so the only real cost
+  // is the round trip. Both mutations therefore paint optimistically and then
+  // seed the cache from the response the server already sent back, instead of
+  // invalidating `["tabs"]` and paying a second round trip before the UI moves.
   const activateTabMutation = useMutation({
     mutationFn: (id: string) => readerApi.activateTab(id),
-    onSuccess: invalidateAfterTabChange,
-    onError: (error) => {
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["tabs"] });
+      const previousTabs = queryClient.getQueryData<TabsResult>(["tabs"]);
+      if (previousTabs) {
+        queryClient.setQueryData<TabsResult>(["tabs"], { ...previousTabs, activeId: id });
+      }
+      return { previousTabs };
+    },
+    onSuccess: (snapshot, id) => {
+      // The activate response *is* the newly active tab's snapshot — seeding it
+      // (plus its notes/suggestions, which ride along) means the tab renders
+      // populated on first paint rather than after three more fetches.
+      queryClient.setQueryData<SessionSnapshot>(["session", id], snapshot);
+      queryClient.setQueryData<Note[]>(["notes", id], snapshot.notes);
+      queryClient.setQueryData<Suggestion[]>(["suggestions", id], snapshot.suggestions);
+    },
+    onError: (error, _id, context) => {
+      if (context?.previousTabs) queryClient.setQueryData(["tabs"], context.previousTabs);
+      invalidateTabs();
       showError("Switch tab", error);
     },
   });
 
   const closeTabMutation = useMutation({
     mutationFn: (id: string) => readerApi.closeTab(id),
-    onSuccess: invalidateAfterTabChange,
-    onError: (error) => {
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["tabs"] });
+      const previousTabs = queryClient.getQueryData<TabsResult>(["tabs"]);
+      if (previousTabs) {
+        const tabs = previousTabs.tabs.filter((tab) => tab.id !== id);
+        queryClient.setQueryData<TabsResult>(["tabs"], {
+          tabs,
+          // Mirrors the server's fallback: closing the active tab hands focus to
+          // the first tab still open (SessionStore.closeTab).
+          activeId: previousTabs.activeId === id ? (tabs[0]?.id ?? null) : previousTabs.activeId,
+        });
+      }
+      return { previousTabs };
+    },
+    onSuccess: (result, id) => {
+      queryClient.setQueryData<TabsResult>(["tabs"], result);
+      queryClient.removeQueries({ queryKey: ["session", id] });
+      queryClient.removeQueries({ queryKey: ["notes", id] });
+      queryClient.removeQueries({ queryKey: ["suggestions", id] });
+      // The tab that inherits focus still needs its own data fetched.
+      invalidateSession();
+      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+      void queryClient.invalidateQueries({ queryKey: ["suggestions"] });
+    },
+    onError: (error, _id, context) => {
+      if (context?.previousTabs) queryClient.setQueryData(["tabs"], context.previousTabs);
+      invalidateTabs();
       showError("Close tab", error);
     },
   });
 
   const openDocumentMutation = useMutation({
     mutationFn: (path: string) => readerApi.openDocument(path),
-    onSuccess: (_data, path) => {
-      invalidateAfterTabChange();
+    onSuccess: (result, path) => {
+      // The open response already carries the new tab list and the opened tab's
+      // notes/suggestions, so seed them instead of invalidating — otherwise the
+      // document the server just sent us gets fetched a second time before the
+      // reader paints anything.
+      queryClient.setQueryData<TabsResult>(["tabs"], {
+        tabs: result.tabs,
+        activeId: result.activeId,
+      });
+      if (result.activeId) {
+        const opened = result.tabs.find((tab) => tab.id === result.activeId);
+        queryClient.setQueryData<SessionSnapshot>(["session", result.activeId], {
+          document: opened?.document ?? null,
+          documentContent: result.content,
+          notes: result.notes,
+          suggestions: result.suggestions,
+          homeDirectory: result.homeDirectory,
+        });
+        queryClient.setQueryData<Note[]>(["notes", result.activeId], result.notes);
+        queryClient.setQueryData<Suggestion[]>(
+          ["suggestions", result.activeId],
+          result.suggestions,
+        );
+      }
       invalidateRecents();
-      const homeDirectory = activeSessionQuery.data?.homeDirectory;
-      showSuccess(`Opened ${formatDisplayPath(path, homeDirectory)}`);
+      // File name only: the full path is already in the top nav, and a long
+      // absolute path wraps the toast over the notes column.
+      showSuccess(`Opened ${pathFileName(path)}`);
       callbacks.onOpened?.(path);
     },
     onError: (error) => {
@@ -376,6 +447,7 @@ export function useDocumentTabs(
       void queryClient.invalidateQueries({ queryKey: ["suggestions"] });
     },
     isOpening: pickDocumentMutation.isPending || openDocumentMutation.isPending,
+    openingPath: openDocumentMutation.isPending ? (openDocumentMutation.variables ?? null) : null,
     isSavingDropped: saveDroppedDocumentMutation.isPending,
     isLoadingNotes: loadNotesMutation.isPending,
   };

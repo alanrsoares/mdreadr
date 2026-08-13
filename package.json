@@ -19,14 +19,14 @@
     "tersify:dry": "onrails-codemod-neverthrow . --tersify --dry",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "astryx": "node node_modules/@astryxdesign/cli/bin/astryx.mjs",
-    "theme:build": "npm run astryx -- theme build src/webview/app/theme/mdreadrTheme.ts --out src/webview/app/theme/mdreadr.css && biome format --write src/webview/app/theme",
+    "astryx": "bunx astryx",
+    "theme:build": "bunx astryx theme build src/webview/app/theme/mdreadrTheme.ts --out src/webview/app/theme/mdreadr.css && biome format --write src/webview/app/theme",
     "postinstall": "bun run scripts/patch-electrobun.ts",
     "check": "biome ci --error-on-warnings . && bun run typecheck && bun test"
   },
   "dependencies": {
-    "@astryxdesign/core": "^0.1.9",
-    "@astryxdesign/theme-neutral": "^0.1.9",
+    "@astryxdesign/core": "^0.3.0",
+    "@astryxdesign/theme-neutral": "^0.3.0",
     "@codemirror/lang-markdown": "^6.5.2",
     "@elysiajs/cors": "^1.4.2",
     "@elysiajs/eden": "^1.4.9",
@@ -61,7 +61,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@astryxdesign/cli": "^0.1.9",
+    "@astryxdesign/cli": "^0.3.0",
     "@biomejs/biome": "^2.5.8",
     "@onrails/codemod": "^0.2.5",
     "@resvg/resvg-js": "^2.6.2",

@@ -98,7 +98,7 @@ body,
 @keyframes reader-pin-flash {
   0%,
   20% {
-    background: color-mix(in srgb, var(--color-background-accent) 28%, transparent);
+    background: color-mix(in srgb, var(--color-accent) 28%, transparent);
   }
 
   100% {
@@ -155,6 +155,14 @@ body,
   animation: reader-reveal var(--duration-fast) var(--ease-standard) both;
 }
 
+.reader-notes-panel {
+  transition: box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.reader-notes-panel[data-pending="true"] {
+  box-shadow: inset 3px 0 0 0 var(--color-text-accent);
+}
+
 .reader-main-drop-overlay {
   pointer-events: none;
   position: absolute;
@@ -163,7 +171,7 @@ body,
   display: grid;
   place-items: center;
   border: 2px dashed var(--color-text-accent);
-  background: color-mix(in srgb, var(--color-background-accent) 12%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
   color: var(--color-text-primary);
   font-size: var(--font-size-sm);
   opacity: 0;
@@ -313,7 +321,7 @@ body,
 
   .reader-block-pin-flash {
     animation: none;
-    background: color-mix(in srgb, var(--color-background-accent) 28%, transparent);
+    background: color-mix(in srgb, var(--color-accent) 28%, transparent);
   }
 
   .reader-drop-overlay-content {
@@ -384,7 +392,7 @@ body,
 .reader-pin-button:hover {
   border-color: var(--color-text-accent);
   color: var(--color-text-accent);
-  background: color-mix(in srgb, var(--color-background-accent) 12%, var(--reader-paper-bg));
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--reader-paper-bg));
 }
 
 .reader-pin-button:active {

@@ -13,19 +13,26 @@ import { DocumentTextIcon } from "../icons.ts";
 import { formatDisplayPath, formatRecentMenuLabels, pathFileName } from "./path-display.ts";
 import { useRecentsSidebar } from "./RecentsSidebarContext.tsx";
 
+type OpenActionVariant = "primary" | "secondary";
+
 type RecentsSidebarOpenActionProps = {
   onPickDocument: () => void;
   isOpening: boolean;
+  variant: OpenActionVariant;
 };
 
-function RecentsSidebarOpenAction({ onPickDocument, isOpening }: RecentsSidebarOpenActionProps) {
+function RecentsSidebarOpenAction({
+  onPickDocument,
+  isOpening,
+  variant,
+}: RecentsSidebarOpenActionProps) {
   const { isCollapsed } = useSideNavCollapse();
 
   return isCollapsed ? (
     <IconButton
       label="Open markdown…"
       tooltip="Open markdown…"
-      variant="primary"
+      variant={variant}
       size="sm"
       icon={<Icon icon={DocumentTextIcon} size="sm" />}
       isLoading={isOpening}
@@ -34,7 +41,7 @@ function RecentsSidebarOpenAction({ onPickDocument, isOpening }: RecentsSidebarO
   ) : (
     <Button
       label="Open markdown…"
-      variant="primary"
+      variant={variant}
       isLoading={isOpening}
       onClick={onPickDocument}
     />
@@ -45,10 +52,17 @@ type RecentSideNavItemProps = {
   menuLabel: string;
   displayPath: string;
   isSelected: boolean;
+  isOpening: boolean;
   onOpen: () => void;
 };
 
-function RecentSideNavItem({ menuLabel, displayPath, isSelected, onOpen }: RecentSideNavItemProps) {
+function RecentSideNavItem({
+  menuLabel,
+  displayPath,
+  isSelected,
+  isOpening,
+  onOpen,
+}: RecentSideNavItemProps) {
   const { isCollapsed } = useSideNavCollapse();
   const anchorRef = useRef<HTMLDivElement>(null);
   const itemLabel = isCollapsed ? displayPath : menuLabel;
@@ -59,7 +73,10 @@ function RecentSideNavItem({ menuLabel, displayPath, isSelected, onOpen }: Recen
         label={itemLabel}
         icon={DocumentTextIcon}
         selectedIcon={DocumentTextIcon}
-        isSelected={isSelected}
+        // Reading a file off disk is the one part of opening we can't make
+        // instant, so the clicked row claims selection immediately rather than
+        // leaving the click looking dropped until the document lands.
+        isSelected={isSelected || isOpening}
         onClick={onOpen}
       />
       {!isCollapsed && displayPath !== menuLabel ? (
@@ -72,19 +89,28 @@ function RecentSideNavItem({ menuLabel, displayPath, isSelected, onOpen }: Recen
 type RecentsSidebarProps = {
   paths: string[];
   selectedPath?: string;
+  /** Recent currently being opened, if any — gets the pending affordance. */
+  openingPath?: string | null;
   homeDirectory?: string;
   onOpen: (path: string) => void;
   onPickDocument: () => void;
   isOpening?: boolean;
+  /**
+   * Demoted to secondary while the app is empty, so the centred CTA in
+   * ReaderPage is the only primary action on screen.
+   */
+  openActionVariant?: OpenActionVariant;
 };
 
 export function RecentsSidebar({
   paths,
   selectedPath,
+  openingPath = null,
   homeDirectory,
   onOpen,
   onPickDocument,
   isOpening = false,
+  openActionVariant = "primary",
 }: RecentsSidebarProps) {
   const { isCollapsed, setCollapsed } = useRecentsSidebar();
 
@@ -108,7 +134,11 @@ export function RecentsSidebar({
         maxWidth: 360,
       }}
       topContent={
-        <RecentsSidebarOpenAction onPickDocument={onPickDocument} isOpening={isOpening} />
+        <RecentsSidebarOpenAction
+          onPickDocument={onPickDocument}
+          isOpening={isOpening}
+          variant={openActionVariant}
+        />
       }
     >
       <SideNavSection title="Recents">
@@ -127,6 +157,7 @@ export function RecentsSidebar({
                 menuLabel={menuLabel}
                 displayPath={displayPaths.get(path) ?? menuLabel}
                 isSelected={path === selectedPath}
+                isOpening={path === openingPath}
                 onOpen={() => onOpen(path)}
               />
             );

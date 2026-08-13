@@ -23,11 +23,21 @@ export function MermaidChart({ chart }: MermaidChartProps) {
     setSvgContent(null);
 
     void (async () => {
+      const id = `mermaid-${crypto.randomUUID()}`;
+      // Mermaid mounts a scratch element for measurement; give it an offscreen host we own
+      // so a throwing render cannot leave orphans parented to <body>.
+      const host = document.createElement("div");
+      host.setAttribute("aria-hidden", "true");
+      host.style.cssText =
+        "position:absolute;left:-9999px;top:0;width:0;height:0;overflow:hidden;pointer-events:none";
+      document.body.appendChild(host);
+
       try {
         const mermaid = await import("mermaid");
         mermaid.default.initialize({ startOnLoad: false, theme: mermaidTheme() });
-        const id = `mermaid-${crypto.randomUUID()}`;
-        const result = await mermaid.default.render(id, chart);
+        // parse() turns syntax errors into a clean rejection before any DOM is created
+        await mermaid.default.parse(chart);
+        const result = await mermaid.default.render(id, chart, host);
         if (!cancelled) {
           setSvgContent(result.svg);
           setState("ready");
@@ -37,6 +47,10 @@ export function MermaidChart({ chart }: MermaidChartProps) {
           setState("error");
           setErrorMessage(error instanceof Error ? error.message : "Diagram failed to render");
         }
+      } finally {
+        host.remove();
+        document.getElementById(id)?.remove();
+        document.getElementById(`d${id}`)?.remove();
       }
     })();
 
