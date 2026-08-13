@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.0](https://github.com/alanrsoares/mdreadr/compare/v0.10.3...v0.11.0) (2026-08-13)
+
+
+### Features
+
+* add version badge ([0a0bd50](https://github.com/alanrsoares/mdreadr/commit/0a0bd5035642ab8b953b3d1c58a7aaecc4904089))
+* improved distributability coverage + wired undo/redo bridge ([bab4fdb](https://github.com/alanrsoares/mdreadr/commit/bab4fdbb8bec9dfd90d149a7988bea7de2577326))
+
 ## [0.10.3](https://github.com/alanrsoares/mdreadr/compare/v0.10.2...v0.10.3) (2026-08-13)
 
 
