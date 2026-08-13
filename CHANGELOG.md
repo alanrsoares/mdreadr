@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.2](https://github.com/alanrsoares/mdreadr/compare/v0.10.1...v0.10.2) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ui:** fix sidebar toggle overrides caused by render effects ([bc00a03](https://github.com/alanrsoares/mdreadr/commit/bc00a030e767781a2b142267003f516d6e5555aa))
+* **ui:** unify recents sidebar state with RecentsSidebarProvider ([b3de5a7](https://github.com/alanrsoares/mdreadr/commit/b3de5a73dcde4a990e0638a71f88145788fa3ceb))
+
 ## [0.10.1](https://github.com/alanrsoares/mdreadr/compare/v0.10.0...v0.10.1) (2026-08-12)
 
 
