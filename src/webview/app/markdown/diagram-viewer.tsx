@@ -293,7 +293,7 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
 
         <DiagramFrame
           aria-busy={state === "loading"}
-          className="relative flex min-h-[150px] cursor-grab select-none items-center justify-center active:cursor-grabbing"
+          className="relative flex min-h-37.5 cursor-grab select-none items-center justify-center active:cursor-grabbing"
           onMouseDown={handleMouseDown}
           onWheel={handleWheel}
         >
@@ -361,7 +361,7 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
         >
           <div
             ref={modalContainerRef}
-            className="[&>svg]:!h-full [&>svg]:!w-full [&>svg]:!max-h-full [&>svg]:!max-w-full flex h-full w-full items-center justify-center transition-transform duration-75 ease-out [&>svg]:overflow-visible"
+            className="flex h-full w-full items-center justify-center transition-transform duration-75 ease-out [&>svg]:h-full! [&>svg]:max-h-full! [&>svg]:w-full! [&>svg]:max-w-full! [&>svg]:overflow-visible"
             style={{
               transform: `translate(${modalPan.x}px, ${modalPan.y}px) scale(${modalZoom})`,
               transformOrigin: "center center",

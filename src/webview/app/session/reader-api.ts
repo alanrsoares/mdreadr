@@ -18,6 +18,18 @@ export type SessionSnapshot = {
 };
 
 export type OpenDocumentResult = { path: string; content: string };
+/**
+ * What `/documents/open` answers with: the document *plus* the post-open shell
+ * state, so the caller can seed every cache the open invalidates rather than
+ * refetching them.
+ */
+export type OpenDocumentSnapshot = OpenDocumentResult & {
+  tabs: TabSummary[];
+  activeId: string | null;
+  notes: Note[];
+  suggestions: Suggestion[];
+  homeDirectory: string;
+};
 export type LoadNotesResult = {
   notes: Note[];
   document?: DocumentRef | null;
@@ -32,7 +44,7 @@ export type ReaderApi = {
   getSession(): Promise<SessionSnapshot>;
   getRecents(): Promise<string[]>;
   getNotes(): Promise<Note[]>;
-  openDocument(path: string): Promise<OpenDocumentResult>;
+  openDocument(path: string): Promise<OpenDocumentSnapshot>;
   createDocument(path: string, content: string): Promise<OpenDocumentResult>;
   pickPath(input: PickFileInput): Promise<string | null>;
   createNote(input: CreateNoteRequest): Promise<void>;

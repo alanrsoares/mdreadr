@@ -160,9 +160,18 @@ export const app = new Elysia()
         return toDocumentHttpError(result.error);
       }
 
+      // The tab list and the newly active tab's notes/suggestions ride along, so
+      // the webview can paint the opened document from this one response instead
+      // of chasing it with a tabs + session + notes + suggestions refetch.
+      const snapshot = sessionStore.snapshot();
       return {
         path: result.value.path,
         content: result.value.content,
+        tabs: sessionStore.listTabs(),
+        activeId: sessionStore.activeTabId,
+        notes: snapshot.notes,
+        suggestions: snapshot.suggestions,
+        homeDirectory: snapshot.homeDirectory,
       };
     },
     {

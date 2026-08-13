@@ -334,6 +334,7 @@ function ReaderPageContent() {
         <RecentsSidebar
           paths={tabs.recents}
           selectedPath={activeDocumentPath}
+          openingPath={tabs.openingPath}
           homeDirectory={tabs.homeDirectory}
           onOpen={handleOpenPath}
           onPickDocument={tabs.pick}

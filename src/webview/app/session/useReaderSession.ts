@@ -218,6 +218,8 @@ export type DocumentTabs = {
   load: () => Promise<void>;
   refresh: () => void;
   isOpening: boolean;
+  /** Path of the document currently being opened, for per-item pending affordances. */
+  openingPath: string | null;
   isSavingDropped: boolean;
   isLoadingNotes: boolean;
 };
@@ -341,8 +343,30 @@ export function useDocumentTabs(
 
   const openDocumentMutation = useMutation({
     mutationFn: (path: string) => readerApi.openDocument(path),
-    onSuccess: (_data, path) => {
-      invalidateAfterTabChange();
+    onSuccess: (result, path) => {
+      // The open response already carries the new tab list and the opened tab's
+      // notes/suggestions, so seed them instead of invalidating — otherwise the
+      // document the server just sent us gets fetched a second time before the
+      // reader paints anything.
+      queryClient.setQueryData<TabsResult>(["tabs"], {
+        tabs: result.tabs,
+        activeId: result.activeId,
+      });
+      if (result.activeId) {
+        const opened = result.tabs.find((tab) => tab.id === result.activeId);
+        queryClient.setQueryData<SessionSnapshot>(["session", result.activeId], {
+          document: opened?.document ?? null,
+          documentContent: result.content,
+          notes: result.notes,
+          suggestions: result.suggestions,
+          homeDirectory: result.homeDirectory,
+        });
+        queryClient.setQueryData<Note[]>(["notes", result.activeId], result.notes);
+        queryClient.setQueryData<Suggestion[]>(
+          ["suggestions", result.activeId],
+          result.suggestions,
+        );
+      }
       invalidateRecents();
       // File name only: the full path is already in the top nav, and a long
       // absolute path wraps the toast over the notes column.
@@ -423,6 +447,7 @@ export function useDocumentTabs(
       void queryClient.invalidateQueries({ queryKey: ["suggestions"] });
     },
     isOpening: pickDocumentMutation.isPending || openDocumentMutation.isPending,
+    openingPath: openDocumentMutation.isPending ? (openDocumentMutation.variables ?? null) : null,
     isSavingDropped: saveDroppedDocumentMutation.isPending,
     isLoadingNotes: loadNotesMutation.isPending,
   };

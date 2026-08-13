@@ -52,10 +52,17 @@ type RecentSideNavItemProps = {
   menuLabel: string;
   displayPath: string;
   isSelected: boolean;
+  isOpening: boolean;
   onOpen: () => void;
 };
 
-function RecentSideNavItem({ menuLabel, displayPath, isSelected, onOpen }: RecentSideNavItemProps) {
+function RecentSideNavItem({
+  menuLabel,
+  displayPath,
+  isSelected,
+  isOpening,
+  onOpen,
+}: RecentSideNavItemProps) {
   const { isCollapsed } = useSideNavCollapse();
   const anchorRef = useRef<HTMLDivElement>(null);
   const itemLabel = isCollapsed ? displayPath : menuLabel;
@@ -66,7 +73,10 @@ function RecentSideNavItem({ menuLabel, displayPath, isSelected, onOpen }: Recen
         label={itemLabel}
         icon={DocumentTextIcon}
         selectedIcon={DocumentTextIcon}
-        isSelected={isSelected}
+        // Reading a file off disk is the one part of opening we can't make
+        // instant, so the clicked row claims selection immediately rather than
+        // leaving the click looking dropped until the document lands.
+        isSelected={isSelected || isOpening}
         onClick={onOpen}
       />
       {!isCollapsed && displayPath !== menuLabel ? (
@@ -79,6 +89,8 @@ function RecentSideNavItem({ menuLabel, displayPath, isSelected, onOpen }: Recen
 type RecentsSidebarProps = {
   paths: string[];
   selectedPath?: string;
+  /** Recent currently being opened, if any — gets the pending affordance. */
+  openingPath?: string | null;
   homeDirectory?: string;
   onOpen: (path: string) => void;
   onPickDocument: () => void;
@@ -93,6 +105,7 @@ type RecentsSidebarProps = {
 export function RecentsSidebar({
   paths,
   selectedPath,
+  openingPath = null,
   homeDirectory,
   onOpen,
   onPickDocument,
@@ -144,6 +157,7 @@ export function RecentsSidebar({
                 menuLabel={menuLabel}
                 displayPath={displayPaths.get(path) ?? menuLabel}
                 isSelected={path === selectedPath}
+                isOpening={path === openingPath}
                 onOpen={() => onOpen(path)}
               />
             );
