@@ -15,9 +15,9 @@ import { McpSettingsDialog } from "../components/McpSettingsDialog.tsx";
 import { formatDisplayPath, pathFileName } from "../components/path-display.ts";
 import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
 import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
-import { RecentsSidebarProvider, useRecentsSidebar } from "../components/RecentsSidebarContext.tsx";
+import { RecentsSidebarProvider } from "../components/RecentsSidebarContext.tsx";
 import { TabStrip } from "../components/TabStrip.tsx";
-import { Bars3Icon, Cog6ToothIcon, ViewColumnsIcon } from "../icons.ts";
+import { Cog6ToothIcon, ViewColumnsIcon } from "../icons.ts";
 import { createTreatyReaderApi } from "../session/reader-api.ts";
 import { useDocumentTabs } from "../session/useReaderSession.ts";
 import { EmptyState } from "../ui/layout.tsx";
@@ -76,8 +76,6 @@ function ReaderDocumentTopNavHeading({
 }
 
 function ReaderPageContent() {
-  const { isCollapsed: isRecentsCollapsed, toggleCollapsed } = useRecentsSidebar();
-
   const notesSidebar = useResizable({
     defaultSize: 280,
     minSizePx: 220,
@@ -284,13 +282,6 @@ function ReaderPageContent() {
                 variant="ghost"
                 icon={<Icon icon={Cog6ToothIcon} size="sm" />}
                 onClick={() => setIsMcpSettingsOpen(true)}
-              />
-              <IconButton
-                label={isRecentsCollapsed ? "Show recents sidebar" : "Hide recents sidebar"}
-                tooltip={isRecentsCollapsed ? "Show recents sidebar" : "Hide recents sidebar"}
-                variant={isRecentsCollapsed ? "ghost" : "secondary"}
-                icon={<Icon icon={Bars3Icon} size="sm" />}
-                onClick={toggleCollapsed}
               />
               <IconButton
                 label={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
