@@ -2,6 +2,8 @@ export type TocEntry = {
   id: string;
   level: number;
   text: string;
+  /** 0-based index of the source line the heading sits on. */
+  line: number;
 };
 
 const slugify = (text: string): string =>
@@ -16,7 +18,7 @@ export function extractHeadings(markdown: string): TocEntry[] {
   const entries: TocEntry[] = [];
   const slugCounts = new Map<string, number>();
 
-  for (const line of lines) {
+  for (const [lineIndex, line] of lines.entries()) {
     const match = /^(#{1,6})\s+(.+)$/.exec(line.trim());
     if (!match) continue;
 
@@ -27,7 +29,7 @@ export function extractHeadings(markdown: string): TocEntry[] {
     slugCounts.set(base, count + 1);
     const id = count === 0 ? base : `${base}-${count}`;
 
-    entries.push({ id, level, text });
+    entries.push({ id, level, text, line: lineIndex });
   }
 
   return entries;

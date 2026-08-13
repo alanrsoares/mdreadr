@@ -1,6 +1,8 @@
 import { Button } from "@astryxdesign/core/Button";
 import { Selector } from "@astryxdesign/core/Selector";
+import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
+import { Timestamp } from "@astryxdesign/core/Timestamp";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import type { BlockAnchor, CreateNoteRequest, Note, NoteStatus } from "@mdreadr/domain";
 import { formatAuthorLabel } from "@mdreadr/domain";
@@ -49,12 +51,6 @@ const kindOptions = [
   { value: "request", label: "Edit request" },
 ];
 
-const formatNoteTime = (iso: string): string =>
-  new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(iso));
-
 export function NotesPanel({
   notes,
   pendingAnchor,
@@ -87,15 +83,19 @@ export function NotesPanel({
 
   return (
     <PanelStack>
+      <Text type="label">Notes ({notes.length})</Text>
+
+      {/* Both demoted to secondary: the composer's "Add note" is the primary
+          action in this column. Named for the disk, not for the panel. */}
       <ButtonRow>
         <Button
-          label="Save notes"
-          variant="primary"
+          label="Save to file"
+          variant="secondary"
           isLoading={isSaving}
           onClick={() => void onSaveNotes()}
         />
         <Button
-          label="Open notes"
+          label="Load from file"
           variant="secondary"
           isLoading={isLoadingNotes}
           onClick={() => void onLoadNotes()}
@@ -223,13 +223,16 @@ function NoteCardItem({
           }}
         />
       </NoteCardHeader>
-      <NoteMeta>Updated {formatNoteTime(note.updatedAt)}</NoteMeta>
+      <NoteMeta>
+        Updated <Timestamp value={note.updatedAt} format="auto" isLive />
+      </NoteMeta>
 
       <ReplyList>
         {note.replies.map((reply) => (
           <ReplyBubble key={reply.id}>
             <ReplyAuthor>
-              {formatAuthorLabel(reply.author)} · {formatNoteTime(reply.createdAt)}
+              {formatAuthorLabel(reply.author)} ·{" "}
+              <Timestamp value={reply.createdAt} format="auto" size="xsm" isLive />
             </ReplyAuthor>
             <ReplyBody>{reply.body}</ReplyBody>
           </ReplyBubble>

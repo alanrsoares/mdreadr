@@ -34,11 +34,21 @@ export function TabStrip({ tabs, activeId, dirtyIds, onActivate, onRequestClose 
           endContent={
             <>
               {dirtyIds.has(tab.id) ? <TabStripDirtyDot aria-hidden /> : null}
+              {/* Tab itself renders a <button>, so this cannot be a nested
+                  <button>; keep it a focusable role=button and drive it from
+                  the keyboard by hand. Cmd+W in ReaderPage is the other path. */}
               <TabStripCloseButton
                 role="button"
-                tabIndex={-1}
+                tabIndex={0}
                 aria-label={`Close ${tab.label}`}
+                className="focus:opacity-100"
                 onClick={(event) => {
+                  event.stopPropagation();
+                  onRequestClose(tab.id);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
                   event.stopPropagation();
                   onRequestClose(tab.id);
                 }}

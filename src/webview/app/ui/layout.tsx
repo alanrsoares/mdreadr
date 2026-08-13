@@ -1,23 +1,10 @@
 import tw from "@styled-cva/react";
 
-export const ReaderLayout = tw.section(
-  "grid h-full grid-cols-[minmax(0,200px)_minmax(0,1fr)_auto_var(--notes-col-width,280px)] overflow-hidden",
-);
-
-export const ReaderPanel = tw.aside(
-  "min-w-0 overflow-auto border-[var(--color-border)] border-r bg-[var(--color-background-surface)]",
-);
-
-export const ReaderMain = tw.main(
-  "relative min-w-0 overflow-auto border-[var(--color-border)] border-r bg-[var(--reader-well-bg)]",
-);
-
-export const ReaderNotesAside = tw.aside(
-  "min-w-0 overflow-auto border-[var(--color-border)] border-l bg-[var(--color-background-surface)] transition-[box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)] data-[pending=true]:shadow-[inset_3px_0_0_0_var(--color-text-accent)]",
-);
-
+// The horizontal padding is what makes --reader-well-bg (and the sheet's border,
+// radius and shadow) visible: without it the sheet fills the well edge to edge
+// at every window size this app is actually used at.
 export const ReaderContent = tw.div(
-  "mx-auto min-h-full w-full max-w-[min(100%,clamp(640px,68vw,920px))]",
+  "mx-auto min-h-full w-full max-w-[min(100%,clamp(640px,68vw,920px))] px-3 py-3 sm:px-5 sm:py-5",
 );
 
 export const ReaderSheet = tw.article(
@@ -30,19 +17,17 @@ export const ReaderDocumentChrome = tw.header(
   "sticky top-0 z-10 shrink-0 border-[var(--color-border)] border-b bg-[var(--reader-chrome-bg)] px-4 py-3.5 backdrop-blur-sm sm:px-6 md:px-8",
 );
 
-export const ReaderDocumentBody = tw.div`min-h-0 flex-1 px-4 pt-4 pb-12 sm:px-6 sm:pt-6 sm:pb-14 md:px-8`;
-
 export const ReaderChromeControls = tw.div`mx-auto flex w-fit items-center justify-center gap-2`;
 
 export const ReaderChromeEnd = tw.div(
   "absolute right-4 top-1/2 -translate-y-1/2 sm:right-2 md:right-3.5",
 );
 
-export const ReaderBadgeRow = tw.div`flex flex-wrap items-center gap-1.5`;
+// Padding is owned by the mode-specific wrapper inside DocumentView (preview
+// needs it, the editor supplies its own), so this stays a bare flex child.
+export const ReaderDocumentBody = tw.div`min-h-0 flex-1`;
 
-export const EmptyState = tw.div(
-  "grid h-full place-items-center content-center gap-4 p-6 text-center text-[var(--color-text-secondary)]",
-);
+export const ReaderBadgeRow = tw.div`flex flex-wrap items-center gap-1.5`;
 
 export const PanelStack = tw.div`grid gap-3 p-4`;
 

@@ -1,18 +1,21 @@
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { Button } from "@astryxdesign/core/Button";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { useResizable } from "@astryxdesign/core/Resizable";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
+import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
+import { VStack } from "@astryxdesign/core/VStack";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppLogo } from "../components/AppLogo.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
 import { McpClientsIndicator } from "../components/McpClientsIndicator.tsx";
 import { McpSettingsDialog } from "../components/McpSettingsDialog.tsx";
-import { formatDisplayPath, pathFileName } from "../components/path-display.ts";
+import { formatDisplayPath, pathFileName, truncatePathMiddle } from "../components/path-display.ts";
 import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
 import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
 import { RecentsSidebarProvider } from "../components/RecentsSidebarContext.tsx";
@@ -20,7 +23,6 @@ import { TabStrip } from "../components/TabStrip.tsx";
 import { Cog6ToothIcon, ViewColumnsIcon } from "../icons.ts";
 import { createTreatyReaderApi } from "../session/reader-api.ts";
 import { useDocumentTabs } from "../session/useReaderSession.ts";
-import { EmptyState } from "../ui/layout.tsx";
 import { ReaderTab, type ReaderTabHandle } from "./ReaderTab.tsx";
 import { UnsavedReaderTab } from "./UnsavedReaderTab.tsx";
 
@@ -57,6 +59,8 @@ function ReaderDocumentTopNavHeading({
   }
 
   const displayPath = formatDisplayPath(documentPath, homeDirectory);
+  // Keeps the heading block from growing to the width of an absolute path.
+  const subheading = truncatePathMiddle(displayPath);
 
   return (
     <>
@@ -65,10 +69,10 @@ function ReaderDocumentTopNavHeading({
           logo={<AppLogo />}
           superheading="mdreadr"
           heading={pathFileName(documentPath)}
-          subheading={displayPath}
+          subheading={subheading}
         />
       </div>
-      {displayPath !== documentPath ? (
+      {subheading !== documentPath ? (
         <Tooltip content={documentPath} placement="below" alignment="start" anchorRef={anchorRef} />
       ) : null}
     </>
@@ -100,6 +104,7 @@ function ReaderPageContent() {
   const [discardTargetLabel, setDiscardTargetLabel] = useState("");
   const pendingActionRef = useRef<(() => void) | null>(null);
   const tabRefs = useRef<Record<string, ReaderTabHandle | null>>({});
+  const hasUserCollapsedNotesRef = useRef(false);
   const unsavedDropSeqRef = useRef(0);
 
   const tabs = useDocumentTabs(readerApi, {
@@ -110,13 +115,17 @@ function ReaderPageContent() {
     },
   });
 
-  // Auto-collapse / expand notes sidebar on viewport breakpoint crossing (<= 1024px)
+  // Auto-collapse the notes sidebar on narrow viewports (<= 1024px). Evaluated on
+  // mount as well as on breakpoint crossings, and never re-expands a sidebar the
+  // user collapsed on purpose (which would fight useResizable's autoSaveId).
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 1024px)");
+    if (mediaQuery.matches) notesSidebar.collapse();
+
     const handleBreakpointChange = (e: MediaQueryListEvent) => {
       if (e.matches) {
         notesSidebar.collapse();
-      } else {
+      } else if (!hasUserCollapsedNotesRef.current) {
         notesSidebar.expand();
       }
     };
@@ -223,7 +232,8 @@ function ReaderPageContent() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
-      if (event.key.toLowerCase() !== "o") return;
+      const key = event.key.toLowerCase();
+      if (key !== "o" && key !== "w") return;
 
       const target = event.target;
       if (
@@ -234,13 +244,22 @@ function ReaderPageContent() {
         return;
       }
 
+      if (key === "o") {
+        event.preventDefault();
+        tabs.pick();
+        return;
+      }
+
+      // Cmd+W closes the active tab through the same guard as the close
+      // control, so a dirty draft still gets the discard dialog.
+      if (!effectiveActiveId) return;
       event.preventDefault();
-      tabs.pick();
+      handleRequestCloseTab(effectiveActiveId);
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [tabs]);
+  }, [tabs, effectiveActiveId, handleRequestCloseTab]);
 
   useEffect(() => {
     readerApi.log("ReaderPage mounted");
@@ -258,6 +277,10 @@ function ReaderPageContent() {
     ...tabs.tabs.map((tab) => ({ id: tab.id, label: pathFileName(tab.document.path) })),
     ...(unsavedDrop ? [{ id: UNSAVED_TAB_ID, label: unsavedDrop.name }] : []),
   ];
+
+  // With nothing open the centred CTA is the only primary action, and the
+  // controls that act on a document have nothing to act on.
+  const isEmpty = tabStripEntries.length === 0;
 
   return (
     <AppShell
@@ -287,17 +310,22 @@ function ReaderPageContent() {
                 label={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
                 tooltip={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
                 variant={notesSidebar.isCollapsed ? "ghost" : "secondary"}
+                isDisabled={isEmpty}
                 icon={<Icon icon={ViewColumnsIcon} size="sm" />}
-                onClick={() =>
-                  notesSidebar.isCollapsed ? notesSidebar.expand() : notesSidebar.collapse()
-                }
+                onClick={() => {
+                  hasUserCollapsedNotesRef.current = !notesSidebar.isCollapsed;
+                  if (notesSidebar.isCollapsed) notesSidebar.expand();
+                  else notesSidebar.collapse();
+                }}
               />
-              <Button
-                label="Open…"
-                variant="secondary"
-                isLoading={tabs.isOpening}
-                onClick={tabs.pick}
-              />
+              {isEmpty ? null : (
+                <Button
+                  label="Open…"
+                  variant="secondary"
+                  isLoading={tabs.isOpening}
+                  onClick={tabs.pick}
+                />
+              )}
             </HStack>
           }
         />
@@ -310,24 +338,31 @@ function ReaderPageContent() {
           onOpen={handleOpenPath}
           onPickDocument={tabs.pick}
           isOpening={tabs.isOpening}
+          openActionVariant={isEmpty ? "secondary" : "primary"}
         />
       }
     >
-      <div aria-live="polite" className="sr-only">
+      <VisuallyHidden as="div" aria-live="polite">
         {liveMessage}
-      </div>
+      </VisuallyHidden>
 
-      {tabStripEntries.length === 0 ? (
-        <EmptyState className="reader-empty-enter">
-          <AppLogo size={48} />
-          <ReaderDropHint />
-          <Button
-            label="Open markdown…"
-            variant="primary"
-            isLoading={tabs.isOpening}
-            onClick={tabs.pick}
-          />
-        </EmptyState>
+      {isEmpty ? (
+        <EmptyState
+          className="reader-empty-enter h-full justify-center"
+          icon={<AppLogo size={48} />}
+          title="No document open"
+          actions={
+            <VStack gap={3} hAlign="center">
+              <Button
+                label="Open markdown…"
+                variant="primary"
+                isLoading={tabs.isOpening}
+                onClick={tabs.pick}
+              />
+              <ReaderDropHint />
+            </VStack>
+          }
+        />
       ) : (
         <div className="flex h-full min-h-0 flex-col">
           <TabStrip
@@ -366,6 +401,7 @@ function ReaderPageContent() {
                   name={unsavedDrop.name}
                   content={unsavedDrop.content}
                   notesSidebar={notesSidebar}
+                  isActive={effectiveActiveId === UNSAVED_TAB_ID}
                   isSaving={tabs.isSavingDropped}
                   onOpenPath={handleOpenPath}
                   onDropUnsaved={handleDropUnsaved}

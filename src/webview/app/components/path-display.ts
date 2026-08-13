@@ -104,6 +104,18 @@ export function formatDisplayPath(path: string, homeDirectory?: string): string 
   return rest.length === 0 ? "~" : `~${rest}`;
 }
 
+/**
+ * Middle-truncate a path so the heading block keeps a bounded width while the
+ * distinguishing head and tail stay readable. Full value belongs in a tooltip.
+ */
+export function truncatePathMiddle(path: string, maxLength = 44): string {
+  if (path.length <= maxLength) return path;
+  const keep = maxLength - 1;
+  const head = Math.ceil(keep / 2);
+  const tail = keep - head;
+  return `${path.slice(0, head)}…${path.slice(path.length - tail)}`;
+}
+
 /** Collision-aware labels for the Recents sidebar. */
 export function formatRecentMenuLabels(paths: readonly string[]): Map<string, RecentPathMenuLabel> {
   const displays = buildRecentPathDisplays(paths);

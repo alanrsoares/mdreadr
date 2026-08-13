@@ -45,22 +45,22 @@ export const AppLogo = ({ size = 28 }: AppLogoProps) => (
       <rect x="248" y="464.647" fill="#1D1D1B" width="16.009" height="15.713" />
     </g>
     <g>
-      <rect x="47.88" y="88.431" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="47.88" y="128.447" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="47.88" y="168.472" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="47.88" y="208.498" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="47.88" y="248.523" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="47.88" y="288.549" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="47.88" y="328.564" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="47.88" y="368.59" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="296.028" y="88.431" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="296.028" y="128.447" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="296.028" y="168.472" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="296.028" y="208.498" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="296.028" y="248.523" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="296.028" y="288.549" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="296.028" y="328.564" fill="#FFFFFF;" width="168.095" height="15.713" />
-      <rect x="296.028" y="368.59" fill="#FFFFFF;" width="168.095" height="15.713" />
+      <rect x="47.88" y="88.431" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="47.88" y="128.447" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="47.88" y="168.472" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="47.88" y="208.498" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="47.88" y="248.523" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="47.88" y="288.549" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="47.88" y="328.564" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="47.88" y="368.59" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="296.028" y="88.431" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="296.028" y="128.447" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="296.028" y="168.472" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="296.028" y="208.498" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="296.028" y="248.523" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="296.028" y="288.549" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="296.028" y="328.564" fill="#FFFFFF" width="168.095" height="15.713" />
+      <rect x="296.028" y="368.59" fill="#FFFFFF" width="168.095" height="15.713" />
     </g>
   </svg>
 );

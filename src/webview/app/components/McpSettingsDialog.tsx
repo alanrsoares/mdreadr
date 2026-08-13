@@ -71,7 +71,7 @@ export function McpSettingsDialog({ isOpen, onOpenChange }: McpSettingsDialogPro
       onOpenChange={onOpenChange}
       width={440}
       maxHeight="calc(100vh - 32px)"
-      position={{ top: 16, right: 16, bottom: 16 }}
+      position={{ top: 16, end: 16, bottom: 16 }}
     >
       <DialogHeader
         title="MCP Access"
@@ -96,7 +96,9 @@ export function McpSettingsDialog({ isOpen, onOpenChange }: McpSettingsDialogPro
       )}
 
       {connection.data && (
-        <>
+        // Dialog clips at maxHeight instead of scrolling; own the scroll so the
+        // revoke action stays reachable at short viewports.
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <Section padding={5} dividers={["bottom"]}>
             <HStack gap={2} vAlign="center" hAlign="between">
               <HStack gap={2} vAlign="center">
@@ -161,6 +163,8 @@ export function McpSettingsDialog({ isOpen, onOpenChange }: McpSettingsDialogPro
                 code={claudeCodeSnippet(connection.data.url, connection.data.token)}
                 language="bash"
                 hasLanguageLabel={false}
+                isWrapped
+                width="100%"
               />
             </VStack>
           </Section>
@@ -175,6 +179,8 @@ export function McpSettingsDialog({ isOpen, onOpenChange }: McpSettingsDialogPro
                 code={jsonConfigSnippet(connection.data.url, connection.data.token)}
                 language="json"
                 title="mcp.json"
+                isWrapped
+                width="100%"
               />
             </VStack>
           </Section>
@@ -194,7 +200,7 @@ export function McpSettingsDialog({ isOpen, onOpenChange }: McpSettingsDialogPro
               {revoke.isError && <Banner status="error" title="Could not revoke token" />}
             </VStack>
           </Section>
-        </>
+        </div>
       )}
     </Dialog>
   );

@@ -235,7 +235,7 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
   return (
     <>
       <section
-        className="group relative overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+        className="group relative overflow-hidden rounded-(--radius-container) border border-(--color-border) bg-(--color-background-surface)"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => {
           setIsHovered(false);
@@ -244,7 +244,7 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
         aria-label={label}
       >
         {state === "ready" && (isHovered || isDragging) && (
-          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-100/90 p-1 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-800/90">
+          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-(--radius-inner) border border-(--color-border) bg-(--color-background-popover) p-1 shadow-(--shadow-low)">
             <IconButton
               icon={<PlusIcon className="h-4 w-4" />}
               label="Zoom In"
@@ -269,7 +269,7 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
               size="sm"
               onClick={reset}
             />
-            <div className="mx-1 h-4 w-[1px] bg-zinc-200 dark:bg-zinc-700" />
+            <div className="mx-1 h-4 w-[1px] bg-(--color-border)" />
             <IconButton
               icon={<ArrowsPointingOutIcon className="h-4 w-4" />}
               label="Expand to Fullscreen"
@@ -286,7 +286,7 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
         )}
 
         {state === "ready" && (isHovered || isDragging) && (
-          <div className="pointer-events-none absolute bottom-2 left-2 z-10 rounded bg-zinc-900/5 px-1.5 py-0.5 text-[10px] text-zinc-400 backdrop-blur dark:bg-zinc-100/5 dark:text-zinc-500">
+          <div className="pointer-events-none absolute bottom-2 left-2 z-10 rounded-(--radius-inner) bg-(--color-background-muted) px-1.5 py-0.5 text-(--color-text-secondary) text-[10px]">
             {isDragging ? "Panning…" : "Drag to pan • Cmd/Ctrl + Scroll to zoom"}
           </div>
         )}
@@ -322,7 +322,7 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
           subtitle={`Zoom: ${Math.round(modalZoom * 100)}%`}
           onOpenChange={setIsExpanded}
           endContent={
-            <div className="flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-100 p-1 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex items-center gap-1 rounded-(--radius-inner) border border-(--color-border) bg-(--color-background-muted) p-1">
               <IconButton
                 icon={<PlusIcon className="h-4 w-4" />}
                 label="Zoom In"
@@ -368,7 +368,7 @@ export function DiagramViewer({ state, svgContent, errorMessage, label }: Diagra
             }}
           />
 
-          <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-md border border-zinc-200 bg-white/80 px-2.5 py-1 text-xs text-zinc-600 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-400">
+          <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-(--radius-inner) border border-(--color-border) bg-(--color-background-popover) px-2.5 py-1 text-(--color-text-secondary) text-xs shadow-(--shadow-low)">
             {isModalDragging
               ? "Panning…"
               : modalZoom === 1 && modalPan.x === 0 && modalPan.y === 0

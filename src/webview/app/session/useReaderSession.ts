@@ -1,7 +1,7 @@
 import type { CreateNoteRequest, DocumentRef, Note, NoteStatus, Suggestion } from "@mdreadr/domain";
 import { type UseQueryResult, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
-import { formatDisplayPath } from "../components/path-display.ts";
+import { pathFileName } from "../components/path-display.ts";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
 import type { ReaderApi, SessionSnapshot, TabSummary } from "./reader-api.ts";
 import {
@@ -298,8 +298,9 @@ export function useDocumentTabs(
     onSuccess: (_data, path) => {
       invalidateAfterTabChange();
       invalidateRecents();
-      const homeDirectory = activeSessionQuery.data?.homeDirectory;
-      showSuccess(`Opened ${formatDisplayPath(path, homeDirectory)}`);
+      // File name only: the full path is already in the top nav, and a long
+      // absolute path wraps the toast over the notes column.
+      showSuccess(`Opened ${pathFileName(path)}`);
       callbacks.onOpened?.(path);
     },
     onError: (error) => {

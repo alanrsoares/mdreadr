@@ -13,19 +13,26 @@ import { DocumentTextIcon } from "../icons.ts";
 import { formatDisplayPath, formatRecentMenuLabels, pathFileName } from "./path-display.ts";
 import { useRecentsSidebar } from "./RecentsSidebarContext.tsx";
 
+type OpenActionVariant = "primary" | "secondary";
+
 type RecentsSidebarOpenActionProps = {
   onPickDocument: () => void;
   isOpening: boolean;
+  variant: OpenActionVariant;
 };
 
-function RecentsSidebarOpenAction({ onPickDocument, isOpening }: RecentsSidebarOpenActionProps) {
+function RecentsSidebarOpenAction({
+  onPickDocument,
+  isOpening,
+  variant,
+}: RecentsSidebarOpenActionProps) {
   const { isCollapsed } = useSideNavCollapse();
 
   return isCollapsed ? (
     <IconButton
       label="Open markdown…"
       tooltip="Open markdown…"
-      variant="primary"
+      variant={variant}
       size="sm"
       icon={<Icon icon={DocumentTextIcon} size="sm" />}
       isLoading={isOpening}
@@ -34,7 +41,7 @@ function RecentsSidebarOpenAction({ onPickDocument, isOpening }: RecentsSidebarO
   ) : (
     <Button
       label="Open markdown…"
-      variant="primary"
+      variant={variant}
       isLoading={isOpening}
       onClick={onPickDocument}
     />
@@ -76,6 +83,11 @@ type RecentsSidebarProps = {
   onOpen: (path: string) => void;
   onPickDocument: () => void;
   isOpening?: boolean;
+  /**
+   * Demoted to secondary while the app is empty, so the centred CTA in
+   * ReaderPage is the only primary action on screen.
+   */
+  openActionVariant?: OpenActionVariant;
 };
 
 export function RecentsSidebar({
@@ -85,6 +97,7 @@ export function RecentsSidebar({
   onOpen,
   onPickDocument,
   isOpening = false,
+  openActionVariant = "primary",
 }: RecentsSidebarProps) {
   const { isCollapsed, setCollapsed } = useRecentsSidebar();
 
@@ -108,7 +121,11 @@ export function RecentsSidebar({
         maxWidth: 360,
       }}
       topContent={
-        <RecentsSidebarOpenAction onPickDocument={onPickDocument} isOpening={isOpening} />
+        <RecentsSidebarOpenAction
+          onPickDocument={onPickDocument}
+          isOpening={isOpening}
+          variant={openActionVariant}
+        />
       }
     >
       <SideNavSection title="Recents">

@@ -1,4 +1,5 @@
 import { HStack } from "@astryxdesign/core/HStack";
+import type { EditorView } from "@codemirror/view";
 import type { BlockAnchor, Note } from "@mdreadr/domain";
 import type { CSSProperties, ReactNode } from "react";
 import { getReaderFontFamilyCss, useFontSettings } from "../theme/FontSettingsContext.tsx";
@@ -25,7 +26,10 @@ type DocumentViewProps = {
   onPinBlock?: (anchor: BlockAnchor) => void;
   editorValue: string;
   onEditorChange: (text: string) => void;
+  onEditorReady?: (view: EditorView) => void;
   chromeEnd?: ReactNode;
+  /** False for a mounted-but-hidden tab; gates the window-level Cmd+± shortcut. */
+  isActive?: boolean;
 };
 
 export const DocumentView = ({
@@ -37,7 +41,9 @@ export const DocumentView = ({
   onPinBlock,
   editorValue,
   onEditorChange,
+  onEditorReady,
   chromeEnd,
+  isActive = true,
 }: DocumentViewProps) => {
   const { readerFontSize, readerFontFamily } = useFontSettings();
   const readerFontFamilyCss = getReaderFontFamilyCss(readerFontFamily);
@@ -56,15 +62,15 @@ export const DocumentView = ({
         </ReaderChromeControls>
         <ReaderChromeEnd>
           <HStack gap={2} vAlign="center">
-            <FontAdjustmentControl viewMode={viewMode} />
+            <FontAdjustmentControl viewMode={viewMode} isActive={isActive} />
             {chromeEnd}
           </HStack>
         </ReaderChromeEnd>
       </ReaderDocumentChrome>
 
-      <ReaderDocumentBody className="reader-document-body p-0!" key={viewMode}>
+      <ReaderDocumentBody className="reader-document-body" key={viewMode}>
         {viewMode === "preview" ? (
-          <div className="px-4 py-4 sm:px-6 sm:py-6 md:px-8" style={readerStyles}>
+          <div className="px-4 pt-4 pb-12 sm:px-6 sm:pt-6 sm:pb-14 md:px-8" style={readerStyles}>
             <MarkdownView
               content={content}
               documentPath={documentPath}
@@ -73,7 +79,11 @@ export const DocumentView = ({
             />
           </div>
         ) : (
-          <DocumentEditor value={editorValue} onChange={onEditorChange} />
+          <DocumentEditor
+            value={editorValue}
+            onChange={onEditorChange}
+            onEditorReady={onEditorReady}
+          />
         )}
       </ReaderDocumentBody>
     </ReaderSheet>

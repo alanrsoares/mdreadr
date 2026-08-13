@@ -19,9 +19,17 @@ import type { DocumentViewMode } from "./DocumentViewModeSwitch.tsx";
 
 type FontAdjustmentControlProps = {
   viewMode?: DocumentViewMode;
+  /**
+   * Every tab stays mounted, so without this each one would register its own
+   * Cmd+± listener and the shortcut would fire once per open tab.
+   */
+  isActive?: boolean;
 };
 
-export function FontAdjustmentControl({ viewMode = "preview" }: FontAdjustmentControlProps) {
+export function FontAdjustmentControl({
+  viewMode = "preview",
+  isActive = true,
+}: FontAdjustmentControlProps) {
   const {
     readerFontSize,
     readerFontFamily,
@@ -78,6 +86,8 @@ export function FontAdjustmentControl({ viewMode = "preview" }: FontAdjustmentCo
   };
 
   useEffect(() => {
+    if (!isActive) return;
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
 
@@ -101,7 +111,7 @@ export function FontAdjustmentControl({ viewMode = "preview" }: FontAdjustmentCo
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleIncrease, handleDecrease]);
+  }, [isActive, handleIncrease, handleDecrease]);
 
   return (
     <HStack

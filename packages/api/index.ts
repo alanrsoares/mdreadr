@@ -34,6 +34,7 @@ import {
   UpdateSuggestionStatusBodySchema,
 } from "../domain/schemas/index.ts";
 import { isAgentAuthorized, isWebviewAuthorized, revokeAgentToken, sessionTokens } from "./auth.ts";
+import { DEFAULT_API_PORT } from "./default-port.ts";
 import { documentSession } from "./document-session.ts";
 import {
   pickNativePath,
@@ -559,7 +560,7 @@ export { sessionStore } from "./session.ts";
 // Stable so MCP client configs (URL + persisted agent token, see auth.ts)
 // keep working across restarts without the user having to reconfigure them.
 // Falls back to a random port if something else is already bound to it.
-const DEFAULT_PORT = Number(process.env.MDREADR_PORT) || 47813;
+const DEFAULT_PORT = Number(process.env.MDREADR_PORT) || DEFAULT_API_PORT;
 
 async function writeMcpConfigFile(origin: string): Promise<void> {
   try {

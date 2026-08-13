@@ -85,8 +85,8 @@ describe("markdown helpers", () => {
   test("extracts headings for TOC", () => {
     const headings = extractHeadings("# Title\n\n## Section\n");
     expect(headings).toEqual([
-      { id: "title", level: 1, text: "Title" },
-      { id: "section", level: 2, text: "Section" },
+      { id: "title", level: 1, text: "Title", line: 0 },
+      { id: "section", level: 2, text: "Section", line: 2 },
     ]);
   });
 
