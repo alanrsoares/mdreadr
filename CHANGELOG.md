@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.10.3](https://github.com/alanrsoares/mdreadr/compare/v0.10.2...v0.10.3) (2026-08-13)
+
+
+### Bug Fixes
+
+* more responsive doc loading ([a32fcb9](https://github.com/alanrsoares/mdreadr/commit/a32fcb97196b9446bb4395de1b7801a99234b431))
+* tab activation/close optimistic updates ([b137ef6](https://github.com/alanrsoares/mdreadr/commit/b137ef68dbcbac0407716f9b38045bae074067c5))
+* theme build ([8d20312](https://github.com/alanrsoares/mdreadr/commit/8d20312b8f375c32fcbbb64213345b65a7431809))
+
 ## [0.10.2](https://github.com/alanrsoares/mdreadr/compare/v0.10.1...v0.10.2) (2026-08-13)
 
 
