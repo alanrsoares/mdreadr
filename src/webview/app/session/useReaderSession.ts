@@ -3,7 +3,7 @@ import { type UseQueryResult, useMutation, useQuery, useQueryClient } from "@tan
 import { useCallback, useEffect } from "react";
 import { pathFileName } from "../components/path-display.ts";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
-import type { ReaderApi, SessionSnapshot, TabSummary } from "./reader-api.ts";
+import type { ReaderApi, SessionSnapshot, TabSummary, TabsResult } from "./reader-api.ts";
 import {
   loadNotesFlow,
   pickDocumentFlow,
@@ -277,18 +277,64 @@ export function useDocumentTabs(
     void queryClient.invalidateQueries({ queryKey: ["suggestions"] });
   }, [invalidateTabs, invalidateSession, queryClient]);
 
+  // Tab switch/close are pure in-memory work server-side, so the only real cost
+  // is the round trip. Both mutations therefore paint optimistically and then
+  // seed the cache from the response the server already sent back, instead of
+  // invalidating `["tabs"]` and paying a second round trip before the UI moves.
   const activateTabMutation = useMutation({
     mutationFn: (id: string) => readerApi.activateTab(id),
-    onSuccess: invalidateAfterTabChange,
-    onError: (error) => {
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["tabs"] });
+      const previousTabs = queryClient.getQueryData<TabsResult>(["tabs"]);
+      if (previousTabs) {
+        queryClient.setQueryData<TabsResult>(["tabs"], { ...previousTabs, activeId: id });
+      }
+      return { previousTabs };
+    },
+    onSuccess: (snapshot, id) => {
+      // The activate response *is* the newly active tab's snapshot — seeding it
+      // (plus its notes/suggestions, which ride along) means the tab renders
+      // populated on first paint rather than after three more fetches.
+      queryClient.setQueryData<SessionSnapshot>(["session", id], snapshot);
+      queryClient.setQueryData<Note[]>(["notes", id], snapshot.notes);
+      queryClient.setQueryData<Suggestion[]>(["suggestions", id], snapshot.suggestions);
+    },
+    onError: (error, _id, context) => {
+      if (context?.previousTabs) queryClient.setQueryData(["tabs"], context.previousTabs);
+      invalidateTabs();
       showError("Switch tab", error);
     },
   });
 
   const closeTabMutation = useMutation({
     mutationFn: (id: string) => readerApi.closeTab(id),
-    onSuccess: invalidateAfterTabChange,
-    onError: (error) => {
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["tabs"] });
+      const previousTabs = queryClient.getQueryData<TabsResult>(["tabs"]);
+      if (previousTabs) {
+        const tabs = previousTabs.tabs.filter((tab) => tab.id !== id);
+        queryClient.setQueryData<TabsResult>(["tabs"], {
+          tabs,
+          // Mirrors the server's fallback: closing the active tab hands focus to
+          // the first tab still open (SessionStore.closeTab).
+          activeId: previousTabs.activeId === id ? (tabs[0]?.id ?? null) : previousTabs.activeId,
+        });
+      }
+      return { previousTabs };
+    },
+    onSuccess: (result, id) => {
+      queryClient.setQueryData<TabsResult>(["tabs"], result);
+      queryClient.removeQueries({ queryKey: ["session", id] });
+      queryClient.removeQueries({ queryKey: ["notes", id] });
+      queryClient.removeQueries({ queryKey: ["suggestions", id] });
+      // The tab that inherits focus still needs its own data fetched.
+      invalidateSession();
+      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+      void queryClient.invalidateQueries({ queryKey: ["suggestions"] });
+    },
+    onError: (error, _id, context) => {
+      if (context?.previousTabs) queryClient.setQueryData(["tabs"], context.previousTabs);
+      invalidateTabs();
       showError("Close tab", error);
     },
   });
