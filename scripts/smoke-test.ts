@@ -155,3 +155,8 @@ if (!attempt.ready) {
 }
 
 console.log(`[smoke] ok — app started and stayed up (${buildDir})`);
+
+// Exit rather than falling off the end. `xvfb-run` is a shell wrapper, so
+// killing it leaves the app holding the piped stdout, and the drain loops keep
+// the event loop alive forever waiting on a stream that never closes.
+process.exit(0);
