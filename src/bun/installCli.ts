@@ -1,7 +1,7 @@
 import { chmodSync, copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { PATHS, Utils } from "electrobun/bun";
+import { PATHS, Utils } from "electrobun/main";
 import { APP_NAME } from "../../shared/constants.ts";
 
 const CLI_TARGET_PATH = "/usr/local/bin/mdreadr";

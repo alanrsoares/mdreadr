@@ -20,6 +20,9 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
     "paths": {
+      "electrobun": ["./.hutch/devkit/api/sdks/main/index.ts"],
+      "electrobun/main": ["./.hutch/devkit/api/sdks/main/index.ts"],
+      "electrobun/view": ["./.hutch/devkit/api/browser/index.ts"],
       "@mdreadr/domain": ["./packages/domain/index.ts"],
       "@mdreadr/domain/*": ["./packages/domain/*"],
       "@mdreadr/api": ["./packages/api/index.ts"],

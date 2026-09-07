@@ -1,4 +1,4 @@
-import type { ElectrobunConfig } from "electrobun/bun";
+import type { ElectrobunConfig } from "electrobun";
 import pkg from "./package.json";
 import { APP_IDENTIFIER, APP_NAME } from "./shared/constants.ts";
 
@@ -16,15 +16,20 @@ export default {
     ],
   },
   build: {
-    useAsar: true,
+    // Cottontail is v2's default main-process runtime; ours is Bun, because the
+    // API server is Elysia on `Bun.serve` and the document layer is `Bun.file`
+    // and `Bun.spawn`. `electrobun prepare` fetches the matching Bun toolchain
+    // and the built bundle ships it.
+    mainProcess: "bun",
     bun: {
       entrypoint: "src/bun/index.ts",
       external: [],
     },
-    views: {},
+    // No trailing slash on a destination: Electrobun 2 fails the build with
+    // `UnsafeOutputPath` and says nothing about which path it meant.
     copy: {
       "dist/index.html": "views/mainview/index.html",
-      "dist/assets/": "views/mainview/assets/",
+      "dist/assets": "views/mainview/assets",
     },
     watchIgnore: ["dist/**"],
     mac: {
