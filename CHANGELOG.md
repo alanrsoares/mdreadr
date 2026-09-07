@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/alanrsoares/mdreadr/compare/v0.13.0...v0.13.1) (2026-09-07)
+
+
+### Bug Fixes
+
+* **release:** match electrobun 2 artifact names ([e04b24b](https://github.com/alanrsoares/mdreadr/commit/e04b24b06ffcb036d23d5b3f493c654c22620b65))
+
 ## [0.13.0](https://github.com/alanrsoares/mdreadr/compare/v0.12.2...v0.13.0) (2026-09-07)
 
 
