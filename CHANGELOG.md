@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.12.0](https://github.com/alanrsoares/mdreadr/compare/v0.11.0...v0.12.0) (2026-09-07)
+
+
+### Features
+
+* **anchors:** anchor list and table blocks ([9a8f727](https://github.com/alanrsoares/mdreadr/commit/9a8f7279aa187e0623b23e7b1f75bdf0334f1b42))
+* **reader:** seamless preview/edit toggle ([f122a48](https://github.com/alanrsoares/mdreadr/commit/f122a48b54012d7de03a6b1c0fe4b2d2deb6a12a))
+* **reader:** tune measure, gutter, block cursor ([620217e](https://github.com/alanrsoares/mdreadr/commit/620217e5de20fc04e21cab1dd0bc2b28e09fbd5e))
+* **reader:** tune the measure and make preview/edit seamless ([c0273bc](https://github.com/alanrsoares/mdreadr/commit/c0273bcd509821611b41afaf70962026dc8756e3))
+
+
+### Bug Fixes
+
+* **reader:** stand block cursor down while editing ([416210c](https://github.com/alanrsoares/mdreadr/commit/416210cb365986a976fe5e25d9fe9ad328ed00c8))
+
 ## [0.11.0](https://github.com/alanrsoares/mdreadr/compare/v0.10.3...v0.11.0) (2026-09-07)
 
 
