@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.1](https://github.com/alanrsoares/mdreadr/compare/v0.12.0...v0.12.1) (2026-09-07)
+
+
+### Bug Fixes
+
+* **ci:** smoke test the real Linux app bundle ([3e7960b](https://github.com/alanrsoares/mdreadr/commit/3e7960bf30d98af177f65b13c4beb05933944551))
+* **ci:** smoke test the real Linux app bundle ([1fcc4df](https://github.com/alanrsoares/mdreadr/commit/1fcc4dfd8fe0f5a93109b10b745c4bcb929a9190))
+
 ## [0.12.0](https://github.com/alanrsoares/mdreadr/compare/v0.11.0...v0.12.0) (2026-09-07)
 
 
