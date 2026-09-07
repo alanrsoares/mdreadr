@@ -7,7 +7,8 @@
  * for the main process to print its ready line, which only happens after the
  * API server is listening and the window has been created.
  */
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const CHANNEL = "stable";
@@ -42,16 +43,38 @@ function findExecutable(buildDir: string): string {
     return launcher;
   }
 
-  const launcher = join(buildDir, "bin", "launcher");
-  if (existsSync(launcher)) return launcher;
+  return unpackLinuxBundle();
+}
 
-  // Some Linux layouts nest the bundle one level deeper.
-  const nested = readdirSync(buildDir, { withFileTypes: true })
+// On Linux the bundle left in build/ is not runnable: electrobun builds the app
+// bundle, tars it, then recreates the same folder as the self-extractor wrapper,
+// overwriting bin/launcher with the extractor stub. That stub only works with
+// the app archive appended to it — the form shipped in <app>-Setup.tar.gz — so
+// running it straight from build/ dies with "Not a valid self-extracting
+// installer". The untouched bundle is the tar.zst artifact, so unpack that.
+function unpackLinuxBundle(): string {
+  if (!existsSync("artifacts")) fail("no artifacts/ directory — run `bun run build` first");
+
+  const tarball = readdirSync("artifacts")
+    .filter((n) => n.startsWith(`${CHANNEL}-linux-`) && n.endsWith(".tar.zst"))
+    .sort()
+    .at(0);
+
+  if (!tarball) fail(`no ${CHANNEL}-linux-*.tar.zst under artifacts/`);
+
+  const workDir = mkdtempSync(join(tmpdir(), "mdreadr-smoke-"));
+  const tarPath = join(workDir, "bundle.tar");
+  writeFileSync(tarPath, Bun.zstdDecompressSync(readFileSync(join("artifacts", tarball))));
+
+  const untar = Bun.spawnSync(["tar", "-xf", tarPath, "-C", workDir], { stderr: "inherit" });
+  if (!untar.success) fail(`failed to untar ${tarball} (exit ${untar.exitCode})`);
+
+  const launcher = readdirSync(workDir, { withFileTypes: true })
     .filter((e) => e.isDirectory())
-    .map((e) => join(buildDir, e.name, "bin", "launcher"))
+    .map((e) => join(workDir, e.name, "bin", "launcher"))
     .find(existsSync);
 
-  return nested ?? fail(`no launcher under ${buildDir}`);
+  return launcher ?? fail(`no bin/launcher inside ${tarball}`);
 }
 
 type Attempt = { ready: boolean; output: string; exitCode: number | null };
