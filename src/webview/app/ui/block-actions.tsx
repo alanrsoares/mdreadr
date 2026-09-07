@@ -55,20 +55,3 @@ export function PinButton({ onPin, anchor }: PinButtonProps) {
     </Tooltip>
   );
 }
-
-type BlockActionsProps = {
-  anchor: BlockAnchor;
-  onPin?: (anchor: BlockAnchor) => void;
-  onEdit?: (anchor: BlockAnchor) => void;
-};
-
-export function BlockActions({ anchor, onPin, onEdit }: BlockActionsProps) {
-  if (!onPin && !onEdit) return null;
-
-  return (
-    <div className="reader-block-actions" role="toolbar" aria-label="Block actions">
-      {onEdit ? <EditBlockButton anchor={anchor} onEdit={onEdit} /> : null}
-      {onPin ? <PinButton anchor={anchor} onPin={onPin} /> : null}
-    </div>
-  );
-}
