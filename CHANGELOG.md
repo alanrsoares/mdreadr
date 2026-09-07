@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.13.0](https://github.com/alanrsoares/mdreadr/compare/v0.12.2...v0.13.0) (2026-09-07)
+
+
+### Features
+
+* **api:** open a document's web links in the OS browser ([cf24d6a](https://github.com/alanrsoares/mdreadr/commit/cf24d6ab159917576a62da9564bb49b18fd9dec6))
+* **reader:** add pure inline markdown edit ops ([2982d18](https://github.com/alanrsoares/mdreadr/commit/2982d185fa0f6c4985da568c73ee78c8f69b77c6))
+* **reader:** follow a document's links inside the app ([490dd39](https://github.com/alanrsoares/mdreadr/commit/490dd3988c440eef8883a77f35a58d43b1096d3f))
+* **reader:** hold the block still during inline edit ([ba4ecb2](https://github.com/alanrsoares/mdreadr/commit/ba4ecb28f426ed78065be9db19b65eeb66dc48c2))
+* **reader:** inline-edit sweep and in-app document links ([93a7a43](https://github.com/alanrsoares/mdreadr/commit/93a7a43295910c50589a1c7746cad71294f01526))
+
 ## [0.12.2](https://github.com/alanrsoares/mdreadr/compare/v0.12.1...v0.12.2) (2026-09-07)
 
 
