@@ -4,16 +4,37 @@
  * `bun run check` and the Vite bundle step both pass happily on a build that
  * cannot start — a broken native bundle, a missing copied asset, an entrypoint
  * that throws on import. This runs the real artifact from `build/` and waits
- * for the main process to print its ready line, which only happens after the
- * API server is listening and the window has been created.
+ * until the app is actually serving on its API port, which only happens after
+ * the main process has booted.
  */
 import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DEFAULT_API_PORT } from "../packages/api/default-port.ts";
 
 const CHANNEL = "stable";
 const READY_LINE = "mdreadr API listening";
+const API_URL = `http://127.0.0.1:${DEFAULT_API_PORT}/`;
 const TIMEOUT_MS = 90_000;
+const HANDOFF_GRACE_MS = 15_000;
+
+/**
+ * The ready line alone is not a usable signal on macOS. On a cold machine the
+ * self-extractor installs the bundle, starts the app *without* forwarding its
+ * stdout, and then stays alive itself — so the launcher we spawned never exits
+ * and never prints anything, while a perfectly healthy app listens behind it.
+ * Asking the server whether it is serving works on every platform and on both
+ * the cold and warm paths, and proves more than a log line does.
+ */
+async function isApiUp(): Promise<boolean> {
+  try {
+    // Any status answers the question: a 404 still means the server replied.
+    await fetch(API_URL, { signal: AbortSignal.timeout(2000) });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function fail(message: string): never {
   console.error(`[smoke] ${message}`);
@@ -114,26 +135,38 @@ async function launch(executable: string): Promise<Attempt> {
   let ready = false;
 
   while (Date.now() - startedAt < TIMEOUT_MS) {
-    if (chunks.join("").includes(READY_LINE)) {
+    if (chunks.join("").includes(READY_LINE) || (await isApiUp())) {
       ready = true;
       break;
     }
-    if (child.exitCode !== null) break;
+    // The launcher exiting does not mean the app is gone — on macOS it hands
+    // off and quits — so keep polling for a grace period before giving up.
+    if (child.exitCode !== null && Date.now() - startedAt > HANDOFF_GRACE_MS) break;
     await Bun.sleep(500);
   }
 
-  // A process that reaches "ready" and then immediately dies is still a
-  // failure, so confirm it is holding steady rather than trusting the log line.
+  // Reaching "ready" and then dying is still a failure, so confirm it is
+  // holding steady. The app serving is the invariant, not the process we
+  // happen to be holding a handle to.
   if (ready) {
     await Bun.sleep(3000);
-    if (child.exitCode !== null) {
+    if (!(await isApiUp())) {
       ready = false;
-      console.error(`[smoke] app started then exited with code ${child.exitCode}`);
+      console.error(`[smoke] app came up then stopped serving (exit code ${child.exitCode})`);
     }
   }
 
   child.kill();
   return { ready, output: chunks.join(""), exitCode: child.exitCode };
+}
+
+// Readiness is now "the port answers", so anything already on it would make
+// this pass without launching a thing. A stale instance from an earlier run or
+// a locally installed copy is the likely culprit, and it is worth naming.
+if (await isApiUp()) {
+  fail(
+    `something is already serving on port ${DEFAULT_API_PORT} — stop it first (\`pkill -f mdreadr\`), otherwise this test proves nothing`,
+  );
 }
 
 const buildDir = findBuildDir();
@@ -151,12 +184,22 @@ if (!attempt.ready && attempt.exitCode === 0) {
   attempt = await launch(executable);
 }
 
-if (!attempt.ready) {
-  console.error(`[smoke] ---- captured output ----\n${attempt.output}`);
-  fail(`app never reported "${READY_LINE}" (last exit code: ${attempt.exitCode})`);
+// Killing the launcher does not reap an app it handed off to, which would leave
+// the port held for whatever runs next in the same job.
+function killPortHolder(): void {
+  const found = Bun.spawnSync(["lsof", "-ti", `tcp:${DEFAULT_API_PORT}`]);
+  const pids = found.stdout.toString().trim().split("\n").filter(Boolean);
+  if (pids.length > 0) Bun.spawnSync(["kill", ...pids]);
 }
 
-console.log(`[smoke] ok — app started and stayed up (${buildDir})`);
+if (!attempt.ready) {
+  killPortHolder();
+  console.error(`[smoke] ---- captured output ----\n${attempt.output}`);
+  fail(`app never came up on port ${DEFAULT_API_PORT} (last exit code: ${attempt.exitCode})`);
+}
+
+killPortHolder();
+console.log(`[smoke] ok — app started and served on ${DEFAULT_API_PORT} (${buildDir})`);
 
 // Exit rather than falling off the end. `xvfb-run` is a shell wrapper, so
 // killing it leaves the app holding the piped stdout, and the drain loops keep
