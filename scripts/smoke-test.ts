@@ -186,9 +186,20 @@ if (!attempt.ready && attempt.exitCode === 0) {
 
 // Killing the launcher does not reap an app it handed off to, which would leave
 // the port held for whatever runs next in the same job.
+//
+// `-sTCP:LISTEN` is not optional: a bare `-iTCP:<port>` also matches the client
+// end of a connection, so the readiness polls above put this process in the
+// results and the test terminates itself. Skipping our own pid too, belt and
+// braces.
 function killPortHolder(): void {
-  const found = Bun.spawnSync(["lsof", "-ti", `tcp:${DEFAULT_API_PORT}`]);
-  const pids = found.stdout.toString().trim().split("\n").filter(Boolean);
+  const found = Bun.spawnSync(["lsof", "-nP", "-t", `-iTCP:${DEFAULT_API_PORT}`, "-sTCP:LISTEN"]);
+
+  const pids = found.stdout
+    .toString()
+    .trim()
+    .split("\n")
+    .filter((pid) => pid !== "" && pid !== String(process.pid));
+
   if (pids.length > 0) Bun.spawnSync(["kill", ...pids]);
 }
 
@@ -198,8 +209,10 @@ if (!attempt.ready) {
   fail(`app never came up on port ${DEFAULT_API_PORT} (last exit code: ${attempt.exitCode})`);
 }
 
-killPortHolder();
+// Report before tearing down, so the result is on the log even if the teardown
+// misbehaves.
 console.log(`[smoke] ok — app started and served on ${DEFAULT_API_PORT} (${buildDir})`);
+killPortHolder();
 
 // Exit rather than falling off the end. `xvfb-run` is a shell wrapper, so
 // killing it leaves the app holding the piped stdout, and the drain loops keep
