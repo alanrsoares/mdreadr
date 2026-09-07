@@ -40,7 +40,7 @@ function textFromChildren(children: ReactNode): string {
   return "";
 }
 
-const blockClasses = (notedBlockIds: ReadonlySet<string>, blockId: string): string =>
+export const blockClasses = (notedBlockIds: ReadonlySet<string>, blockId: string): string =>
   notedBlockIds.has(blockId) ? "reader-block-has-note" : "";
 
 type PinParagraphProps = {

@@ -1,6 +1,6 @@
 import { Button } from "@astryxdesign/core/Button";
 import type { ResizableRegion } from "@astryxdesign/core/Resizable";
-import { EditorView } from "@codemirror/view";
+import type { EditorView } from "@codemirror/view";
 import type { BlockAnchor, Suggestion, TocEntry } from "@mdreadr/domain";
 import { applyBlockEdit, applySuggestion, extractHeadings } from "@mdreadr/domain";
 import { useContainer, useStoreValues } from "@re-reduced/react";
@@ -10,11 +10,14 @@ import { NotesPanel } from "../components/NotesPanel.tsx";
 import { SuggestionsPanel } from "../components/SuggestionsPanel.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
 import { registerEditorView } from "../editorCommands.ts";
+import { useEditorOutlineSpy } from "../hooks/useEditorOutlineSpy.ts";
 import { useFileDrop } from "../hooks/useFileDrop.ts";
 import { useLiveDocumentUpdates } from "../hooks/useLiveDocumentUpdates.ts";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
+import { useViewModeHandoff } from "../hooks/useViewModeHandoff.ts";
 import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
 import { isDirty } from "../session/document-draft.ts";
+import { scrollEditorToSettled } from "../session/editor-scroll.ts";
 import type { ReaderApi } from "../session/reader-api.ts";
 import { useReaderSession } from "../session/useReaderSession.ts";
 import { ReaderTabShell } from "./ReaderTabShell.tsx";
@@ -147,20 +150,32 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
   // The outline stays live in edit mode by reading the draft instead of the
   // saved content, so the column never degrades into an apology.
   const isEditing = documentViewMode === "edit";
+
+  // Keeps the reading position across a Preview <-> Edit toggle.
+  const changeViewMode = useViewModeHandoff({
+    viewMode: documentViewMode,
+    content: editorValue,
+    rootRef: readerMainRef,
+    editorViewRef,
+    onChange: store.actions.documentViewModeChanged,
+  });
   const toc = useMemo(
     () => extractHeadings(isEditing ? editorValue : content),
     [isEditing, editorValue, content],
   );
 
+  // The DOM scroll spy inside TocSidebar has no heading elements to watch in
+  // edit mode, so the active section is tracked against the editor instead.
+  const editorActiveHeadingId = useEditorOutlineSpy(editorViewRef, readerMainRef, toc, isEditing);
+
   const onSelectHeadingInEditor = useCallback((entry: TocEntry) => {
     const view = editorViewRef.current;
-    if (!view) return;
+    const root = readerMainRef.current;
+    if (!view || !root) return;
     const lineNumber = Math.min(entry.line + 1, view.state.doc.lines);
     const line = view.state.doc.line(lineNumber);
-    view.dispatch({
-      selection: { anchor: line.from },
-      effects: EditorView.scrollIntoView(line.from, { y: "start" }),
-    });
+    view.dispatch({ selection: { anchor: line.from } });
+    scrollEditorToSettled(view, root, line.from);
     view.focus();
   }, []);
 
@@ -173,6 +188,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
       };
 
       if (documentViewMode !== "preview") {
+        // Raw action, not the handoff: this jump supplies its own destination.
         store.actions.documentViewModeChanged("preview");
         window.requestAnimationFrame(() => {
           window.requestAnimationFrame(jump);
@@ -234,6 +250,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
           scrollRootRef={readerMainRef}
           documentKey={documentPath}
           onSelect={isEditing ? onSelectHeadingInEditor : undefined}
+          activeId={editorActiveHeadingId}
         />
       }
       notes={
@@ -275,7 +292,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
         notes={notes}
         isActive={isActive}
         viewMode={documentViewMode}
-        onViewModeChange={store.actions.documentViewModeChanged}
+        onViewModeChange={changeViewMode}
         onPinBlock={(anchor) => {
           store.actions.pendingAnchorChanged(anchor);
           flashAnchor(anchor.blockId, "reader-block-pin-flash");

@@ -36,8 +36,17 @@ body,
   --reader-block-gap: 0.75rem;
   --reader-heading-major-gap: 0.75rem;
   --reader-heading-minor-gap: 0.25rem;
+  /* Distance from the text column to a gutter control. Both controls read it,
+     so they stay mirrored; the sheet padding is what has to make room. */
+  --reader-gutter: 1.75rem;
   font-size: var(--text-body-size, 1.0625rem);
   line-height: var(--text-body-leading);
+}
+
+@media (min-width: 640px) {
+  .reader-prose {
+    --reader-gutter: 2rem;
+  }
 }
 
 .reader-prose .reader-flow {
@@ -334,16 +343,13 @@ body,
   }
 
   .reader-pin-button,
-  .reader-edit-button,
-  .reader-block-actions,
-  .reader-block-action-btn {
+  .reader-edit-button {
     transform: none;
     transition: opacity var(--duration-fast) var(--ease-standard);
   }
 
   .reader-pin-button:active,
-  .reader-edit-button:active,
-  .reader-block-action-btn:active {
+  .reader-edit-button:active {
     transform: none;
   }
 
@@ -366,7 +372,7 @@ body,
 
   .reader-block-highlight {
     animation: none;
-    background: color-mix(in srgb, var(--color-background-blue) 35%, transparent);
+    background: color-mix(in srgb, var(--color-accent) 18%, transparent);
   }
 
   .reader-block-updated {
@@ -375,10 +381,13 @@ body,
   }
 }
 
+/* Right gutter, mirroring the edit control on the left: the block is as wide as
+   the sheet, so the control hangs off the end of the text column, and only
+   falls back to the sheet padding once the window is what caps the column. */
 .reader-pin-button {
   position: absolute;
   top: 0.125rem;
-  right: 0;
+  left: calc(min(var(--reader-measure, 100%), 100%) + var(--reader-gutter) - 1.5rem);
   z-index: 1;
   display: inline-flex;
   align-items: center;
@@ -407,6 +416,12 @@ body,
   transform: scale(1);
 }
 
+.reader-pin-button:focus-visible,
+.reader-edit-button:focus-visible {
+  outline: 2px solid var(--color-text-accent);
+  outline-offset: 2px;
+}
+
 .reader-pin-button:hover {
   border-color: var(--color-text-accent);
   color: var(--color-text-accent);
@@ -420,7 +435,7 @@ body,
 .reader-edit-button {
   position: absolute;
   top: 0.125rem;
-  left: -1.75rem;
+  left: calc(-1 * var(--reader-gutter));
   z-index: 1;
   display: inline-flex;
   align-items: center;
@@ -442,12 +457,6 @@ body,
     background-color var(--duration-fast) var(--ease-standard);
 }
 
-@media (min-width: 640px) {
-  .reader-edit-button {
-    left: -2rem;
-  }
-}
-
 .group\/pin:hover .reader-edit-button,
 .group\/pin:focus-within .reader-edit-button,
 .reader-edit-button:focus-visible {
@@ -462,56 +471,6 @@ body,
 }
 
 .reader-edit-button:active {
-  transform: scale(0.94);
-}
-
-.reader-block-actions {
-  position: absolute;
-  top: 0.125rem;
-  right: 0;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  opacity: 0;
-  transform: scale(0.92);
-  transition:
-    opacity var(--duration-fast) var(--ease-standard),
-    transform var(--duration-fast) var(--ease-standard);
-}
-
-.group\/pin:hover .reader-block-actions,
-.group\/pin:focus-within .reader-block-actions,
-.reader-block-actions:focus-within {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.reader-block-action-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-inner);
-  background: var(--reader-paper-bg);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  line-height: 0;
-  padding: 0.25rem;
-  transition:
-    border-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard),
-    background-color var(--duration-fast) var(--ease-standard),
-    transform var(--duration-fast) var(--ease-standard);
-}
-
-.reader-block-action-btn:hover {
-  border-color: var(--color-text-accent);
-  color: var(--color-text-accent);
-  background: color-mix(in srgb, var(--color-accent) 12%, var(--reader-paper-bg));
-}
-
-.reader-block-action-btn:active {
   transform: scale(0.94);
 }
 
@@ -545,19 +504,44 @@ body,
   animation: reader-block-edit-flash 1.2s var(--ease-standard) both;
 }
 
+/* Negative inline margin cancels the padding, so the wash bleeds past the
+   measure without shifting the text baseline — adding or removing a Note must
+   not reflow the prose around it. The rule is an inset shadow for the same
+   reason: it takes no box space. */
 .reader-block-has-note {
-  border-inline-start: 2px solid var(--color-text-blue);
-  padding-inline-start: 0.75rem;
+  margin-inline: -0.75rem;
+  padding-inline: 0.75rem;
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+  box-shadow: inset 2px 0 0 var(--color-accent);
   transition:
-    border-color var(--duration-fast) var(--ease-standard),
-    padding-inline-start var(--duration-fast) var(--ease-standard);
+    background-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+/* The j/k cursor. Outline rather than a background, so it reads as a cursor
+   and not as a Note; offset keeps it off the glyphs. Blocks only take focus
+   from that navigation, so the ring is never a surprise. */
+.reader-prose [data-block-id]:focus-visible {
+  outline: 2px solid var(--color-text-accent);
+  outline-offset: 0.25rem;
+  border-radius: var(--radius-inner);
+}
+
+/* CodeMirror's bundled dark theme paints its own slate background. The reader is
+   one sheet of paper in both modes, so the editor has to be transparent and let
+   `--reader-paper-bg` through. The class is repeated to outrank the bundled
+   theme's own two-class rule without reaching for `!important`. */
+.reader-editor .cm-editor.cm-editor,
+.reader-editor .cm-editor.cm-editor .cm-scroller,
+.reader-editor .cm-editor.cm-editor .cm-gutters {
+  background: transparent;
 }
 
 .reader-block-highlight {
   animation: reader-block-flash 1.8s var(--ease-standard);
 }
 
-/* Distinct from the blue jump/pin flash: this one says "this block just changed
+/* Distinct from the accent jump/pin flash: this one says "this block just changed
    on disk", so it reads as an arrival rather than a selection. */
 .reader-block-updated {
   animation: reader-block-updated-flash 1.8s var(--ease-standard);
@@ -579,7 +563,7 @@ body,
 @keyframes reader-block-flash {
   0%,
   15% {
-    background: color-mix(in srgb, var(--color-background-blue) 35%, transparent);
+    background: color-mix(in srgb, var(--color-accent) 18%, transparent);
   }
 
   100% {

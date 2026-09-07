@@ -60,6 +60,12 @@ export function blockIdForCode(
   return `code-${hashBlockContent(key)}-${occurrence}`;
 }
 
+export const blockIdForList = (text: string, occurrence: number): string =>
+  `list-${hashBlockContent(text)}-${occurrence}`;
+
+export const blockIdForTable = (text: string, occurrence: number): string =>
+  `table-${hashBlockContent(text)}-${occurrence}`;
+
 export function truncateAnchorLabel(text: string, maxLength = 72): string {
   const singleLine = text.replace(/\s+/g, " ").trim();
   return singleLine.length <= maxLength ? singleLine : `${singleLine.slice(0, maxLength - 1)}…`;

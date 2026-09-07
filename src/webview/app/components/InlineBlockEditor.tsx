@@ -265,7 +265,7 @@ export function InlineBlockEditor({
       };
     }
 
-    if (anchor.kind === "code") {
+    if (anchor.kind === "code" || anchor.kind === "table") {
       return {
         fontFamily: "var(--font-family-code, monospace)",
         fontSize: "var(--text-code-size, 0.9em)",

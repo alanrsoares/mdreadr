@@ -3,12 +3,16 @@ import {
   type BlockAnchor,
   blockIdForCode,
   blockIdForHeading,
+  blockIdForList,
   blockIdForParagraph,
+  blockIdForTable,
   collectPinnableBlocks,
   extractHeadings,
   hashBlockContent,
   headingPathForLevel,
+  listToText,
   type TocEntry,
+  tableToText,
   truncateAnchorLabel,
 } from "@mdreadr/domain";
 import { isSpecialFence } from "./pipeline.tsx";
@@ -22,6 +26,8 @@ export type AnchorPlan = {
   nextHeading(level: number, text: string): { anchor: BlockAnchor; domId: string };
   nextParagraph(text: string): BlockAnchor;
   nextCode(code: string, language?: string): BlockAnchor;
+  nextList(text: string): BlockAnchor;
+  nextTable(text: string): BlockAnchor;
 };
 
 const isPinnableCodeBlock = (language: string | undefined): boolean => !isSpecialFence(language);
@@ -30,6 +36,8 @@ type BlockIds = {
   headings: TocEntry[];
   paragraphIds: string[];
   codeIds: string[];
+  listIds: string[];
+  tableIds: string[];
 };
 
 /** The ids `createAnchorPlan` will hand out, in render order, without the cursor state. */
@@ -41,8 +49,12 @@ function computeBlockIds(prepared: string): BlockIds {
 
   const paragraphCounts = new Map<string, number>();
   const codeCounts = new Map<string, number>();
+  const listCounts = new Map<string, number>();
+  const tableCounts = new Map<string, number>();
   const paragraphIds: string[] = [];
   const codeIds: string[] = [];
+  const listIds: string[] = [];
+  const tableIds: string[] = [];
 
   for (const block of pinnable) {
     if (block.kind === "paragraph") {
@@ -53,13 +65,31 @@ function computeBlockIds(prepared: string): BlockIds {
       continue;
     }
 
-    const key = hashBlockContent(`${block.language ?? ""}\n${block.text}`);
-    const occurrence = codeCounts.get(key) ?? 0;
-    codeCounts.set(key, occurrence + 1);
-    codeIds.push(blockIdForCode(block.text, block.language, occurrence));
+    if (block.kind === "code") {
+      const key = hashBlockContent(`${block.language ?? ""}\n${block.text}`);
+      const occurrence = codeCounts.get(key) ?? 0;
+      codeCounts.set(key, occurrence + 1);
+      codeIds.push(blockIdForCode(block.text, block.language, occurrence));
+      continue;
+    }
+
+    if (block.kind === "list") {
+      const hash = hashBlockContent(block.text);
+      const occurrence = listCounts.get(hash) ?? 0;
+      listCounts.set(hash, occurrence + 1);
+      listIds.push(blockIdForList(block.text, occurrence));
+      continue;
+    }
+
+    if (block.kind === "table") {
+      const hash = hashBlockContent(block.text);
+      const occurrence = tableCounts.get(hash) ?? 0;
+      tableCounts.set(hash, occurrence + 1);
+      tableIds.push(blockIdForTable(block.text, occurrence));
+    }
   }
 
-  return { headings, paragraphIds, codeIds };
+  return { headings, paragraphIds, codeIds, listIds, tableIds };
 }
 
 /**
@@ -69,16 +99,24 @@ function computeBlockIds(prepared: string): BlockIds {
  * file is rewritten under the reader.
  */
 export function collectBlockIds(prepared: string): Set<string> {
-  const { headings, paragraphIds, codeIds } = computeBlockIds(prepared);
-  return new Set([...headings.map(blockIdForHeading), ...paragraphIds, ...codeIds]);
+  const { headings, paragraphIds, codeIds, listIds, tableIds } = computeBlockIds(prepared);
+  return new Set([
+    ...headings.map(blockIdForHeading),
+    ...paragraphIds,
+    ...codeIds,
+    ...listIds,
+    ...tableIds,
+  ]);
 }
 
 /** Build the Anchor plan for a Document's *prepared* markdown (post-preprocess). */
 export function createAnchorPlan(prepared: string): AnchorPlan {
-  const { headings, paragraphIds, codeIds } = computeBlockIds(prepared);
+  const { headings, paragraphIds, codeIds, listIds, tableIds } = computeBlockIds(prepared);
 
   let paragraphIndex = 0;
   let codeIndex = 0;
+  let listIndex = 0;
+  let tableIndex = 0;
   let headingIndex = 0;
   let headingStack: { level: number; text: string }[] = [];
 
@@ -87,6 +125,8 @@ export function createAnchorPlan(prepared: string): AnchorPlan {
     begin() {
       paragraphIndex = 0;
       codeIndex = 0;
+      listIndex = 0;
+      tableIndex = 0;
       headingIndex = 0;
       headingStack = [];
     },
@@ -120,7 +160,98 @@ export function createAnchorPlan(prepared: string): AnchorPlan {
         label: truncateAnchorLabel(code.split("\n")[0] ?? code),
       };
     },
+    nextList(text) {
+      const id = listIds[listIndex];
+      listIndex += 1;
+      return {
+        kind: "list",
+        blockId: id ?? blockIdForList(text, 0),
+        label: truncateAnchorLabel(text),
+      };
+    },
+    nextTable(text) {
+      const id = tableIds[tableIndex];
+      tableIndex += 1;
+      return {
+        kind: "table",
+        blockId: id ?? blockIdForTable(text, 0),
+        label: truncateAnchorLabel(text),
+      };
+    },
   };
+}
+
+export type ReaderSegment =
+  | { kind: "markdown"; text: string; key: string }
+  | {
+      kind: "list";
+      text: string;
+      rawText: string;
+      key: string;
+    }
+  | {
+      kind: "table";
+      text: string;
+      rawText: string;
+      key: string;
+    };
+
+export function partitionReaderSegments(prepared: string): ReaderSegment[] {
+  const blocks = parseMarkdown(prepared, { sourceRanges: true, autolink: "gfm" });
+  const segments: ReaderSegment[] = [];
+  let cursor = 0;
+  let index = 0;
+
+  for (const block of blocks) {
+    if (block.type === "list" || block.type === "table") {
+      if (block.range && block.range.start > cursor) {
+        const slice = prepared.slice(cursor, block.range.start);
+        if (slice.trim()) {
+          segments.push({
+            kind: "markdown",
+            text: slice.trim(),
+            key: `md-${index++}`,
+          });
+        }
+      }
+      if (block.range) {
+        const raw = prepared.slice(block.range.start, block.range.end);
+        if (block.type === "list") {
+          segments.push({
+            kind: "list",
+            text: raw,
+            rawText: listToText(block),
+            key: `list-${index++}`,
+          });
+        } else {
+          segments.push({
+            kind: "table",
+            text: raw,
+            rawText: tableToText(block),
+            key: `table-${index++}`,
+          });
+        }
+        cursor = block.range.end;
+      }
+    }
+  }
+
+  if (cursor < prepared.length) {
+    const remaining = prepared.slice(cursor);
+    if (remaining.trim()) {
+      segments.push({
+        kind: "markdown",
+        text: remaining.trim(),
+        key: `md-${index++}`,
+      });
+    }
+  }
+
+  if (segments.length === 0) {
+    segments.push({ kind: "markdown", text: prepared, key: "md-0" });
+  }
+
+  return segments;
 }
 
 export function flashAnchor(blockId: string, className = "reader-block-highlight"): boolean {

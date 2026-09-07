@@ -10,15 +10,16 @@ copy of the values.
 
 ## 1. Physical Scene & Palette Strategy
 - **Physical Scene**: Technical reviewer reading architectural documents under ambient room lighting, prioritizing clarity over visual stimulation.
-- **Palette Strategy**: Restrained neutrals, no pure `#000` / `#fff`.
+- **Palette Strategy**: Restrained neutrals, no pure `#000` / `#fff`. Astryx neutral ships pure white dark-mode body text, so `mdreadrTheme.ts` overrides `--color-text-primary` to `light-dark(#111111, #f2ede6)` - 17.8:1 light, 14.9:1 dark against the paper.
   - Light mode: subtle warm/paper tone neutrals.
   - Dark mode: deep slate/charcoal tones.
 - **Single accent: cobalt.** `--color-accent: light-dark(#1c7ea8, #5ebae7)`, text-on-surface variant `--color-text-accent`. Used strictly for active Anchors, focal states, and unread Note indicators, at <= 10% surface coverage. There is no second accent; the green `--color-background-green` wash is reserved for the "changed on disk" signal and is a state colour, not an accent.
 
 ## 2. Typography & Rhythm Invariants
-- **Measure (line length)**: enforced by `MEASURE_EMS = 40` in `src/webview/app/components/MarkdownView.tsx`, passed to the Markdown container as `contentWidth = readerFontSize * MEASURE_EMS`. Em-based on purpose: the measure then holds constant in characters across every font size step. Do not add a second `ch`- or `px`-based cap on the prose column; two caps fight and line length swings across the size range (see the comment in `src/webview/app/ui/reader.tsx`).
-  - Target: 65-75 characters per line. **Unverified against the shipped prose fonts** at time of writing; 40em is the current best estimate. Measure it (see `docs/UX_DESIGN_SPEC.md` §4) and tune `MEASURE_EMS` to the measurement.
-  - The outer sheet padding (`DocumentView.tsx`) is chrome width, not measure. It does not set line length.
+- **Measure (line length)**: owned by `getReaderMeasurePx` in `src/webview/app/theme/measure.ts`, published as `--reader-measure` on the reader sheet and capped per prose block. Em-based on purpose: the measure then holds constant in characters across every font size step. That var is the only cap on the column; do not add a second `ch`- or `px`-based one (see the comment in `src/webview/app/ui/reader.tsx`).
+  - Target: 65-75 characters per line. **Verified** in headless Chrome at 12 / 17 / 22 / 28 / 34px with 1.7 leading: 66-72 characters per line for every family. The per-family ems are serif 33, sans 33, mono 44 - mono needs the wider column because its average glyph is ~0.62em against ~0.47em for the other two.
+  - Astryx's `Markdown contentWidth` prop alone does not enforce it: the prop is dropped for any block rendered by a custom component, which is most of the reader. It is still passed, for the blocks Astryx renders itself, from the same number.
+  - The outer sheet padding (`DocumentView.tsx`) is chrome width, not measure, but the sheet grows to fit the measure so that past ~24px reader text the sheet cap is not what sets line length. When the window itself is narrower than the measure, lines shorten - that is the one case where the measure cannot hold.
 - **Prose font pairing**:
   - Headings: clean structured sans-serif, >= 1.25 hierarchy scale step.
   - Body: proportional reading serif or optical variable sans, user-selectable via `--reader-prose-family`.
@@ -32,11 +33,15 @@ copy of the values.
 ## 3. Anchor & Interaction Laws
 - **Gutter affordances**:
   - Block controls live in the margin gutter, outside the prose column. Never over prose text.
-  - Both controls belong to the same gutter system: today the edit control sits at `left: -2rem` and the anchor control at `right: 0` (inside the column). That asymmetry is a known violation, tracked as polish work.
+  - Both controls are driven by one token, `--reader-gutter` (`1.75rem`, `2rem` from the `sm` breakpoint up): the edit control at `calc(-1 * var(--reader-gutter))`, the anchor control just past the end of the text column. Sheet padding is what reserves the room, so its narrow-width value cannot drop below the gutter.
   - Reveal on block hover or `:focus-within` via `opacity` + `transform`, honouring `prefers-reduced-motion`.
 - **Note indication**:
-  - Blocks carrying Notes get a tinted background wash or inset marker. **No layout shift**: never animate or add `padding` / `border` that reflows prose. The current `border-inline-start` + `padding-inline-start` transition on `.reader-block-has-note` violates both this law and §4, tracked as polish work.
+  - Blocks carrying Notes get a tinted background wash plus an inset marker. **No layout shift**: never animate or add `padding` / `border` that reflows prose. `.reader-block-has-note` uses an accent wash, an `inset` box shadow for the rule, and a negative inline margin that cancels its own padding, so toggling a Note moves nothing.
   - Activating an Anchor smooth-scrolls the target block to viewport centre and plays a brief attention flash, no jump.
+- **Block cursor**: `j` / `k` move the cursor block to block, `J` / `K` to the next or previous heading (`src/webview/app/hooks/useReaderBlockNavigation.ts`). Movement sets real focus, not just scroll, which is what makes the hover-only gutter controls reachable from the keyboard.
+- **Preview <-> Edit is one surface**: both modes share `ReaderColumn` - same centring, same padding, same measure law - and the editor is transparent, borderless and gutterless so `--reader-paper-bg` shows through. Toggling changes the typeface, not the layout: the first glyph keeps its x. The body must not be keyed on the view mode either, or the enter animation replays as a flash.
+  - Reading position carries across the toggle (`src/webview/app/hooks/useViewModeHandoff.ts`): rendered blocks and their source offsets form a piecewise-linear map, read *before* the mode flips because the outgoing view unmounts.
+  - The document chrome is sticky over the whole document, so the sheet must not be height-capped to one viewport (`ReaderSheet` is `min-h-full`, never `h-full`).
 - **Inline editing**:
   - Inline block editing replaces the rendered block in place, no modal.
   - `Escape` cancels, `Cmd+Enter` / `Ctrl+Enter` saves. First-class, not discoverability-optional.
