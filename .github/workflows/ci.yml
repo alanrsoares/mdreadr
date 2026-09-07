@@ -36,6 +36,35 @@ jobs:
 
       # Webview production bundle gate: catches Vite/module-resolution issues
       # that lint, typecheck, and tests all miss, without needing the
-      # Electrobun native packaging step (that's release.yml's job).
+      # Electrobun native packaging step (that's the package job's).
       - name: Webview production bundle
         run: bun run vite build
+
+  # release.yml packages the app, but it only runs after release-please has
+  # already cut the tag — so a packaging bug becomes a published release with
+  # missing or broken assets, which is how v0.11.0 and v0.12.0 shipped. Prove
+  # the app packages and boots before the PR lands. One platform is enough:
+  # Linux is where the packaging differs most from the dev loop.
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          # xvfb gives the smoke test a display to open a real window against.
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev zenity xvfb
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build Application
+        run: bun run build
+
+      - name: Smoke test the built app
+        run: bun run scripts/smoke-test.ts
