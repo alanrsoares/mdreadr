@@ -55,8 +55,10 @@ function findExecutable(buildDir: string): string {
 function unpackLinuxBundle(): string {
   if (!existsSync("artifacts")) fail("no artifacts/ directory — run `bun run build` first");
 
+  // Electrobun 2 dropped the channel prefix from some artifact names, so match
+  // on the platform part and let the extension do the rest.
   const tarball = readdirSync("artifacts")
-    .filter((n) => n.startsWith(`${CHANNEL}-linux-`) && n.endsWith(".tar.zst"))
+    .filter((n) => /(^|-)linux-/.test(n) && n.endsWith(".tar.zst"))
     .sort()
     .at(0);
 

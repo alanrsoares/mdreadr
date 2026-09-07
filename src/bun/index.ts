@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import { isErr } from "@onrails/result";
-import { ApplicationMenu, app, BrowserWindow, Updater } from "electrobun/bun";
+import { ApplicationMenu, app, BrowserWindow, Updater } from "electrobun/main";
 import { toDocumentHttpError } from "../../packages/api/documents.ts";
 import { documentSession, startServer } from "../../packages/api/index.ts";
 import { APP_NAME } from "../../shared/constants.ts";
@@ -26,7 +26,12 @@ documentSession.onChange((documentId) => {
   }
 });
 
-// Register the open-url listener for runtime triggers (when app is already running)
+// File associations (electrobun.config.ts `app.fileAssociations`) deliver an
+// opened document here as a `file://` url, both cold-start and while running.
+// Electrobun 1.x had no such delivery to the main process, which is what
+// `scripts/patch-electrobun.ts` used to bolt on by patching the launcher's FFI
+// bindings; v2 emits the event itself, so the patch and its second
+// worker-message channel are both gone.
 app.on("open-url", async (data: unknown) => {
   const urlStr = (data as { url?: string })?.url;
   try {
@@ -45,30 +50,6 @@ app.on("open-url", async (data: unknown) => {
 
   await handleOpenUrl(urlStr, activeMainWindow);
 });
-
-// Register parent thread message listener for open-url events forwarded by the launcher
-// Since these are received as JS string messages, they are immune to FFI memory corruption.
-self.onmessage = async (event: MessageEvent) => {
-  const data = event.data;
-  if (data && data.type === "open-url") {
-    const urlStr = data.url;
-    try {
-      fs.appendFileSync(
-        "/tmp/mdreadr-debug.log",
-        `[${new Date().toISOString()}] Worker received open-url message: ${urlStr}\n`,
-      );
-    } catch {}
-
-    if (!urlStr) return;
-
-    if (!activeApiBase || !activeMainWindow) {
-      pendingOpenUrl = urlStr;
-      return;
-    }
-
-    await handleOpenUrl(urlStr, activeMainWindow);
-  }
-};
 
 async function handleOpenUrl(urlStr: string, mainWindow: BrowserWindow) {
   try {

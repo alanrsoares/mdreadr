@@ -46,3 +46,7 @@ artifacts/
 /src/webview/app/theme/mdreadr.d.ts
 /src/webview/app/theme/mdreadr.variants.d.ts
 
+# Hutch projects the Electrobun devkit here (postinstall `electrobun prepare`).
+# Generated per host and per toolchain version, like node_modules.
+.hutch/
+.cottontail-tmp/

@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { PATHS, Updater, Utils } from "electrobun/bun";
+import { PATHS, Updater, Utils } from "electrobun/main";
 import { APP_NAME } from "../../shared/constants.ts";
 
 // Electrobun disables updates on the "dev" channel and when no release baseUrl
