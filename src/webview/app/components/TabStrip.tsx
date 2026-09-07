@@ -42,11 +42,11 @@ export function TabStrip({ tabs, activeId, dirtyIds, onActivate, onRequestClose 
                 tabIndex={0}
                 aria-label={`Close ${tab.label}`}
                 className="focus:opacity-100"
-                onClick={(event) => {
+                onClick={(event: React.MouseEvent) => {
                   event.stopPropagation();
                   onRequestClose(tab.id);
                 }}
-                onKeyDown={(event) => {
+                onKeyDown={(event: React.KeyboardEvent) => {
                   if (event.key !== "Enter" && event.key !== " ") return;
                   event.preventDefault();
                   event.stopPropagation();
