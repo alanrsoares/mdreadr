@@ -115,7 +115,10 @@ list_assets() {
   fi
 }
 
-ASSETS=$(list_assets | grep "^${PREFIX}-" || true)
+# Electrobun 2 names the macOS disk image `<os>-<arch>-<app>.dmg`, without the
+# channel prefix the update archives still carry, so both spellings count as
+# this platform's assets. Older releases only have the prefixed form.
+ASSETS=$(list_assets | grep -E "^(${PREFIX}|${OS}-${ARCH})-" || true)
 [ -n "$ASSETS" ] || fail "this release has no ${OS}-${ARCH} build.
        CI currently builds macos-arm64 and linux-x64."
 
