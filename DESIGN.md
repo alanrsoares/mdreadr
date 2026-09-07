@@ -44,7 +44,17 @@ copy of the values.
   - The document chrome is sticky over the whole document, so the sheet must not be height-capped to one viewport (`ReaderSheet` is `min-h-full`, never `h-full`).
 - **Inline editing**:
   - Inline block editing replaces the rendered block in place, no modal.
-  - `Escape` cancels, `Cmd+Enter` / `Ctrl+Enter` saves. First-class, not discoverability-optional.
+  - **The block does not move.** The editor's inline padding is cancelled by a negative inline margin (the `.reader-block-has-note` device), its ring is an `inset` shadow, the textarea has no padding of its own, and the source is capped at `--reader-measure` for prose and headings. Verified in the build at 1440px: rendered paragraph and its source both at `left: 240, top: 299.31, width: 475`, and the block above it does not move.
+  - **All chrome sits below the text, never above it.** What the reader double-clicked has to stay where they pointed, so the toolbar and the actions are underneath. A heading editor also reproduces the `.reader-flow` heading gap from `data-level`, which it reads off the source's own `#` run, or the block jumps up by that gap.
+  - `Escape` cancels, `Cmd+Enter` / `Ctrl+Enter` saves, both from the textarea *and* from a focused toolbar button. First-class, not discoverability-optional.
+  - **An edit in progress is not discarded silently.** `Escape` on a dirty editor arms, and says so in place of the shortcut hint; a second `Escape` discards. Opening another block's editor while one is dirty is refused, and the open editor pulses instead. An edit that can no longer be located leaves the editor open with the text in it, since at that point it is the only copy.
+  - Focus returns to the block when the editor closes, so `j` / `k` and the gutter controls stay reachable. **By position, not by id**: paragraph and heading ids are content-derived, so an edited block comes back with a different one (`focusBlockAtIndex` in `src/webview/app/markdown/anchors.ts`).
+  - Shortcut hints come from `shortcutLabel` (`src/webview/app/platform.ts`). The app ships on macOS and Linux, so a hard-coded `⌘` is wrong half the time.
+
+## 3a. Links out of a Document
+- Every link in rendered prose is classified before the browser sees it (`resolveReaderLink`): a markdown Document opens in a Tab, a `#fragment` scroll-centres a heading here, `http` / `https` / `mailto` go to the OS, and everything else is left alone. The reader is a webview: a followed link navigates the app off its own bundle and takes the session with it.
+- **An external link says so.** A `↗` follows the text, quiet at rest and full-strength on hover or focus, with the space reserved at rest so revealing it cannot reflow the line. Leaving the app is a different act from moving inside the document, and the reader gets to know which one they are about to do.
+- Only `http`, `https` and `mailto` reach the OS opener. The allowlist lives in the main process (`packages/api/external.ts`), not in the webview, because that is where the refusal has to hold.
 
 ## 4. Hard Bans
 - No side-stripe borders (`border-left: Npx solid ...`) as a status or emphasis device on Notes, alerts, or cards. Exception: `blockquote`, where the left rule is standard typographic convention, not status decoration.

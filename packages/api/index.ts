@@ -27,6 +27,7 @@ import {
   LoadNotesBodySchema,
   NotesFileSchema,
   OpenDocumentBodySchema,
+  OpenExternalBodySchema,
   PickFileBodySchema,
   SaveDocumentBodySchema,
   SaveNotesBodySchema,
@@ -43,6 +44,7 @@ import {
   toDocumentHttpError,
   writeTextFile,
 } from "./documents.ts";
+import { openExternalUrl } from "./external.ts";
 import {
   DEFAULT_WAIT_TIMEOUT_MS,
   getConnectedClients,
@@ -515,6 +517,41 @@ export const app = new Elysia()
       return { path: result.value };
     },
     { body: PickFileBodySchema },
+  )
+  // A Document's links out to the web: the webview must not follow them in
+  // place, so the main process hands them to the OS instead.
+  .post(
+    "/system/open-url",
+    async ({ body, request, set }) => {
+      if (!isWebviewRequest(request)) {
+        set.status = 401;
+        return unauthorized;
+      }
+
+      const parsed = OpenExternalBodySchema.safeParse(body);
+      if (!parsed.success) {
+        set.status = 400;
+        return { error: parsed.error.message, code: "ValidationError" };
+      }
+
+      const result = await openExternalUrl(parsed.data.url);
+      if (isErr(result)) {
+        set.status = match(result.error._tag)
+          .with("ExternalSchemeRejected", () => 400)
+          .with("ExternalOpenFailed", () => 500)
+          .exhaustive();
+        return {
+          error: match(result.error)
+            .with({ _tag: "ExternalSchemeRejected" }, ({ url }) => `Refused to open ${url}`)
+            .with({ _tag: "ExternalOpenFailed" }, ({ message }) => message)
+            .exhaustive(),
+          code: result.error._tag,
+        };
+      }
+
+      return { url: result.value };
+    },
+    { body: OpenExternalBodySchema },
   )
   .get("/mcp/connection", ({ request, set }) => {
     if (!isWebviewRequest(request)) {

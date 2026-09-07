@@ -1,10 +1,13 @@
 import { Button } from "@astryxdesign/core/Button";
-import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
-import { Text } from "@astryxdesign/core/Text";
 import type { BlockAnchor } from "@mdreadr/domain";
+import { match } from "@onrails/pattern";
+import { isErr, type Result } from "@onrails/result";
 import {
+  type CSSProperties,
   type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useId,
@@ -19,414 +22,386 @@ import {
   ListBulletIcon,
   QueueListIcon,
 } from "../icons.ts";
+import {
+  indent,
+  insertLink,
+  outdent,
+  type Selection,
+  setHeadingLevel,
+  type TextEdit,
+  toggleLinePrefix,
+  wrapSelection,
+} from "../markdown/inline-edit-ops.ts";
+import { shortcutLabel } from "../platform.ts";
+import { type BlockEditError, blockEditErrorMessage } from "../session/block-edit.ts";
 import { useFontSettings } from "../theme/FontSettingsContext.tsx";
 
 type InlineBlockEditorProps = {
   anchor: BlockAnchor;
   initialValue: string;
-  onSave: (newMarkdown: string) => void;
+  /** Applies the edit. An `Err` keeps the editor open with the text in it and
+   *  states the reason, since at that point it is the only copy. */
+  onSave: (newMarkdown: string) => Result<void, BlockEditError>;
   onCancel: () => void;
+  onDirtyChange?: (isDirty: boolean) => void;
 };
 
-type SelectionRange = {
-  start: number;
-  end: number;
+/** Source typography per block kind. Prose and headings keep the reader's own
+ *  family, size and leading so the first glyph does not move when the rendered
+ *  block is swapped for its source; code and tables are already monospace. */
+const SOURCE_TYPOGRAPHY: Record<"heading" | "mono", CSSProperties> = {
+  heading: {
+    fontFamily: "var(--reader-heading-family, var(--font-family-heading, inherit))",
+    fontSize: "1.35em",
+    fontWeight: 600,
+    lineHeight: 1.35,
+  },
+  mono: {
+    fontFamily: "var(--font-family-code, monospace)",
+    fontSize: "var(--text-code-size, 0.9em)",
+    lineHeight: 1.5,
+  },
 };
+
+const isMonospaceKind = (kind: BlockAnchor["kind"]): boolean => kind === "code" || kind === "table";
+
+/** The heading level, read off the source's own `#` run. `.reader-flow` gives a
+ *  rendered heading its top gap by tag name, and the editor is a `section`, so
+ *  the CSS needs the level to reproduce that gap and hold the block still. */
+const headingLevelOf = (source: string): string | undefined => {
+  const hashes = /^(#{1,6})\s/.exec(source);
+  return hashes ? String(hashes[1]?.length) : undefined;
+};
+
+/** How long the "press Escape again" arming lasts before it forgets. */
+const DISCARD_ARM_MS = 4_000;
+
+type Tool = {
+  id: string;
+  /** Accessible name, without the shortcut: the shortcut rides on the title. */
+  label: string;
+  shortcut?: string;
+  glyph: ReactNode;
+  apply: (value: string, selection: Selection) => TextEdit;
+};
+
+const FORMAT_TOOLS: Tool[] = [
+  {
+    id: "bold",
+    label: "Bold",
+    shortcut: "B",
+    glyph: <span className="font-bold text-xs leading-none">B</span>,
+    apply: (value, selection) => wrapSelection(value, selection, "**", "**", "bold text"),
+  },
+  {
+    id: "italic",
+    label: "Italic",
+    shortcut: "I",
+    glyph: <span className="font-serif text-xs italic leading-none">I</span>,
+    apply: (value, selection) => wrapSelection(value, selection, "*", "*", "italic text"),
+  },
+  {
+    id: "code",
+    label: "Inline code",
+    shortcut: "E",
+    glyph: <Icon icon={CodeBracketIcon} size="sm" />,
+    apply: (value, selection) => wrapSelection(value, selection, "`", "`", "code"),
+  },
+  {
+    id: "strike",
+    label: "Strikethrough",
+    glyph: <span className="text-xs leading-none line-through">S</span>,
+    apply: (value, selection) => wrapSelection(value, selection, "~~", "~~", "strikethrough"),
+  },
+  {
+    id: "link",
+    label: "Link",
+    shortcut: "K",
+    glyph: <Icon icon={LinkIcon} size="sm" />,
+    apply: insertLink,
+  },
+  {
+    id: "quote",
+    label: "Quote",
+    glyph: <Icon icon={ChatBubbleBottomCenterTextIcon} size="sm" />,
+    apply: (value, selection) => toggleLinePrefix(value, selection, "> "),
+  },
+  {
+    id: "bullet",
+    label: "Bullet list",
+    glyph: <Icon icon={ListBulletIcon} size="sm" />,
+    apply: (value, selection) => toggleLinePrefix(value, selection, "- "),
+  },
+  {
+    id: "ordered",
+    label: "Numbered list",
+    glyph: <Icon icon={QueueListIcon} size="sm" />,
+    apply: (value, selection) => toggleLinePrefix(value, selection, "1. "),
+  },
+];
+
+const HEADING_TOOLS: Tool[] = [1, 2, 3].map((level) => ({
+  id: `heading-${level}`,
+  label: `Heading ${level}`,
+  glyph: <span className="font-bold text-[11px] leading-none">{`H${level}`}</span>,
+  apply: (value, selection) => setHeadingLevel(value, selection, level),
+}));
 
 export function InlineBlockEditor({
   anchor,
   initialValue,
   onSave,
   onCancel,
+  onDirtyChange,
 }: InlineBlockEditorProps) {
   const [text, setText] = useState(initialValue);
+  const [isDiscardArmed, setIsDiscardArmed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const editorId = useId();
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const hintId = useId();
+  const errorId = useId();
   const { readerFontSize, readerLineHeight } = useFontSettings();
 
-  // Auto-resize textarea to fit content
+  const isDirty = text !== initialValue;
+  const isMono = isMonospaceKind(anchor.kind);
+  const tools = useMemo(
+    () =>
+      anchor.kind === "heading" || anchor.kind === "paragraph"
+        ? [...FORMAT_TOOLS, ...HEADING_TOOLS]
+        : FORMAT_TOOLS,
+    [anchor.kind],
+  );
+
+  // Auto-size to the content. No minimum beyond one line: a one-line paragraph
+  // has to stay one line tall or entering edit shifts everything below it.
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     void text;
     el.style.height = "auto";
-    el.style.height = `${Math.max(64, el.scrollHeight)}px`;
+    el.style.height = `${el.scrollHeight}px`;
   }, [text]);
 
-  // Focus textarea on mount and scroll into view smoothly if needed
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.focus();
-    const len = el.value.length;
-    el.setSelectionRange(len, len);
-    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    el.focus({ preventScroll: true });
+    const end = el.value.length;
+    el.setSelectionRange(end, end);
   }, []);
 
-  const stats = useMemo(() => {
-    const trimmed = text.trim();
-    const words = trimmed ? trimmed.split(/\s+/).length : 0;
-    const chars = text.length;
-    return { words, chars };
-  }, [text]);
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+    return () => onDirtyChange?.(false);
+  }, [isDirty, onDirtyChange]);
 
-  const setContentWithSelection = useCallback((nextText: string, range: SelectionRange) => {
-    setText(nextText);
+  // The arming forgets itself, so an Escape minutes later is not read as the
+  // second half of a discard the user has long stopped thinking about.
+  useEffect(() => {
+    if (!isDiscardArmed) return;
+    const timer = window.setTimeout(() => setIsDiscardArmed(false), DISCARD_ARM_MS);
+    return () => window.clearTimeout(timer);
+  }, [isDiscardArmed]);
+
+  const applyEdit = useCallback((edit: TextEdit) => {
+    setText(edit.text);
+    setIsDiscardArmed(false);
+    setError(null);
     window.requestAnimationFrame(() => {
       const el = textareaRef.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(range.start, range.end);
-      }
+      if (!el) return;
+      el.focus({ preventScroll: true });
+      el.setSelectionRange(edit.selection.start, edit.selection.end);
     });
   }, []);
 
-  const wrapSelection = useCallback(
-    (before: string, after = before, defaultPlaceholder = "text") => {
+  const runTool = useCallback(
+    (tool: Tool) => {
       const el = textareaRef.current;
       if (!el) return;
+      applyEdit(tool.apply(el.value, { start: el.selectionStart, end: el.selectionEnd }));
+    },
+    [applyEdit],
+  );
 
-      const start = el.selectionStart;
-      const end = el.selectionEnd;
-      const val = el.value;
-      const selected = val.slice(start, end);
+  const handleApply = useCallback(() => {
+    const applied = onSave(text);
+    if (!isErr(applied)) return;
+    setError(blockEditErrorMessage(applied.error));
+    textareaRef.current?.focus({ preventScroll: true });
+  }, [onSave, text]);
 
-      if (selected.length > 0) {
-        // Toggle off if already wrapped
-        const beforeLen = before.length;
-        const afterLen = after.length;
-        if (
-          start >= beforeLen &&
-          val.slice(start - beforeLen, start) === before &&
-          val.slice(end, end + afterLen) === after
-        ) {
-          const unwrapped = val.slice(0, start - beforeLen) + selected + val.slice(end + afterLen);
-          setContentWithSelection(unwrapped, {
-            start: start - beforeLen,
-            end: end - beforeLen,
-          });
-          return;
-        }
+  const handleCancel = useCallback(() => {
+    if (!isDirty || isDiscardArmed) {
+      onCancel();
+      return;
+    }
+    setIsDiscardArmed(true);
+  }, [isDirty, isDiscardArmed, onCancel]);
 
-        const wrapped = val.slice(0, start) + before + selected + after + val.slice(end);
-        setContentWithSelection(wrapped, {
-          start: start + beforeLen,
-          end: end + beforeLen,
-        });
+  // On the section, not the textarea: Escape and the apply shortcut have to
+  // work while focus sits on a toolbar button too.
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLElement>) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        handleCancel();
         return;
       }
 
-      const inserted = val.slice(0, start) + before + defaultPlaceholder + after + val.slice(end);
-      setContentWithSelection(inserted, {
-        start: start + before.length,
-        end: start + before.length + defaultPlaceholder.length,
-      });
-    },
-    [setContentWithSelection],
-  );
+      const isMod = event.metaKey || event.ctrlKey;
 
-  const toggleLinePrefix = useCallback(
-    (prefix: string) => {
-      const el = textareaRef.current;
-      if (!el) return;
-
-      const start = el.selectionStart;
-      const val = el.value;
-      const lineStart = val.lastIndexOf("\n", start - 1) + 1;
-      const lineEnd = val.indexOf("\n", start);
-      const effectiveEnd = lineEnd === -1 ? val.length : lineEnd;
-      const line = val.slice(lineStart, effectiveEnd);
-
-      if (line.startsWith(prefix)) {
-        const nextVal =
-          val.slice(0, lineStart) + line.slice(prefix.length) + val.slice(effectiveEnd);
-        const newCursor = Math.max(lineStart, start - prefix.length);
-        setContentWithSelection(nextVal, { start: newCursor, end: newCursor });
-      } else {
-        const nextVal = val.slice(0, lineStart) + prefix + line + val.slice(effectiveEnd);
-        const newCursor = start + prefix.length;
-        setContentWithSelection(nextVal, { start: newCursor, end: newCursor });
-      }
-    },
-    [setContentWithSelection],
-  );
-
-  const setHeadingLevel = useCallback(
-    (level: number) => {
-      const el = textareaRef.current;
-      if (!el) return;
-
-      const start = el.selectionStart;
-      const val = el.value;
-      const lineStart = val.lastIndexOf("\n", start - 1) + 1;
-      const lineEnd = val.indexOf("\n", start);
-      const effectiveEnd = lineEnd === -1 ? val.length : lineEnd;
-      const line = val.slice(lineStart, effectiveEnd);
-
-      const prefix = `${"#".repeat(level)} `;
-      const stripped = line.replace(/^#{1,6}\s+/, "");
-      const nextLine = `${prefix}${stripped}`;
-      const nextVal = val.slice(0, lineStart) + nextLine + val.slice(effectiveEnd);
-      const newCursor = lineStart + nextLine.length;
-
-      setContentWithSelection(nextVal, { start: newCursor, end: newCursor });
-    },
-    [setContentWithSelection],
-  );
-
-  const insertLink = useCallback(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const val = el.value;
-    const selected = val.slice(start, end);
-
-    if (selected.length > 0) {
-      const wrapped = `${val.slice(0, start)}[${selected}](url)${val.slice(end)}`;
-      setContentWithSelection(wrapped, {
-        start: start + selected.length + 3,
-        end: start + selected.length + 6,
-      });
-      return;
-    }
-
-    const inserted = `${val.slice(0, start)}[link](url)${val.slice(end)}`;
-    setContentWithSelection(inserted, {
-      start: start + 7,
-      end: start + 10,
-    });
-  }, [setContentWithSelection]);
-
-  const handleApply = useCallback(() => {
-    onSave(text);
-  }, [onSave, text]);
-
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLTextAreaElement>) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      if (isMod && event.key === "Enter") {
         event.preventDefault();
         handleApply();
         return;
       }
 
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onCancel();
+      if (isMod && !event.altKey) {
+        const key = event.key === "`" ? "E" : event.key.toUpperCase();
+        const tool = tools.find((candidate) => candidate.shortcut === key);
+        if (tool) {
+          event.preventDefault();
+          runTool(tool);
+        }
         return;
       }
 
-      if (event.metaKey || event.ctrlKey) {
-        const key = event.key.toLowerCase();
-        if (key === "b") {
-          event.preventDefault();
-          wrapSelection("**", "**", "bold text");
-          return;
-        }
-        if (key === "i") {
-          event.preventDefault();
-          wrapSelection("*", "*", "italic text");
-          return;
-        }
-        if (key === "e" || event.key === "`") {
-          event.preventDefault();
-          wrapSelection("`", "`", "code");
-          return;
-        }
-        if (key === "k") {
-          event.preventDefault();
-          insertLink();
-          return;
-        }
-      }
-
-      if (event.key === "Tab") {
-        event.preventDefault();
+      // Indentation is the textarea's business; in the toolbar, Tab still moves
+      // focus out of the editor, which is the only reason it is not a trap.
+      if (event.key === "Tab" && event.target === textareaRef.current) {
         const el = textareaRef.current;
         if (!el) return;
-        const start = el.selectionStart;
-        const end = el.selectionEnd;
-        const val = el.value;
-        const nextVal = `${val.slice(0, start)}  ${val.slice(end)}`;
-        setContentWithSelection(nextVal, { start: start + 2, end: start + 2 });
+        event.preventDefault();
+        const selection = { start: el.selectionStart, end: el.selectionEnd };
+        applyEdit(event.shiftKey ? outdent(el.value, selection) : indent(el.value, selection));
       }
     },
-    [handleApply, onCancel, wrapSelection, insertLink, setContentWithSelection],
+    [applyEdit, handleApply, handleCancel, runTool, tools],
   );
 
-  const textareaStyle = useMemo(() => {
-    if (anchor.kind === "heading") {
-      return {
-        fontFamily: "var(--reader-heading-family, var(--font-family-heading, inherit))",
-        fontSize: "1.35em",
-        fontWeight: 600,
-        lineHeight: 1.35,
-      };
-    }
+  /** Roving focus, so the whole toolbar is one Tab stop rather than eleven. */
+  const handleToolbarKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (step === 0 && event.key !== "Home" && event.key !== "End") return;
 
-    if (anchor.kind === "code" || anchor.kind === "table") {
-      return {
-        fontFamily: "var(--font-family-code, monospace)",
-        fontSize: "var(--text-code-size, 0.9em)",
-        lineHeight: 1.5,
-      };
-    }
+    const buttons = Array.from(
+      toolbarRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? [],
+    );
+    if (buttons.length === 0) return;
 
-    return {
-      fontFamily: "var(--reader-prose-family, inherit)",
-      fontSize: `${readerFontSize}px`,
-      lineHeight: readerLineHeight,
-    };
-  }, [anchor.kind, readerFontSize, readerLineHeight]);
+    event.preventDefault();
+    const from = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const target =
+      event.key === "Home"
+        ? buttons[0]
+        : event.key === "End"
+          ? buttons[buttons.length - 1]
+          : buttons[(from + step + buttons.length) % buttons.length];
+    target?.focus();
+  }, []);
+
+  const sourceStyle = useMemo(
+    (): CSSProperties =>
+      match(anchor.kind)
+        .with("heading", () => SOURCE_TYPOGRAPHY.heading)
+        .with("code", () => SOURCE_TYPOGRAPHY.mono)
+        .with("table", () => SOURCE_TYPOGRAPHY.mono)
+        .otherwise(() => ({
+          fontFamily: "var(--reader-prose-family, inherit)",
+          fontSize: `${readerFontSize}px`,
+          lineHeight: readerLineHeight,
+        })),
+    [anchor.kind, readerFontSize, readerLineHeight],
+  );
+
+  const hint = isDiscardArmed
+    ? "Escape again to discard your changes"
+    : `${shortcutLabel("Enter")} to apply, Escape to ${isDirty ? "discard" : "close"}`;
 
   return (
     <section
-      className="reader-block-edit-enter my-2 overflow-hidden rounded-lg border border-[var(--color-border-emphasized)] bg-[var(--color-background-surface)] p-3 shadow-md transition-all duration-150"
-      aria-label={`Editing ${anchor.kind} block inline`}
+      className="reader-block-edit"
+      data-kind={anchor.kind}
+      data-level={anchor.kind === "heading" ? headingLevelOf(initialValue) : undefined}
+      data-measure={isMono ? "full" : "capped"}
+      aria-label={`Editing ${anchor.label ?? anchor.kind} source`}
+      onKeyDown={handleKeyDown}
     >
-      {/* Rich Formatting Toolbar */}
-      <div className="mb-2.5 flex flex-wrap items-center gap-1 border-[var(--color-border)] border-b pb-2">
-        <HStack gap={1} vAlign="center" wrap="wrap">
-          <Button
-            label="Bold (⌘B)"
-            icon={<span className="font-bold text-xs">B</span>}
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            tooltip="Bold (⌘B)"
-            onClick={() => wrapSelection("**", "**", "bold text")}
-          />
-          <Button
-            label="Italic (⌘I)"
-            icon={<span className="font-serif text-xs italic">I</span>}
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            tooltip="Italic (⌘I)"
-            onClick={() => wrapSelection("*", "*", "italic text")}
-          />
-          <Button
-            label="Inline Code (⌘E)"
-            icon={<Icon icon={CodeBracketIcon} size="sm" />}
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            tooltip="Inline Code (⌘E)"
-            onClick={() => wrapSelection("`", "`", "code")}
-          />
-          <Button
-            label="Strikethrough"
-            icon={<span className="text-xs line-through">S</span>}
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            tooltip="Strikethrough"
-            onClick={() => wrapSelection("~~", "~~", "strikethrough")}
-          />
+      <textarea
+        ref={textareaRef}
+        value={text}
+        onChange={(event) => {
+          setText(event.target.value);
+          setIsDiscardArmed(false);
+        }}
+        rows={1}
+        className="reader-block-edit-input"
+        placeholder="Markdown source"
+        style={sourceStyle}
+        spellCheck={!isMono}
+        aria-label={`${anchor.kind} source`}
+        aria-describedby={error ? `${hintId} ${errorId}` : hintId}
+        aria-invalid={error !== null}
+        aria-keyshortcuts="Meta+Enter Control+Enter Escape"
+      />
 
-          <div className="mx-1 h-3.5 w-px bg-[var(--color-border)]" aria-hidden />
+      <div className="reader-block-edit-chrome">
+        <div
+          ref={toolbarRef}
+          className="reader-block-edit-tools"
+          role="toolbar"
+          aria-label="Markdown formatting"
+          onKeyDown={handleToolbarKeyDown}
+        >
+          {tools.map((tool, index) => (
+            <button
+              key={tool.id}
+              type="button"
+              className="reader-block-edit-tool"
+              // The toolbar is one Tab stop; arrow keys move within it.
+              tabIndex={index === 0 ? 0 : -1}
+              aria-label={tool.label}
+              title={tool.shortcut ? `${tool.label} (${shortcutLabel(tool.shortcut)})` : tool.label}
+              // Keeps the textarea's selection alive through the click, so the
+              // tool acts on what the user had selected.
+              onMouseDown={(event: MouseEvent) => event.preventDefault()}
+              onClick={() => runTool(tool)}
+            >
+              {tool.glyph}
+            </button>
+          ))}
+        </div>
 
-          <Button
-            label="Link (⌘K)"
-            icon={<Icon icon={LinkIcon} size="sm" />}
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            tooltip="Link (⌘K)"
-            onClick={insertLink}
-          />
-          <Button
-            label="Quote"
-            icon={<Icon icon={ChatBubbleBottomCenterTextIcon} size="sm" />}
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            tooltip="Quote (> )"
-            onClick={() => toggleLinePrefix("> ")}
-          />
-          <Button
-            label="Bullet list"
-            icon={<Icon icon={ListBulletIcon} size="sm" />}
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            tooltip="Bullet list (- )"
-            onClick={() => toggleLinePrefix("- ")}
-          />
-          <Button
-            label="Numbered list"
-            icon={<Icon icon={QueueListIcon} size="sm" />}
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            tooltip="Numbered list (1. )"
-            onClick={() => toggleLinePrefix("1. ")}
-          />
+        <p
+          id={hintId}
+          className="reader-block-edit-hint"
+          data-armed={isDiscardArmed ? "true" : undefined}
+          role={isDiscardArmed ? "status" : undefined}
+        >
+          {hint}
+        </p>
 
-          {anchor.kind === "heading" || anchor.kind === "paragraph" ? (
-            <>
-              <div className="mx-1 h-3.5 w-px bg-[var(--color-border)]" aria-hidden />
-              <Button
-                label="Heading 1"
-                icon={<span className="font-bold text-[11px]">H1</span>}
-                variant="ghost"
-                size="sm"
-                isIconOnly
-                tooltip="Heading 1 (# )"
-                onClick={() => setHeadingLevel(1)}
-              />
-              <Button
-                label="Heading 2"
-                icon={<span className="font-bold text-[11px]">H2</span>}
-                variant="ghost"
-                size="sm"
-                isIconOnly
-                tooltip="Heading 2 (## )"
-                onClick={() => setHeadingLevel(2)}
-              />
-              <Button
-                label="Heading 3"
-                icon={<span className="font-bold text-[11px]">H3</span>}
-                variant="ghost"
-                size="sm"
-                isIconOnly
-                tooltip="Heading 3 (### )"
-                onClick={() => setHeadingLevel(3)}
-              />
-            </>
-          ) : null}
-        </HStack>
-
-        <div className="ml-auto select-none font-mono text-[var(--color-text-disabled)] text-xs">
-          {stats.words}w · {stats.chars}c
+        <div className="reader-block-edit-actions">
+          <Button label="Cancel" variant="secondary" size="sm" onClick={handleCancel} />
+          {/* Dimmed until there is a diff, like Edit mode's Save. */}
+          <Button
+            label="Apply"
+            variant="primary"
+            size="sm"
+            isDisabled={!isDirty}
+            onClick={handleApply}
+          />
         </div>
       </div>
 
-      {/* Editor Body */}
-      <textarea
-        ref={textareaRef}
-        id={editorId}
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        onKeyDown={handleKeyDown}
-        rows={2}
-        className="w-full resize-none border-none bg-transparent p-1 text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-disabled)]"
-        placeholder="Enter markdown content…"
-        style={textareaStyle}
-        aria-label={`Edit ${anchor.kind} content`}
-      />
-
-      {/* Footer / Actions */}
-      <div className="mt-2.5 flex items-center justify-between border-[var(--color-border)] border-t pt-2.5">
-        <Text size="xsm" color="disabled">
-          ⌘Enter to apply · Esc to cancel
-        </Text>
-        <HStack gap={2} vAlign="center">
-          <Button label="Cancel" variant="secondary" size="sm" onClick={onCancel} />
-          <Button label="Apply" variant="primary" size="sm" onClick={handleApply} />
-        </HStack>
-      </div>
+      {error ? (
+        <p id={errorId} className="reader-block-edit-error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </section>
   );
 }
