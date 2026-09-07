@@ -54,12 +54,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
+        uses: actions/checkout@v5
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -70,8 +65,10 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          # xvfb gives the smoke test a display to open a real window against.
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev zenity xvfb
+          # Runtime libraries only — nothing here is compiled from source, the
+          # electrobun native bits ship prebuilt. xvfb gives the smoke test a
+          # display to open a real window against.
+          sudo apt-get install -y libgtk-3-0t64 libwebkit2gtk-4.1-0 libayatana-appindicator3-1 zenity xvfb
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
