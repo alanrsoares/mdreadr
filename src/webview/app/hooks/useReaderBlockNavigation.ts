@@ -14,6 +14,12 @@ function isTextEntry(target: EventTarget | null): boolean {
   return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
+/** An open inline editor owns the document, even when focus sits on one of its
+ *  toolbar buttons rather than in the textarea: moving the reader's cursor out
+ *  from under an edit in progress is never what `j` meant.
+ *  (`.reader-block-edit-enter` is `InlineBlockEditor`'s own wrapper class.) */
+const isEditingInline = (): boolean => document.querySelector(".reader-block-edit-enter") !== null;
+
 /** The block the cursor moves from: the focused one if there is one, otherwise
  *  the first block at or below the top of the viewport, so `j` continues from
  *  wherever the reader has scrolled to. */
@@ -64,7 +70,7 @@ export function useReaderBlockNavigation(
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (isTextEntry(event.target)) return;
+      if (isTextEntry(event.target) || isEditingInline()) return;
 
       const step = event.key === "j" || event.key === "J" ? 1 : -1;
       if (!["j", "k", "J", "K"].includes(event.key)) return;
