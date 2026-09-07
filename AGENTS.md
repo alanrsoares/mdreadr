@@ -9,6 +9,9 @@
 
 - **Product**: Read-only Documents; Notes are session Threads with Replies and status.
 - **Domain language**: [`CONTEXT.md`](CONTEXT.md) — use those terms; do not invent synonyms.
+- **Product intent**: [`PRODUCT.md`](PRODUCT.md) — users, tone, anti-references.
+- **Design laws & tokens**: [`DESIGN.md`](DESIGN.md) — measure, leading, accent, hard bans. Read before touching reader styling.
+- **UX spec**: [`docs/UX_DESIGN_SPEC.md`](docs/UX_DESIGN_SPEC.md) — per-surface interaction rules, tagged Shipped vs Planned.
 - **Architecture**: Electrobun shell → React webview ↔ Elysia API (loopback) → domain + filesystem.
 - **Runtime**: Bun only (no Node.js for execution).
 

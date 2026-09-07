@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import { isErr } from "@onrails/result";
-import { ApplicationMenu, app, BrowserWindow } from "electrobun/bun";
+import { ApplicationMenu, app, BrowserWindow, Updater } from "electrobun/bun";
 import { toDocumentHttpError } from "../../packages/api/documents.ts";
 import { documentSession, startServer } from "../../packages/api/index.ts";
 import { APP_NAME } from "../../shared/constants.ts";
@@ -103,6 +103,16 @@ async function handleOpenUrl(urlStr: string, mainWindow: BrowserWindow) {
 // The api base is injected via preload instead of a query string: the macOS
 // views:// handler treats the query as part of the ASAR file path and 404s.
 async function getMainViewUrl(): Promise<string> {
+  try {
+    const info = await Updater.getLocalInfo();
+    // Production builds (channel: "stable") must never probe or load dev servers
+    if (info.channel === "stable") {
+      return "views://mainview/index.html";
+    }
+  } catch {
+    // If version info can't be read, continue with dev check fallback
+  }
+
   try {
     const response = await fetch("http://localhost:5173");
     if (response.ok) {
