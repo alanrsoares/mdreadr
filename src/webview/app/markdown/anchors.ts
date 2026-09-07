@@ -26,8 +26,14 @@ export type AnchorPlan = {
 
 const isPinnableCodeBlock = (language: string | undefined): boolean => !isSpecialFence(language);
 
-/** Build the Anchor plan for a Document's *prepared* markdown (post-preprocess). */
-export function createAnchorPlan(prepared: string): AnchorPlan {
+type BlockIds = {
+  headings: TocEntry[];
+  paragraphIds: string[];
+  codeIds: string[];
+};
+
+/** The ids `createAnchorPlan` will hand out, in render order, without the cursor state. */
+function computeBlockIds(prepared: string): BlockIds {
   const headings = extractHeadings(prepared);
 
   const blocks = parseMarkdown(prepared, { autolink: "gfm" });
@@ -52,6 +58,24 @@ export function createAnchorPlan(prepared: string): AnchorPlan {
     codeCounts.set(key, occurrence + 1);
     codeIds.push(blockIdForCode(block.text, block.language, occurrence));
   }
+
+  return { headings, paragraphIds, codeIds };
+}
+
+/**
+ * Every anchorable block id in `prepared`. Paragraph and code ids hash their own
+ * content, so diffing this set across two revisions of a Document yields exactly
+ * the blocks whose text changed — what `useLiveDocumentUpdates` flashes when a
+ * file is rewritten under the reader.
+ */
+export function collectBlockIds(prepared: string): Set<string> {
+  const { headings, paragraphIds, codeIds } = computeBlockIds(prepared);
+  return new Set([...headings.map(blockIdForHeading), ...paragraphIds, ...codeIds]);
+}
+
+/** Build the Anchor plan for a Document's *prepared* markdown (post-preprocess). */
+export function createAnchorPlan(prepared: string): AnchorPlan {
+  const { headings, paragraphIds, codeIds } = computeBlockIds(prepared);
 
   let paragraphIndex = 0;
   let codeIndex = 0;

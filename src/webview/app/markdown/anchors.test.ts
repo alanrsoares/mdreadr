@@ -7,7 +7,7 @@ import {
   extractHeadings,
   type TocEntry,
 } from "@mdreadr/domain";
-import { anchorDisplayLabel, createAnchorPlan } from "./anchors.ts";
+import { anchorDisplayLabel, collectBlockIds, createAnchorPlan } from "./anchors.ts";
 import { preprocessReaderMarkdown } from "./preprocess.ts";
 
 function findHeading(headings: TocEntry[], text: string): TocEntry {
@@ -171,5 +171,38 @@ describe("anchorDisplayLabel", () => {
 
   test("falls back to kind when there is neither label nor headingPath", () => {
     expect(anchorDisplayLabel({ kind: "code", blockId: "x" })).toBe("code");
+  });
+});
+
+describe("collectBlockIds", () => {
+  const doc = ["# Title", "", "First paragraph.", "", "```ts", "const a = 1;", "```"].join("\n");
+
+  test("covers headings, paragraphs and code blocks", () => {
+    const ids = collectBlockIds(preprocessReaderMarkdown(doc));
+    const plan = createAnchorPlan(preprocessReaderMarkdown(doc));
+
+    expect(ids.has(plan.nextHeading(1, "Title").domId)).toBe(true);
+    expect(ids.has(plan.nextParagraph("First paragraph.").blockId)).toBe(true);
+    expect(ids.has(plan.nextCode("const a = 1;\n", "ts").blockId)).toBe(true);
+  });
+
+  test("an edited paragraph is the only id that differs across revisions", () => {
+    const edited = doc.replace("First paragraph.", "First paragraph, revised.");
+
+    const before = collectBlockIds(preprocessReaderMarkdown(doc));
+    const after = collectBlockIds(preprocessReaderMarkdown(edited));
+    const added = [...after].filter((id) => !before.has(id));
+
+    expect(added).toHaveLength(1);
+    const plan = createAnchorPlan(preprocessReaderMarkdown(edited));
+    plan.nextHeading(1, "Title");
+    expect(added[0]).toBe(plan.nextParagraph("First paragraph, revised.").blockId);
+  });
+
+  test("an untouched revision has no changed ids", () => {
+    const before = collectBlockIds(preprocessReaderMarkdown(doc));
+    const after = collectBlockIds(preprocessReaderMarkdown(doc));
+
+    expect([...after].filter((id) => !before.has(id))).toEqual([]);
   });
 });

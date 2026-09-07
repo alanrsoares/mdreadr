@@ -11,6 +11,7 @@ import { SuggestionsPanel } from "../components/SuggestionsPanel.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
 import { registerEditorView } from "../editorCommands.ts";
 import { useFileDrop } from "../hooks/useFileDrop.ts";
+import { useLiveDocumentUpdates } from "../hooks/useLiveDocumentUpdates.ts";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
 import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
 import { isDirty } from "../session/document-draft.ts";
@@ -135,6 +136,11 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
       prevContentRef.current = content;
     }
   }, [content, dirty, showError]);
+
+  // Keeps the reading position and flashes the blocks an agent (or any other
+  // writer) just changed on disk; the reload itself comes from the file watcher
+  // in `documentSession`.
+  useLiveDocumentUpdates(content, readerMainRef, isActive && documentViewMode === "preview");
 
   const notes = reader.notes.data ?? [];
   const suggestions = reader.suggestions.data ?? [];

@@ -368,6 +368,11 @@ body,
     animation: none;
     background: color-mix(in srgb, var(--color-background-blue) 35%, transparent);
   }
+
+  .reader-block-updated {
+    animation: none;
+    background: color-mix(in srgb, var(--color-background-green) 35%, transparent);
+  }
 }
 
 .reader-pin-button {
@@ -550,6 +555,25 @@ body,
 
 .reader-block-highlight {
   animation: reader-block-flash 1.8s var(--ease-standard);
+}
+
+/* Distinct from the blue jump/pin flash: this one says "this block just changed
+   on disk", so it reads as an arrival rather than a selection. */
+.reader-block-updated {
+  animation: reader-block-updated-flash 1.8s var(--ease-standard);
+}
+
+@keyframes reader-block-updated-flash {
+  0%,
+  15% {
+    background: color-mix(in srgb, var(--color-background-green) 35%, transparent);
+    box-shadow: inset 2px 0 0 var(--color-border-green);
+  }
+
+  100% {
+    background: transparent;
+    box-shadow: inset 2px 0 0 transparent;
+  }
 }
 
 @keyframes reader-block-flash {
