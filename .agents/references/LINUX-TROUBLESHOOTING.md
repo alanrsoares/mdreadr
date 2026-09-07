@@ -34,7 +34,7 @@ API may start (`mdreadr API listening on …`) then WebKit dies. Common on **Way
 
 Wrong artifact — use the Setup tarball installer, not the dev bundle launcher.
 
-### `asar_read_file failed … views/mainview/index.html`
+### `asar_read_file failed … views/mainview/index.html` (Electrobun 1.x)
 
 Dev Electrobun bundle without Vite. Ensure:
 

@@ -41,7 +41,7 @@ packages/api/             # Elysia app, session store, document/recents IO
 src/bun/index.ts          # Electrobun entry — starts API, opens window
 src/webview/              # React UI (Treaty client, pages, components)
 shared/constants.ts       # App name, config paths, schema version
-electrobun.config.ts      # Bundles dist/ → views://mainview
+electrobun.config.ts      # Bundles dist/ → views://mainview (Electrobun 2, Bun main process)
 vite.config.ts            # Webview build; TS path aliases for @mdreadr/*
 CONTEXT.md                # Domain glossary (not implementation)
 ```

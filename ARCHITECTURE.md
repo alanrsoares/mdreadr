@@ -135,7 +135,7 @@ text into an SVG string (`mermaid.render()` vs `D2.compile()` + `D2.render()`).
 
 - **Bundling**: Vite (`vite.config.ts`) builds the webview to `dist/`; dev server on
   `:5173`. Path aliases wire up `@mdreadr/domain`, `@mdreadr/api`, `@mdreadr/shared/constants`.
-- **Packaging**: `electrobun build --env=stable` produces the native app bundle
+- **Packaging**: `electrobun build --env=stable` produces the native app bundle. Electrobun 2 ships its SDK through the Hutch toolchain rather than npm: the `electrobun` dependency is a bootstrap, `postinstall` runs `electrobun prepare` to project the devkit into `.hutch/devkit` (gitignored, like `node_modules`), and `tsconfig.json` resolves `electrobun/main` there. The main process runs on Bun (`build.mainProcess: "bun"`), not v2's default Cottontail, because the API server is Elysia on `Bun.serve`.
   (`build/`, `artifacts/`).
 - **Lint/format**: Biome (`biome.json`, custom Grit plugins in `biome/plugins/`).
 - **Tests**: `bun test` (Bun's built-in runner), colocated `*.test.ts` files.
