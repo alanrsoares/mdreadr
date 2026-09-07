@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.11.0](https://github.com/alanrsoares/mdreadr/compare/v0.10.3...v0.11.0) (2026-09-07)
+
+
+### Features
+
+* add version badge ([0a0bd50](https://github.com/alanrsoares/mdreadr/commit/0a0bd5035642ab8b953b3d1c58a7aaecc4904089))
+* improved distributability coverage + wired undo/redo bridge ([bab4fdb](https://github.com/alanrsoares/mdreadr/commit/bab4fdbb8bec9dfd90d149a7988bea7de2577326))
+* **reader:** flash blocks changed on disk ([cb098a6](https://github.com/alanrsoares/mdreadr/commit/cb098a6c1ac7a8c0a40d01821f50ee45928a1717))
+* **ui:** add inline block editing and polish reader chrome ([cd5553e](https://github.com/alanrsoares/mdreadr/commit/cd5553e36bfc760368502ca6c85dbb89fd3cd185))
+
+
+### Bug Fixes
+
+* **shell:** restrict localhost devserver to non-stable ([bdd6c55](https://github.com/alanrsoares/mdreadr/commit/bdd6c554006ba177a62e17056ef00c6dab98d565))
+
 ## [0.10.3](https://github.com/alanrsoares/mdreadr/compare/v0.10.2...v0.10.3) (2026-08-13)
 
 
