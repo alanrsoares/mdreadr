@@ -94,6 +94,10 @@ export const SaveDocumentBodySchema = z.object({
   content: z.string(),
 });
 
+export const OpenExternalBodySchema = z.object({
+  url: z.string().min(1),
+});
+
 export const PickFileBodySchema = z.object({
   mode: z.enum(["open", "save"]),
   defaultPath: z.string().optional(),
