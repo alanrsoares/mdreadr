@@ -19,7 +19,14 @@ export const ReplySchema = z.object({
   createdAt: z.iso.datetime(),
 });
 
-export const BlockAnchorKindSchema = z.enum(["document", "heading", "paragraph", "code"]);
+export const BlockAnchorKindSchema = z.enum([
+  "document",
+  "heading",
+  "paragraph",
+  "code",
+  "list",
+  "table",
+]);
 
 export const BlockAnchorSchema = z.object({
   kind: BlockAnchorKindSchema,

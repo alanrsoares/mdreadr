@@ -3,11 +3,18 @@ import { parseMarkdown } from "@astryxdesign/core/Markdown/utils";
 import {
   blockIdForCode,
   blockIdForHeading,
+  blockIdForList,
   blockIdForParagraph,
+  blockIdForTable,
   extractHeadings,
   type TocEntry,
 } from "@mdreadr/domain";
-import { anchorDisplayLabel, collectBlockIds, createAnchorPlan } from "./anchors.ts";
+import {
+  anchorDisplayLabel,
+  collectBlockIds,
+  createAnchorPlan,
+  partitionReaderSegments,
+} from "./anchors.ts";
 import { preprocessReaderMarkdown } from "./preprocess.ts";
 
 function findHeading(headings: TocEntry[], text: string): TocEntry {
@@ -98,6 +105,77 @@ test("align fences are excluded from the code cursor (align-desync regression)",
   // The renderer only calls nextCode for the `ts` fence — the align fence
   // returns early via AlignBlock without ever consuming a plan cursor slot.
   expect(plan.nextCode(tsCode, "ts").blockId).toBe(blockIdForCode(tsCode, "ts", 0));
+});
+
+test("lists and tables do not desynchronize paragraph cursors and have their own anchors", () => {
+  const raw = [
+    "# Document",
+    "",
+    "Intro paragraph",
+    "",
+    "- First bullet",
+    "- Second bullet",
+    "",
+    "| Header A | Header B |",
+    "| --- | --- |",
+    "| Val 1 | Val 2 |",
+    "",
+    "Outro paragraph",
+  ].join("\n");
+  const prepared = preprocessReaderMarkdown(raw);
+  const plan = createAnchorPlan(prepared);
+
+  expect(plan.nextHeading(1, "Document").domId).toBe("heading-document");
+  expect(plan.nextParagraph("Intro paragraph").blockId).toBe(
+    blockIdForParagraph("Intro paragraph", 0),
+  );
+  expect(plan.nextList("First bullet\nSecond bullet").blockId).toBe(
+    blockIdForList("First bullet\nSecond bullet", 0),
+  );
+  expect(plan.nextTable("Header A | Header B\nVal 1 | Val 2").blockId).toBe(
+    blockIdForTable("Header A | Header B\nVal 1 | Val 2", 0),
+  );
+  // Outro paragraph MUST get its own id, not shifted by list items or table!
+  expect(plan.nextParagraph("Outro paragraph").blockId).toBe(
+    blockIdForParagraph("Outro paragraph", 0),
+  );
+});
+
+test("partitionReaderSegments splits document around lists and tables", () => {
+  const raw = [
+    "# Document",
+    "",
+    "Intro paragraph",
+    "",
+    "- First bullet",
+    "- Second bullet",
+    "",
+    "Middle paragraph",
+    "",
+    "| Col 1 | Col 2 |",
+    "| --- | --- |",
+    "| A | B |",
+    "",
+    "Final paragraph",
+  ].join("\n");
+
+  const segments = partitionReaderSegments(raw);
+  expect(segments).toHaveLength(5);
+  expect(segments[0]?.kind).toBe("markdown");
+  expect(segments[0]?.text).toContain("# Document");
+  expect(segments[0]?.text).toContain("Intro paragraph");
+
+  expect(segments[1]?.kind).toBe("list");
+  expect(segments[1]?.text).toBe("- First bullet\n- Second bullet");
+
+  expect(segments[2]?.kind).toBe("markdown");
+  expect(segments[2]?.text).toBe("Middle paragraph");
+
+  expect(segments[3]?.kind).toBe("table");
+  expect(segments[3]?.text).toContain("| Col 1 | Col 2 |");
+
+  expect(segments[4]?.kind).toBe("markdown");
+  expect(segments[4]?.text).toBe("Final paragraph");
 });
 
 test("begin() resets cursors so a second render pass reproduces identical ids", () => {

@@ -5,7 +5,9 @@ import {
   applySuggestion,
   blockIdForCode,
   blockIdForHeading,
+  blockIdForList,
   blockIdForParagraph,
+  blockIdForTable,
   CreateNoteBodySchema,
   createNote,
   createSuggestion,
@@ -262,6 +264,68 @@ describe("findBlockRange, resolveBlockRawMarkdown, applyBlockEdit", () => {
     expect(findBlockRange(content, anchor)).toBeUndefined();
     expect(resolveBlockRawMarkdown(content, anchor)).toBeUndefined();
     expect(applyBlockEdit(content, anchor, "foo")).toBeUndefined();
+  });
+
+  test("finds and edits list blocks, and preserves paragraph resolution after lists", () => {
+    const docWithList = [
+      "# Doc",
+      "",
+      "Before paragraph.",
+      "",
+      "- Item A",
+      "- Item B",
+      "",
+      "After paragraph.",
+    ].join("\n");
+
+    const listText = "Item A\nItem B";
+    const listAnchor = {
+      kind: "list" as const,
+      blockId: blockIdForList(listText, 0),
+    };
+    const listRaw = resolveBlockRawMarkdown(docWithList, listAnchor);
+    expect(listRaw).toBe("- Item A\n- Item B");
+
+    const editedListDoc = applyBlockEdit(docWithList, listAnchor, "- Item A\n- Item B\n- Item C");
+    expect(editedListDoc).toBeDefined();
+    expect(editedListDoc).toContain("- Item C");
+    expect(editedListDoc).toContain("After paragraph.");
+
+    const afterParagraphAnchor = {
+      kind: "paragraph" as const,
+      blockId: blockIdForParagraph("After paragraph.", 0),
+    };
+    const afterRaw = resolveBlockRawMarkdown(docWithList, afterParagraphAnchor);
+    expect(afterRaw).toBe("After paragraph.");
+  });
+
+  test("finds and edits table blocks", () => {
+    const docWithTable = [
+      "# Tables",
+      "",
+      "| Name | Age |",
+      "| --- | --- |",
+      "| Alice | 30 |",
+      "",
+      "End of doc.",
+    ].join("\n");
+
+    const tableText = "Name | Age\nAlice | 30";
+    const tableAnchor = {
+      kind: "table" as const,
+      blockId: blockIdForTable(tableText, 0),
+    };
+    const tableRaw = resolveBlockRawMarkdown(docWithTable, tableAnchor);
+    expect(tableRaw).toBe("| Name | Age |\n| --- | --- |\n| Alice | 30 |");
+
+    const editedTableDoc = applyBlockEdit(
+      docWithTable,
+      tableAnchor,
+      "| Name | Age |\n| --- | --- |\n| Alice | 31 |",
+    );
+    expect(editedTableDoc).toBeDefined();
+    expect(editedTableDoc).toContain("| Alice | 31 |");
+    expect(editedTableDoc).toContain("End of doc.");
   });
 });
 

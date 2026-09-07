@@ -3,7 +3,9 @@ import type { BlockAnchor } from "../schemas/index.ts";
 import {
   blockIdForCode,
   blockIdForHeading,
+  blockIdForList,
   blockIdForParagraph,
+  blockIdForTable,
   extractHeadings,
   hashBlockContent,
   truncateAnchorLabel,
@@ -16,7 +18,9 @@ export type BlockSourceRange = {
 
 export type PinnableBlock =
   | { kind: "paragraph"; text: string; range?: BlockSourceRange }
-  | { kind: "code"; text: string; language: string | undefined; range?: BlockSourceRange };
+  | { kind: "code"; text: string; language: string | undefined; range?: BlockSourceRange }
+  | { kind: "list"; text: string; range?: BlockSourceRange }
+  | { kind: "table"; text: string; range?: BlockSourceRange };
 
 export type HeadingStackEntry = { level: number; text: string };
 
@@ -49,6 +53,28 @@ export const inlineToText = (nodes: InlineNode[]): string =>
     })
     .join("");
 
+export type ListNode = Extract<BlockNode, { type: "list" }>;
+export type TableNode = Extract<BlockNode, { type: "table" }>;
+
+export function listToText(block: ListNode): string {
+  return block.items
+    .map((item) =>
+      item.children
+        .map((child) => (child.type === "paragraph" ? inlineToText(child.children) : ""))
+        .join(" ")
+        .trim(),
+    )
+    .join("\n");
+}
+
+export function tableToText(block: TableNode): string {
+  const headers = block.headers.map((h) => inlineToText(h.children)).join(" | ");
+  const rows = block.rows
+    .map((row) => row.map((cell) => inlineToText(cell.children)).join(" | "))
+    .join("\n");
+  return `${headers}\n${rows}`;
+}
+
 /**
  * Walks parsed blocks in document order, same shape the reader's AnchorPlan
  * pins against. `isPinnableCode` lets a caller exclude fence languages it
@@ -80,14 +106,38 @@ export function collectPinnableBlocks(
           });
         }
         continue;
-      case "blockquote":
-        result.push(...collectPinnableBlocks(block.children, isPinnableCode));
-        continue;
       case "list":
-        for (const item of block.items) {
-          result.push(...collectPinnableBlocks(item.children, isPinnableCode));
+        result.push({
+          kind: "list",
+          text: listToText(block),
+          range: block.range,
+        });
+        continue;
+      case "table":
+        result.push({
+          kind: "table",
+          text: tableToText(block),
+          range: block.range,
+        });
+        continue;
+      case "blockquote":
+        for (const child of block.children) {
+          if (child.type === "paragraph") {
+            result.push({
+              kind: "paragraph",
+              text: inlineToText(child.children),
+              range: child.range ?? block.range,
+            });
+          } else if (child.type === "codeblock" && isPinnableCode(child.language)) {
+            result.push({
+              kind: "code",
+              text: child.content,
+              language: child.language,
+              range: child.range ?? block.range,
+            });
+          }
         }
-        break;
+        continue;
     }
   }
 
@@ -162,6 +212,8 @@ export function resolveBlockText(
 
   const paragraphCounts = new Map<string, number>();
   const codeCounts = new Map<string, number>();
+  const listCounts = new Map<string, number>();
+  const tableCounts = new Map<string, number>();
 
   for (const block of pinnable) {
     if (block.kind === "paragraph") {
@@ -177,14 +229,36 @@ export function resolveBlockText(
       continue;
     }
 
-    const key = hashBlockContent(`${block.language ?? ""}\n${block.text}`);
-    const occurrence = codeCounts.get(key) ?? 0;
-    codeCounts.set(key, occurrence + 1);
-    if (
-      anchor.kind === "code" &&
-      blockIdForCode(block.text, block.language, occurrence) === anchor.blockId
-    ) {
-      return block.text;
+    if (block.kind === "code") {
+      const key = hashBlockContent(`${block.language ?? ""}\n${block.text}`);
+      const occurrence = codeCounts.get(key) ?? 0;
+      codeCounts.set(key, occurrence + 1);
+      if (
+        anchor.kind === "code" &&
+        blockIdForCode(block.text, block.language, occurrence) === anchor.blockId
+      ) {
+        return block.text;
+      }
+      continue;
+    }
+
+    if (block.kind === "list") {
+      const hash = hashBlockContent(block.text);
+      const occurrence = listCounts.get(hash) ?? 0;
+      listCounts.set(hash, occurrence + 1);
+      if (anchor.kind === "list" && blockIdForList(block.text, occurrence) === anchor.blockId) {
+        return block.text;
+      }
+      continue;
+    }
+
+    if (block.kind === "table") {
+      const hash = hashBlockContent(block.text);
+      const occurrence = tableCounts.get(hash) ?? 0;
+      tableCounts.set(hash, occurrence + 1);
+      if (anchor.kind === "table" && blockIdForTable(block.text, occurrence) === anchor.blockId) {
+        return block.text;
+      }
     }
   }
 
@@ -232,6 +306,8 @@ export function findBlockRange(
   const pinnable = collectPinnableBlocks(blocks, options?.isPinnableCode);
   const paragraphCounts = new Map<string, number>();
   const codeCounts = new Map<string, number>();
+  const listCounts = new Map<string, number>();
+  const tableCounts = new Map<string, number>();
 
   for (const block of pinnable) {
     if (block.kind === "paragraph") {
@@ -247,14 +323,36 @@ export function findBlockRange(
       continue;
     }
 
-    const key = hashBlockContent(`${block.language ?? ""}\n${block.text}`);
-    const occurrence = codeCounts.get(key) ?? 0;
-    codeCounts.set(key, occurrence + 1);
-    if (
-      anchor.kind === "code" &&
-      blockIdForCode(block.text, block.language, occurrence) === anchor.blockId
-    ) {
-      return block.range;
+    if (block.kind === "code") {
+      const key = hashBlockContent(`${block.language ?? ""}\n${block.text}`);
+      const occurrence = codeCounts.get(key) ?? 0;
+      codeCounts.set(key, occurrence + 1);
+      if (
+        anchor.kind === "code" &&
+        blockIdForCode(block.text, block.language, occurrence) === anchor.blockId
+      ) {
+        return block.range;
+      }
+      continue;
+    }
+
+    if (block.kind === "list") {
+      const hash = hashBlockContent(block.text);
+      const occurrence = listCounts.get(hash) ?? 0;
+      listCounts.set(hash, occurrence + 1);
+      if (anchor.kind === "list" && blockIdForList(block.text, occurrence) === anchor.blockId) {
+        return block.range;
+      }
+      continue;
+    }
+
+    if (block.kind === "table") {
+      const hash = hashBlockContent(block.text);
+      const occurrence = tableCounts.get(hash) ?? 0;
+      tableCounts.set(hash, occurrence + 1);
+      if (anchor.kind === "table" && blockIdForTable(block.text, occurrence) === anchor.blockId) {
+        return block.range;
+      }
     }
   }
 
@@ -290,7 +388,7 @@ export function applyBlockEdit(
 
 /** One anchorable block in the open document, ready to hand to propose_edit. */
 export type DocumentBlockSummary = {
-  kind: "heading" | "paragraph" | "code";
+  kind: "heading" | "paragraph" | "code" | "list" | "table";
   /** The id to put in a BlockAnchor — no client-side hashing required. */
   blockId: string;
   /** Short preview: heading/paragraph text, or a code block's first line. */
@@ -321,6 +419,8 @@ export function listDocumentBlocks(
 
   const paragraphCounts = new Map<string, number>();
   const codeCounts = new Map<string, number>();
+  const listCounts = new Map<string, number>();
+  const tableCounts = new Map<string, number>();
   let headingIndex = 0;
   let headingStack: HeadingStackEntry[] = [];
   const result: DocumentBlockSummary[] = [];
@@ -370,12 +470,35 @@ export function listDocumentBlocks(
           });
           continue;
         }
+        case "list": {
+          const text = listToText(block);
+          const hash = hashBlockContent(text);
+          const occurrence = listCounts.get(hash) ?? 0;
+          listCounts.set(hash, occurrence + 1);
+          result.push({
+            kind: "list",
+            blockId: blockIdForList(text, occurrence),
+            label: truncateAnchorLabel(text),
+            headingPath: headingStack.map((item) => item.text),
+          });
+          continue;
+        }
+        case "table": {
+          const text = tableToText(block);
+          const hash = hashBlockContent(text);
+          const occurrence = tableCounts.get(hash) ?? 0;
+          tableCounts.set(hash, occurrence + 1);
+          result.push({
+            kind: "table",
+            blockId: blockIdForTable(text, occurrence),
+            label: truncateAnchorLabel(text),
+            headingPath: headingStack.map((item) => item.text),
+          });
+          continue;
+        }
         case "blockquote":
           walk(block.children);
           continue;
-        case "list":
-          for (const item of block.items) walk(item.children);
-          break;
       }
     }
   };

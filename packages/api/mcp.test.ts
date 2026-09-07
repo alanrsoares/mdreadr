@@ -233,6 +233,8 @@ describe("MCP Server", () => {
       "heading",
       "paragraph",
       "code",
+      "list",
+      "table",
     ]);
 
     expect(props(findTool("get_document_block").inputSchema).anchor.properties.blockId.type).toBe(
