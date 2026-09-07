@@ -24,6 +24,15 @@ jobs:
         with:
           bun-version: latest
 
+      # `postinstall` runs `electrobun prepare`, which downloads the Hutch
+      # toolchain (Electrobun core plus a pinned Bun) on a cold machine. Keyed
+      # on the pinned electrobun version, so a bump invalidates it.
+      - name: Cache Hutch toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.hutch
+          key: hutch-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package.json') }}
+
       - run: bun install --frozen-lockfile
 
       # Generated (gitignored) theme output that ColorSchemeContext.tsx
@@ -62,6 +71,15 @@ jobs:
           # electrobun native bits ship prebuilt. xvfb gives the smoke test a
           # display to open a real window against.
           sudo apt-get install -y libgtk-3-0t64 libwebkit2gtk-4.1-0 libayatana-appindicator3-1 zenity xvfb
+
+      # `postinstall` runs `electrobun prepare`, which downloads the Hutch
+      # toolchain (Electrobun core plus a pinned Bun) on a cold machine. Keyed
+      # on the pinned electrobun version, so a bump invalidates it.
+      - name: Cache Hutch toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.hutch
+          key: hutch-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package.json') }}
 
       - run: bun install --frozen-lockfile
 
