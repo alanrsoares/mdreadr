@@ -16,6 +16,11 @@ wget -qO- https://raw.githubusercontent.com/alanrsoares/mdreadr/main/install.sh 
 
 Picks the right build from the latest GitHub release for your platform (macOS → `.app` into `/Applications`, Linux x64 → electrobun's self-extracting installer with a desktop entry). Pin a version with `MDREADR_VERSION=v0.1.0`; see the header of [`install.sh`](install.sh) for all options.
 
+Builds cover Apple Silicon macOS and Linux (x64 and arm64). Intel Macs are not
+covered: the Electrobun 2 toolchain mdreadr builds with has no darwin-x64
+target. [v0.13.0](https://github.com/alanrsoares/mdreadr/releases/tag/v0.13.0)
+is the last release with a macOS x64 build.
+
 ### macOS: the builds are unsigned
 
 mdreadr is not codesigned or notarized (no Apple Developer account behind it). The installer handles the fallout for you — it clears the `com.apple.quarantine` attribute and applies a local ad-hoc signature so the app launches.
