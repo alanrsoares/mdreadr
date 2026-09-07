@@ -1,8 +1,8 @@
 import { Button } from "@astryxdesign/core/Button";
 import type { ResizableRegion } from "@astryxdesign/core/Resizable";
 import { EditorView } from "@codemirror/view";
-import type { Suggestion, TocEntry } from "@mdreadr/domain";
-import { applySuggestion, extractHeadings } from "@mdreadr/domain";
+import type { BlockAnchor, Suggestion, TocEntry } from "@mdreadr/domain";
+import { applyBlockEdit, applySuggestion, extractHeadings } from "@mdreadr/domain";
 import { useContainer, useStoreValues } from "@re-reduced/react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { DocumentView } from "../components/DocumentView.tsx";
@@ -112,7 +112,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
       if (!isActive) return;
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
       if (event.key.toLowerCase() !== "s") return;
-      if (documentViewMode !== "edit") return;
+      if (documentViewMode !== "edit" && !dirty) return;
       event.preventDefault();
       if (dirty) {
         void saveDraft();
@@ -200,6 +200,21 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
     [reader],
   );
 
+  const onEditBlock = useCallback(
+    (anchor: BlockAnchor, newMarkdown: string) => {
+      if (!documentPath) return;
+      const updated = applyBlockEdit(editorValue, anchor, newMarkdown);
+      if (updated === undefined) {
+        showError("Edit block", "Could not locate that block in the document.");
+        return;
+      }
+      store.actions.draftEdited({ path: documentPath, text: updated, savedContent: content });
+      flashAnchor(anchor.blockId, "reader-block-edit-flash");
+      onAnnounce(`Updated ${anchor.label ?? anchor.kind} in draft`);
+    },
+    [documentPath, editorValue, content, showError, store, onAnnounce],
+  );
+
   return (
     <ReaderTabShell
       notesSidebar={notesSidebar}
@@ -249,7 +264,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
     >
       <DocumentView
         key={tabId}
-        content={content}
+        content={editorValue}
         documentPath={documentPath}
         notes={notes}
         isActive={isActive}
@@ -260,6 +275,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
           flashAnchor(anchor.blockId, "reader-block-pin-flash");
           onAnnounce(`Pinning note to ${anchor.label ?? anchor.kind}`);
         }}
+        onEditBlock={onEditBlock}
         editorValue={editorValue}
         onEditorChange={onEditorChange}
         onEditorReady={(view) => {
@@ -267,7 +283,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
           registerEditorView(view);
         }}
         chromeEnd={
-          isEditing ? (
+          isEditing || dirty ? (
             <Button
               label="Save"
               variant="primary"

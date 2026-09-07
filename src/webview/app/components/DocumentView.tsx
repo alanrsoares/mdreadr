@@ -24,6 +24,7 @@ type DocumentViewProps = {
   viewMode: DocumentViewMode;
   onViewModeChange: (mode: DocumentViewMode) => void;
   onPinBlock?: (anchor: BlockAnchor) => void;
+  onEditBlock?: (anchor: BlockAnchor, newMarkdown: string) => void;
   editorValue: string;
   onEditorChange: (text: string) => void;
   onEditorReady?: (view: EditorView) => void;
@@ -39,6 +40,7 @@ export const DocumentView = ({
   viewMode,
   onViewModeChange,
   onPinBlock,
+  onEditBlock,
   editorValue,
   onEditorChange,
   onEditorReady,
@@ -76,12 +78,16 @@ export const DocumentView = ({
 
       <ReaderDocumentBody className="reader-document-body" key={viewMode}>
         {viewMode === "preview" ? (
-          <div className="px-4 pt-4 pb-12 sm:px-6 sm:pt-6 sm:pb-14 md:px-8" style={readerStyles}>
+          <div
+            className="mx-auto max-w-[min(100%,clamp(640px,68vw,920px))] px-6 pt-4 pb-12 sm:px-10 sm:pt-6 sm:pb-14 md:px-14"
+            style={readerStyles}
+          >
             <MarkdownView
               content={content}
               documentPath={documentPath}
               notes={notes}
               onPinBlock={onPinBlock}
+              onEditBlock={onEditBlock}
             />
           </div>
         ) : (

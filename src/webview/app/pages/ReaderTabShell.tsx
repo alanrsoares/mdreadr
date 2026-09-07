@@ -58,7 +58,7 @@ export const ReaderTabShell = ({
         ref={mainRef}
         padding={0}
         label="Document"
-        className="relative bg-(--reader-well-bg)"
+        className="relative h-full overscroll-none bg-(--reader-paper-bg)"
         {...drop}
       >
         <div

@@ -1,6 +1,6 @@
 import { Markdown } from "@astryxdesign/core/Markdown";
 import type { BlockAnchor, Note } from "@mdreadr/domain";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { createAnchorPlan } from "../markdown/anchors.ts";
 import { createPinComponents } from "../markdown/pin-components.tsx";
 import {
@@ -21,10 +21,19 @@ type MarkdownViewProps = {
   notes: Note[];
   documentPath?: string;
   onPinBlock?: (anchor: BlockAnchor) => void;
+  onEditBlock?: (anchor: BlockAnchor, newMarkdown: string) => void;
 };
 
-export function MarkdownView({ content, notes, documentPath, onPinBlock }: MarkdownViewProps) {
+export function MarkdownView({
+  content,
+  notes,
+  documentPath,
+  onPinBlock,
+  onEditBlock,
+}: MarkdownViewProps) {
   const { readerFontSize } = useFontSettings();
+  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
+
   const prepared = useMemo(() => preprocessReaderMarkdown(content), [content]);
   const plan = useMemo(() => createAnchorPlan(prepared), [prepared]);
   const notedBlockIds = useMemo(() => new Set(notes.map((note) => note.anchor.blockId)), [notes]);
@@ -37,9 +46,47 @@ export function MarkdownView({ content, notes, documentPath, onPinBlock }: Markd
     [resolveImageSrc],
   );
 
+  const handleStartEditBlock = useCallback((anchor: BlockAnchor) => {
+    setEditingBlockId(anchor.blockId);
+  }, []);
+
+  const handleCancelBlockEdit = useCallback(() => {
+    setEditingBlockId(null);
+  }, []);
+
+  const handleSaveBlockEdit = useCallback(
+    (anchor: BlockAnchor, newMarkdown: string) => {
+      setEditingBlockId(null);
+      onEditBlock?.(anchor, newMarkdown);
+    },
+    [onEditBlock],
+  );
+
   const components = useMemo(
-    () => createPinComponents({ onPinBlock, plan, notedBlockIds, resolveImageSrc }),
-    [notedBlockIds, onPinBlock, plan, resolveImageSrc],
+    () =>
+      createPinComponents({
+        onPinBlock,
+        onStartEditBlock: onEditBlock ? handleStartEditBlock : undefined,
+        editingBlockId,
+        onSaveBlockEdit: handleSaveBlockEdit,
+        onCancelBlockEdit: handleCancelBlockEdit,
+        content,
+        plan,
+        notedBlockIds,
+        resolveImageSrc,
+      }),
+    [
+      onPinBlock,
+      onEditBlock,
+      handleStartEditBlock,
+      editingBlockId,
+      handleSaveBlockEdit,
+      handleCancelBlockEdit,
+      content,
+      plan,
+      notedBlockIds,
+      resolveImageSrc,
+    ],
   );
 
   // MUST run at the start of every render pass so cursors restart in sync

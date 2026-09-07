@@ -1,6 +1,8 @@
 import { Button } from "@astryxdesign/core/Button";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import type { ResizableRegion } from "@astryxdesign/core/Resizable";
+import type { BlockAnchor } from "@mdreadr/domain";
+import { applyBlockEdit } from "@mdreadr/domain";
 import { useContainer, useStoreValues } from "@re-reduced/react";
 import { useEffect, useRef, useState } from "react";
 import { DocumentView } from "../components/DocumentView.tsx";
@@ -51,6 +53,13 @@ export function UnsavedReaderTab({
     onDirtyChange(UNSAVED_TAB_ID, dirty);
   }, [dirty, onDirtyChange]);
 
+  const onEditBlock = (anchor: BlockAnchor, newMarkdown: string) => {
+    const updated = applyBlockEdit(text, anchor, newMarkdown);
+    if (updated !== undefined) {
+      setText(updated);
+    }
+  };
+
   return (
     <ReaderTabShell
       notesSidebar={notesSidebar}
@@ -80,10 +89,11 @@ export function UnsavedReaderTab({
         isActive={isActive}
         viewMode={documentViewMode}
         onViewModeChange={store.actions.documentViewModeChanged}
+        onEditBlock={onEditBlock}
         editorValue={text}
         onEditorChange={setText}
         chromeEnd={
-          documentViewMode === "edit" ? (
+          documentViewMode === "edit" || dirty ? (
             <Button
               label="Save As…"
               variant="primary"

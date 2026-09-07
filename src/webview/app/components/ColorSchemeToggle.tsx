@@ -1,42 +1,25 @@
 import { Icon } from "@astryxdesign/core/Icon";
-import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
-import { Tooltip } from "@astryxdesign/core/Tooltip";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import { MoonIcon, SunIcon } from "../icons.ts";
 import { useColorScheme } from "../theme/ColorSchemeContext.tsx";
 
 export function ColorSchemeToggle() {
   const { colorScheme, setColorScheme } = useColorScheme();
+  const isDark = colorScheme === "dark";
 
-  const handleSchemeChange = (next: string) => {
-    if (next === "light" || next === "dark") {
-      setColorScheme(next);
-    }
+  const handleToggle = () => {
+    setColorScheme(isDark ? "light" : "dark");
   };
 
+  const label = isDark ? "Switch to light mode" : "Switch to dark mode";
+
   return (
-    <SegmentedControl
-      label="Color scheme selection"
-      size="sm"
-      layout="hug"
-      value={colorScheme}
-      onChange={handleSchemeChange}
-    >
-      <Tooltip content="Light mode">
-        <SegmentedControlItem
-          value="light"
-          label="Light mode"
-          isLabelHidden
-          icon={<Icon icon={SunIcon} size="sm" />}
-        />
-      </Tooltip>
-      <Tooltip content="Dark mode">
-        <SegmentedControlItem
-          value="dark"
-          label="Dark mode"
-          isLabelHidden
-          icon={<Icon icon={MoonIcon} size="sm" />}
-        />
-      </Tooltip>
-    </SegmentedControl>
+    <IconButton
+      label={label}
+      tooltip={label}
+      variant="ghost"
+      icon={<Icon icon={isDark ? SunIcon : MoonIcon} size="sm" />}
+      onClick={handleToggle}
+    />
   );
 }

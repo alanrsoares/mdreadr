@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   addReply,
+  applyBlockEdit,
   applySuggestion,
   blockIdForCode,
   blockIdForHeading,
@@ -9,10 +10,12 @@ import {
   createNote,
   createSuggestion,
   extractHeadings,
+  findBlockRange,
   findNote,
   findSuggestion,
   listDocumentBlocks,
   parseNotesFileJson,
+  resolveBlockRawMarkdown,
   resolveBlockText,
   SaveDocumentBodySchema,
   setNoteStatus,
@@ -178,6 +181,87 @@ describe("resolveBlockText", () => {
   test("returns undefined when the anchor no longer matches", () => {
     const text = resolveBlockText(content, { kind: "paragraph", blockId: "paragraph-stale" });
     expect(text).toBeUndefined();
+  });
+});
+
+describe("findBlockRange, resolveBlockRawMarkdown, applyBlockEdit", () => {
+  const content = [
+    "# Document Title",
+    "",
+    "First paragraph with **bold** text.",
+    "",
+    "```typescript",
+    "const val = 42;",
+    "```",
+    "",
+    "## Section Two",
+    "",
+    "Second paragraph with *italic* text.",
+  ].join("\n");
+
+  test("finds block range and resolves raw markdown for paragraph", () => {
+    const blockId = blockIdForParagraph("First paragraph with bold text.", 0);
+    const anchor = { kind: "paragraph" as const, blockId };
+    const range = findBlockRange(content, anchor);
+    expect(range).toBeDefined();
+    expect(content.slice(range?.start, range?.end)).toBe("First paragraph with **bold** text.");
+    expect(resolveBlockRawMarkdown(content, anchor)).toBe("First paragraph with **bold** text.");
+  });
+
+  test("finds block range and resolves raw markdown for heading", () => {
+    const anchor = { kind: "heading" as const, blockId: "heading-section-two" };
+    const range = findBlockRange(content, anchor);
+    expect(range).toBeDefined();
+    expect(content.slice(range?.start, range?.end)).toBe("## Section Two");
+    expect(resolveBlockRawMarkdown(content, anchor)).toBe("## Section Two");
+  });
+
+  test("finds block range and resolves raw markdown for code block", () => {
+    const blockId = blockIdForCode("const val = 42;\n", "typescript", 0);
+    const anchor = { kind: "code" as const, blockId };
+    const range = findBlockRange(content, anchor);
+    expect(range).toBeDefined();
+    expect(content.slice(range?.start, range?.end)).toBe("```typescript\nconst val = 42;\n```");
+    expect(resolveBlockRawMarkdown(content, anchor)).toBe("```typescript\nconst val = 42;\n```");
+  });
+
+  test("applies block edit in place cleanly", () => {
+    const blockId = blockIdForParagraph("First paragraph with bold text.", 0);
+    const anchor = { kind: "paragraph" as const, blockId };
+    const updated = applyBlockEdit(content, anchor, "Updated paragraph with `code`.");
+    expect(updated).toBeDefined();
+    expect(updated).toContain("Updated paragraph with `code`.");
+    expect(updated).toContain("# Document Title");
+    expect(updated).toContain("## Section Two");
+    expect(updated).toContain("const val = 42;");
+  });
+
+  test("applies block edit to change heading level and text", () => {
+    const anchor = { kind: "heading" as const, blockId: "heading-section-two" };
+    const updated = applyBlockEdit(content, anchor, "### Renamed Subsection");
+    expect(updated).toBeDefined();
+    expect(updated).toContain("### Renamed Subsection");
+    expect(updated).not.toContain("## Section Two");
+  });
+
+  test("applies block edit to code blocks", () => {
+    const blockId = blockIdForCode("const val = 42;\n", "typescript", 0);
+    const anchor = { kind: "code" as const, blockId };
+    const updated = applyBlockEdit(
+      content,
+      anchor,
+      "```typescript\nconst val = 100;\nconst extra = true;\n```",
+    );
+    expect(updated).toBeDefined();
+    expect(updated).toContain("const val = 100;");
+    expect(updated).toContain("const extra = true;");
+  });
+
+  test("returns undefined when block anchor is not found", () => {
+    const anchor = { kind: "paragraph" as const, blockId: "nonexistent" };
+    expect(findBlockRange(content, anchor)).toBeUndefined();
+    expect(resolveBlockRawMarkdown(content, anchor)).toBeUndefined();
+    expect(applyBlockEdit(content, anchor, "foo")).toBeUndefined();
   });
 });
 

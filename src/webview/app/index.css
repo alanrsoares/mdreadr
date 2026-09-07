@@ -3,6 +3,8 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  overscroll-behavior: none;
+  background: var(--reader-paper-bg);
 }
 
 .sr-only {
@@ -331,13 +333,23 @@ body,
     transition: none;
   }
 
-  .reader-pin-button {
+  .reader-pin-button,
+  .reader-edit-button,
+  .reader-block-actions,
+  .reader-block-action-btn {
     transform: none;
     transition: opacity var(--duration-fast) var(--ease-standard);
   }
 
-  .reader-pin-button:active {
+  .reader-pin-button:active,
+  .reader-edit-button:active,
+  .reader-block-action-btn:active {
     transform: none;
+  }
+
+  .reader-block-edit-enter,
+  .reader-block-edit-flash {
+    animation: none;
   }
 
   .reader-block-has-note {
@@ -398,6 +410,134 @@ body,
 
 .reader-pin-button:active {
   transform: scale(0.94);
+}
+
+.reader-edit-button {
+  position: absolute;
+  top: 0.125rem;
+  left: -1.75rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-inner);
+  background: var(--reader-paper-bg);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  line-height: 0;
+  opacity: 0;
+  padding: 0.25rem;
+  transform: scale(0.92);
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (min-width: 640px) {
+  .reader-edit-button {
+    left: -2rem;
+  }
+}
+
+.group\/pin:hover .reader-edit-button,
+.group\/pin:focus-within .reader-edit-button,
+.reader-edit-button:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.reader-edit-button:hover {
+  border-color: var(--color-text-accent);
+  color: var(--color-text-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--reader-paper-bg));
+}
+
+.reader-edit-button:active {
+  transform: scale(0.94);
+}
+
+.reader-block-actions {
+  position: absolute;
+  top: 0.125rem;
+  right: 0;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  opacity: 0;
+  transform: scale(0.92);
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+.group\/pin:hover .reader-block-actions,
+.group\/pin:focus-within .reader-block-actions,
+.reader-block-actions:focus-within {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.reader-block-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-inner);
+  background: var(--reader-paper-bg);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  line-height: 0;
+  padding: 0.25rem;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+.reader-block-action-btn:hover {
+  border-color: var(--color-text-accent);
+  color: var(--color-text-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--reader-paper-bg));
+}
+
+.reader-block-action-btn:active {
+  transform: scale(0.94);
+}
+
+@keyframes reader-block-edit-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.reader-block-edit-enter {
+  animation: reader-block-edit-enter var(--duration-fast) cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes reader-block-edit-flash {
+  0% {
+    outline: 2px solid var(--color-text-accent);
+    background-color: color-mix(in srgb, var(--color-text-accent) 12%, transparent);
+  }
+  100% {
+    outline: 2px solid transparent;
+    background-color: transparent;
+  }
+}
+
+.reader-block-edit-flash {
+  animation: reader-block-edit-flash 1.2s var(--ease-standard) both;
 }
 
 .reader-block-has-note {

@@ -1,16 +1,11 @@
 import tw from "@styled-cva/react";
 
-// The horizontal padding is what makes --reader-well-bg (and the sheet's border,
-// radius and shadow) visible: without it the sheet fills the well edge to edge
-// at every window size this app is actually used at.
-export const ReaderContent = tw.div(
-  "mx-auto min-h-full w-full max-w-[min(100%,clamp(640px,68vw,920px))] px-3 py-3 sm:px-5 sm:py-5",
-);
+export const ReaderContent = tw.div("relative inset-0 h-full min-h-full w-full overscroll-none");
 
 export const ReaderSheet = tw.article(
   // No overflow clip here: it would become the sticky context for
   // ReaderDocumentChrome, which must stick to ReaderMain's scroll instead.
-  "flex min-h-full flex-col rounded-none border border-(--color-border) bg-(--reader-paper-bg) shadow-(--shadow-low) transition-[box-shadow] duration-(--duration-fast) ease-(--ease-standard) hover:shadow-(--shadow-med)",
+  "flex h-full min-h-full flex-col rounded-none border-0 bg-(--reader-paper-bg) overscroll-none",
 );
 
 export const ReaderDocumentChrome = tw.header(

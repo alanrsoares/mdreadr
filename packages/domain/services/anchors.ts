@@ -9,9 +9,14 @@ import {
   truncateAnchorLabel,
 } from "./markdown.ts";
 
+export type BlockSourceRange = {
+  start: number;
+  end: number;
+};
+
 export type PinnableBlock =
-  | { kind: "paragraph"; text: string }
-  | { kind: "code"; text: string; language: string | undefined };
+  | { kind: "paragraph"; text: string; range?: BlockSourceRange }
+  | { kind: "code"; text: string; language: string | undefined; range?: BlockSourceRange };
 
 export type HeadingStackEntry = { level: number; text: string };
 
@@ -59,11 +64,20 @@ export function collectPinnableBlocks(
   for (const block of blocks) {
     switch (block.type) {
       case "paragraph":
-        result.push({ kind: "paragraph", text: inlineToText(block.children) });
+        result.push({
+          kind: "paragraph",
+          text: inlineToText(block.children),
+          range: block.range,
+        });
         continue;
       case "codeblock":
         if (isPinnableCode(block.language)) {
-          result.push({ kind: "code", text: block.content, language: block.language });
+          result.push({
+            kind: "code",
+            text: block.content,
+            language: block.language,
+            range: block.range,
+          });
         }
         continue;
       case "blockquote":
@@ -183,6 +197,95 @@ export function resolveBlockText(
   }
 
   return undefined;
+}
+
+/**
+ * Finds the exact source range [start, end) of a block in markdown content.
+ */
+export function findBlockRange(
+  content: string,
+  anchor: BlockAnchor,
+  options?: ResolveBlockTextOptions,
+): BlockSourceRange | undefined {
+  if (anchor.kind === "document") {
+    return { start: 0, end: content.length };
+  }
+
+  const blocks = parseMarkdown(content, { sourceRanges: true, autolink: "gfm" });
+
+  if (anchor.kind === "heading") {
+    const headings = extractHeadings(content);
+    const index = headings.findIndex((entry) => blockIdForHeading(entry) === anchor.blockId);
+    if (index === -1) return undefined;
+    let headingCount = 0;
+    for (const block of blocks) {
+      if (block.type === "heading") {
+        if (headingCount === index) {
+          return block.range;
+        }
+        headingCount += 1;
+      }
+    }
+    return undefined;
+  }
+
+  const pinnable = collectPinnableBlocks(blocks, options?.isPinnableCode);
+  const paragraphCounts = new Map<string, number>();
+  const codeCounts = new Map<string, number>();
+
+  for (const block of pinnable) {
+    if (block.kind === "paragraph") {
+      const hash = hashBlockContent(block.text);
+      const occurrence = paragraphCounts.get(hash) ?? 0;
+      paragraphCounts.set(hash, occurrence + 1);
+      if (
+        anchor.kind === "paragraph" &&
+        blockIdForParagraph(block.text, occurrence) === anchor.blockId
+      ) {
+        return block.range;
+      }
+      continue;
+    }
+
+    const key = hashBlockContent(`${block.language ?? ""}\n${block.text}`);
+    const occurrence = codeCounts.get(key) ?? 0;
+    codeCounts.set(key, occurrence + 1);
+    if (
+      anchor.kind === "code" &&
+      blockIdForCode(block.text, block.language, occurrence) === anchor.blockId
+    ) {
+      return block.range;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Resolves the raw markdown source of an anchored block from the document.
+ */
+export function resolveBlockRawMarkdown(
+  content: string,
+  anchor: BlockAnchor,
+  options?: ResolveBlockTextOptions,
+): string | undefined {
+  const range = findBlockRange(content, anchor, options);
+  if (!range) return undefined;
+  return content.slice(range.start, range.end);
+}
+
+/**
+ * Replaces the exact source range of an anchored block in markdown content.
+ */
+export function applyBlockEdit(
+  content: string,
+  anchor: BlockAnchor,
+  newBlockMarkdown: string,
+  options?: ResolveBlockTextOptions,
+): string | undefined {
+  const range = findBlockRange(content, anchor, options);
+  if (!range) return undefined;
+  return `${content.slice(0, range.start)}${newBlockMarkdown}${content.slice(range.end)}`;
 }
 
 /** One anchorable block in the open document, ready to hand to propose_edit. */
