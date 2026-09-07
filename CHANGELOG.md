@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.2](https://github.com/alanrsoares/mdreadr/compare/v0.12.1...v0.12.2) (2026-09-07)
+
+
+### Bug Fixes
+
+* **ci:** exit the smoke test once the app is up ([c8ad7c8](https://github.com/alanrsoares/mdreadr/commit/c8ad7c8c7211e07c3a966c308d8b280406ebede8))
+* **ci:** exit the smoke test once the app is up ([8c8c6d2](https://github.com/alanrsoares/mdreadr/commit/8c8c6d29f28f35603071e53fb0f47ac184665897))
+
 ## [0.12.1](https://github.com/alanrsoares/mdreadr/compare/v0.12.0...v0.12.1) (2026-09-07)
 
 
