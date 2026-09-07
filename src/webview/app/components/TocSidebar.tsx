@@ -20,9 +20,21 @@ type TocSidebarProps = {
    * headings live in the CodeMirror document rather than in rendered DOM.
    */
   onSelect?: (entry: TocEntry) => void;
+  /**
+   * Active entry from the caller, for the same reason: with no heading elements
+   * to observe, the DOM scroll spy cannot find the current section, so edit
+   * mode tracks it against the editor instead.
+   */
+  activeId?: string;
 };
 
-export const TocSidebar = ({ entries, scrollRootRef, documentKey, onSelect }: TocSidebarProps) => {
+export const TocSidebar = ({
+  entries,
+  scrollRootRef,
+  documentKey,
+  onSelect,
+  activeId,
+}: TocSidebarProps) => {
   const items = entries.map((entry) => ({
     id: blockIdForHeading(entry),
     label: entry.text,
@@ -85,7 +97,7 @@ export const TocSidebar = ({ entries, scrollRootRef, documentKey, onSelect }: To
       <Outline
         density="compact"
         items={items}
-        activeId={onSelect ? selectedId : spiedActiveId}
+        activeId={onSelect ? (activeId ?? selectedId) : spiedActiveId}
         hasScrollOnClick={!onSelect}
       />
     </TocNav>

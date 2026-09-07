@@ -5,7 +5,11 @@ export const ReaderContent = tw.div("relative inset-0 h-full min-h-full w-full o
 export const ReaderSheet = tw.article(
   // No overflow clip here: it would become the sticky context for
   // ReaderDocumentChrome, which must stick to ReaderMain's scroll instead.
-  "flex h-full min-h-full flex-col rounded-none border-0 bg-(--reader-paper-bg) overscroll-none",
+  // No `h-full` either: pinning the sheet to one viewport left its sticky
+  // header with a 100%-tall containing block, so the chrome scrolled away with
+  // the first screenful. `min-h-full` keeps a short document filling the pane
+  // while a long one grows the sheet, which is what keeps the header up.
+  "flex min-h-full flex-col rounded-none border-0 bg-(--reader-paper-bg) overscroll-none",
 );
 
 export const ReaderDocumentChrome = tw.header(
@@ -18,9 +22,16 @@ export const ReaderChromeEnd = tw.div(
   "absolute right-4 top-1/2 -translate-y-1/2 sm:right-2 md:right-3.5",
 );
 
-// Padding is owned by the mode-specific wrapper inside DocumentView (preview
-// needs it, the editor supplies its own), so this stays a bare flex child.
 export const ReaderDocumentBody = tw.div`min-h-0 flex-1`;
+
+// The one column both modes live in. Preview and Edit share it so that toggling
+// leaves the text where it was: same centring, same padding, same width. Sheet
+// width is chrome, but it must never be the thing that sets line length - past
+// ~24px reader text the 920px cap would clip the measure, so the column grows
+// to fit the measure plus its own widest padding.
+export const ReaderColumn = tw.div(
+  "mx-auto max-w-[min(100%,max(clamp(640px,68vw,920px),calc(var(--reader-measure)+7rem)))] px-8 pt-4 pb-12 sm:px-10 sm:pt-6 sm:pb-14 md:px-14",
+);
 
 export const ReaderBadgeRow = tw.div`flex flex-wrap items-center gap-1.5`;
 

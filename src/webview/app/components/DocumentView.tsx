@@ -1,11 +1,14 @@
 import { HStack } from "@astryxdesign/core/HStack";
 import type { EditorView } from "@codemirror/view";
 import type { BlockAnchor, Note } from "@mdreadr/domain";
-import type { CSSProperties, ReactNode } from "react";
+import { type CSSProperties, type ReactNode, useRef } from "react";
+import { useReaderBlockNavigation } from "../hooks/useReaderBlockNavigation.ts";
 import { getReaderFontFamilyCss, useFontSettings } from "../theme/FontSettingsContext.tsx";
+import { getReaderMeasurePx } from "../theme/measure.ts";
 import {
   ReaderChromeControls,
   ReaderChromeEnd,
+  ReaderColumn,
   ReaderDocumentBody,
   ReaderDocumentChrome,
   ReaderSheet,
@@ -47,8 +50,12 @@ export const DocumentView = ({
   chromeEnd,
   isActive = true,
 }: DocumentViewProps) => {
-  const { readerFontSize, readerFontFamily, readerLineHeight } = useFontSettings();
+  const { readerFontSize, readerFontFamily, readerLineHeight, editorFontSize, editorFontFamily } =
+    useFontSettings();
   const readerFontFamilyCss = getReaderFontFamilyCss(readerFontFamily);
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  useReaderBlockNavigation(previewRef, isActive && viewMode === "preview");
 
   const readerStyles = {
     "--text-body-size": `${readerFontSize}px`,
@@ -60,6 +67,9 @@ export const DocumentView = ({
     "--reader-heading-family": readerFontFamilyCss,
     // Code tracks the reader size instead of staying pinned at the 14px base.
     "--text-code-size": `${Math.round(readerFontSize * 0.9)}px`,
+    "--reader-measure": `${getReaderMeasurePx(readerFontSize, readerFontFamily)}px`,
+    // Same law for the source column, in ems of the editor's own font size.
+    "--reader-editor-measure": `${getReaderMeasurePx(editorFontSize, editorFontFamily)}px`,
   } as CSSProperties;
 
   return (
@@ -76,12 +86,11 @@ export const DocumentView = ({
         </ReaderChromeEnd>
       </ReaderDocumentChrome>
 
-      <ReaderDocumentBody className="reader-document-body" key={viewMode}>
+      {/* No `key={viewMode}`: keying here remounts the whole body on every
+          toggle, which replays the enter animation and reads as a flash. */}
+      <ReaderDocumentBody className="reader-document-body">
         {viewMode === "preview" ? (
-          <div
-            className="mx-auto max-w-[min(100%,clamp(640px,68vw,920px))] px-6 pt-4 pb-12 sm:px-10 sm:pt-6 sm:pb-14 md:px-14"
-            style={readerStyles}
-          >
+          <ReaderColumn ref={previewRef} style={readerStyles}>
             <MarkdownView
               content={content}
               documentPath={documentPath}
@@ -89,13 +98,15 @@ export const DocumentView = ({
               onPinBlock={onPinBlock}
               onEditBlock={onEditBlock}
             />
-          </div>
+          </ReaderColumn>
         ) : (
-          <DocumentEditor
-            value={editorValue}
-            onChange={onEditorChange}
-            onEditorReady={onEditorReady}
-          />
+          <ReaderColumn style={readerStyles}>
+            <DocumentEditor
+              value={editorValue}
+              onChange={onEditorChange}
+              onEditorReady={onEditorReady}
+            />
+          </ReaderColumn>
         )}
       </ReaderDocumentBody>
     </ReaderSheet>
