@@ -42,9 +42,23 @@ as a description of current behaviour.
 - The document body is not keyed on the view mode: keying it remounted the subtree and replayed the enter animation as a flash on every toggle.
 
 ### 2.4 Inline block editing - Shipped
-- Entered by double-click on a block or by the gutter edit control.
+- Entered by double-click on a block or by the gutter edit control. A double-click on a link, a code block's own control, or any other embedded control is that control's gesture and does not open the editor (`EditableBlock`, `src/webview/app/ui/editable-block.tsx`, which every anchored block kind goes through).
 - Swaps the block in place for `InlineBlockEditor`, surrounding document context preserved.
-- `Escape` cancels, `Cmd+Enter` / `Ctrl+Enter` saves.
+- **Zero shift on the block itself**: padding cancelled by a negative inline margin, an `inset` ring rather than a border, no padding on the textarea, and the source capped at `--reader-measure` so it wraps where the rendered text wrapped. Measured in the build at 1440px: rendered and source both at `left: 240, top: 299.31, width: 475`, block above unmoved. Everything below moves down by the height of the chrome, which sits *below* the text on purpose.
+- `Escape` cancels, `Cmd+Enter` / `Ctrl+Enter` saves, from the textarea and from a focused toolbar button (the handler is on the editor section, not the textarea).
+- The formatting toolbar is one Tab stop with roving focus: `ArrowLeft` / `ArrowRight` / `Home` / `End` move within it. Verified: `Bold` -> `ArrowRight` -> `Italic` -> `End` -> `Heading 3`. Its buttons cancel `mousedown`, so a click acts on the selection the reader had.
+- Transforms behind the toolbar and the shortcuts are pure and tested (`src/webview/app/markdown/inline-edit-ops.ts`): markers toggle back off, a collapsed caret takes the word it sits in, line prefixes apply to every line the selection touches, and the same heading button toggles the level back to a paragraph.
+- **Losing an edit takes two deliberate steps.** A dirty `Escape` arms and the hint says so; a second one discards. Starting another block's edit while one is dirty is refused, and the open editor pulses (`callAttentionToInlineEditor`). A save that cannot locate the block keeps the editor open and shows the reason inline.
+- On close, focus goes back to the block by document position, and an applied edit flashes it. Verified: after both Cancel and Apply, `document.activeElement` is the block, and after Apply it carries `.reader-block-edit-flash`. Position, not id, because editing a paragraph or heading changes its content-derived id, which is also why the old id-based flash never fired.
+
+### 2.5 Links inside a Document - Shipped
+- The reader is a webview, so a followed link navigates the app off its own bundle and the session is gone (`asar_read_file failed for 'views/mainview/CONTEXT.md'`). Every click is classified first by `resolveReaderLink` (`src/webview/app/markdown/document-links.ts`), matched exhaustively:
+  - **Another markdown Document** (relative, parent-relative or absolute, percent-escapes decoded, query dropped): opens in a Tab through the same `onOpenPath` the recents list uses. A `#fragment` on it is carried but not yet applied in the opened Tab.
+  - **A bare `#fragment`**: scroll-centres and flashes the heading in the Document already open. Markdown fragments are GitHub-style slugs while reader heading ids carry a `heading-` prefix, so both spellings are tried (`scrollToHeadingSlug`).
+  - **`http`, `https`, `mailto`**: handed to the OS by the main process (`POST /system/open-url`, webview-token guarded, scheme-allowlisted). `file:`, `views:` and `javascript:` are refused there, not just here.
+  - **Anything else** (other file types, relative paths with no Document to resolve against): left to the browser untouched.
+- Handled by delegation on the reader article, not by a `link` component override: list and table segments render without the override, which is exactly where a Document's links to its neighbours tend to sit.
+- External links carry a `↗` after the text, at rest and brighter on hover or focus. The glyph's space is reserved always, so revealing it cannot reflow the line. The full destination is filled into a native tooltip on first hover, since the reader has no status bar.
 
 ---
 
