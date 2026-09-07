@@ -10,6 +10,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useCallback, useEffect } from "react";
+import { shortcutLabel } from "../platform.ts";
 import {
   type EditorFontFamily,
   type ReaderFontFamily,
@@ -167,7 +168,7 @@ export function FontAdjustmentControl({
               <Text type="body" weight="semibold">
                 Font Settings
               </Text>
-              <Tooltip content="Reset font settings (⌘0)">
+              <Tooltip content={`Reset font settings (${shortcutLabel("0")})`}>
                 <Button
                   label="Reset font settings"
                   variant="ghost"
@@ -256,7 +257,9 @@ export function FontAdjustmentControl({
           </VStack>
         }
       >
-        <Tooltip content={`Font settings — ${surface} at ${currentSize}px (⌘+ / ⌘- / ⌘0)`}>
+        <Tooltip
+          content={`Font settings, ${surface} at ${currentSize}px (${shortcutLabel("+")} / ${shortcutLabel("-")} / ${shortcutLabel("0")})`}
+        >
           <Button label={`Font settings, ${surface} at ${currentSize}px`} variant="ghost" size="sm">
             <span className="flex select-none items-center gap-1.5 font-semibold text-xs">
               <span className="font-serif text-sm">aA</span>

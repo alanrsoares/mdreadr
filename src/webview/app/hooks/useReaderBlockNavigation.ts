@@ -1,5 +1,6 @@
 import type { RefObject } from "react";
 import { useEffect } from "react";
+import { INLINE_EDITOR_SELECTOR } from "../markdown/anchors.ts";
 
 const HEADING_TAGS = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
 
@@ -17,8 +18,8 @@ function isTextEntry(target: EventTarget | null): boolean {
 /** An open inline editor owns the document, even when focus sits on one of its
  *  toolbar buttons rather than in the textarea: moving the reader's cursor out
  *  from under an edit in progress is never what `j` meant.
- *  (`.reader-block-edit-enter` is `InlineBlockEditor`'s own wrapper class.) */
-const isEditingInline = (): boolean => document.querySelector(".reader-block-edit-enter") !== null;
+ *  (`INLINE_EDITOR_SELECTOR` matches `InlineBlockEditor`'s own wrapper.) */
+const isEditingInline = (): boolean => document.querySelector(INLINE_EDITOR_SELECTOR) !== null;
 
 /** The block the cursor moves from: the focused one if there is one, otherwise
  *  the first block at or below the top of the viewport, so `j` continues from

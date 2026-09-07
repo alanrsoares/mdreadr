@@ -1,10 +1,11 @@
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import type { MarkdownComponents } from "@astryxdesign/core/Markdown";
 import { type BlockAnchor, resolveBlockRawMarkdown } from "@mdreadr/domain";
+import { err, type Result } from "@onrails/result";
 import type { ReactNode } from "react";
 import { InlineBlockEditor } from "../components/InlineBlockEditor.tsx";
-import { EditBlockButton, PinButton } from "../ui/block-actions.tsx";
-import { PinnableBlock } from "../ui/pinnable-block.tsx";
+import type { BlockEditError } from "../session/block-edit.ts";
+import { EditableBlock } from "../ui/editable-block.tsx";
 import {
   ReaderBlockquote,
   ReaderCodeWrap,
@@ -18,8 +19,10 @@ export type PinContext = {
   onPinBlock?: (anchor: BlockAnchor) => void;
   onStartEditBlock?: (anchor: BlockAnchor) => void;
   editingBlockId?: string | null;
-  onSaveBlockEdit?: (anchor: BlockAnchor, newMarkdown: string) => void;
+  /** An `Err` leaves the editor open, showing why the edit did not apply. */
+  onSaveBlockEdit?: (anchor: BlockAnchor, newMarkdown: string) => Result<void, BlockEditError>;
   onCancelBlockEdit?: () => void;
+  onEditorDirtyChange?: (isDirty: boolean) => void;
   content?: string;
   plan: AnchorPlan;
   notedBlockIds: ReadonlySet<string>;
@@ -43,110 +46,81 @@ function textFromChildren(children: ReactNode): string {
 export const blockClasses = (notedBlockIds: ReadonlySet<string>, blockId: string): string =>
   notedBlockIds.has(blockId) ? "reader-block-has-note" : "";
 
-type PinParagraphProps = {
-  children: ReactNode;
-  onPinBlock?: (anchor: BlockAnchor) => void;
-  onStartEditBlock?: (anchor: BlockAnchor) => void;
-  editingBlockId?: string | null;
-  onSaveBlockEdit?: (anchor: BlockAnchor, newMarkdown: string) => void;
-  onCancelBlockEdit?: () => void;
-  content?: string;
-  plan: AnchorPlan;
-  notedBlockIds: ReadonlySet<string>;
+type BlockSourceEditorProps = {
+  anchor: BlockAnchor;
+  /** Source to edit when the exact range cannot be resolved in the document. */
+  fallback: string;
+  ctx: PinContext;
 };
 
-function PinParagraph({
-  children,
-  onPinBlock,
-  onStartEditBlock,
-  editingBlockId,
-  onSaveBlockEdit,
-  onCancelBlockEdit,
-  content,
-  plan,
-  notedBlockIds,
-}: PinParagraphProps) {
+/**
+ * The inline editor for one anchored block, seeded with that block's exact
+ * source range. Shared by every block kind so the seeding rule (real range,
+ * else reconstructed fallback) lives in one place.
+ */
+export function BlockSourceEditor({ anchor, fallback, ctx }: BlockSourceEditorProps) {
+  const raw = ctx.content ? (resolveBlockRawMarkdown(ctx.content, anchor) ?? fallback) : fallback;
+
+  return (
+    <InlineBlockEditor
+      anchor={anchor}
+      initialValue={raw}
+      onSave={(newMarkdown) =>
+        ctx.onSaveBlockEdit?.(anchor, newMarkdown) ?? err({ _tag: "BlockNotFound" })
+      }
+      onCancel={() => ctx.onCancelBlockEdit?.()}
+      onDirtyChange={ctx.onEditorDirtyChange}
+    />
+  );
+}
+
+type PinParagraphProps = {
+  children: ReactNode;
+  ctx: PinContext;
+};
+
+function PinParagraph({ children, ctx }: PinParagraphProps) {
   const text = textFromChildren(children);
-  const anchor = plan.nextParagraph(text);
+  const anchor = ctx.plan.nextParagraph(text);
   const blockId = anchor.blockId;
 
-  if (editingBlockId === blockId) {
-    const raw = content ? (resolveBlockRawMarkdown(content, anchor) ?? text) : text;
-    return (
-      <InlineBlockEditor
-        anchor={anchor}
-        initialValue={raw}
-        onSave={(newMarkdown) => onSaveBlockEdit?.(anchor, newMarkdown)}
-        onCancel={() => onCancelBlockEdit?.()}
-      />
-    );
+  if (ctx.editingBlockId === blockId) {
+    return <BlockSourceEditor anchor={anchor} fallback={text} ctx={ctx} />;
   }
 
   return (
-    <PinnableBlock onDoubleClick={() => onStartEditBlock?.(anchor)}>
-      {onStartEditBlock ? <EditBlockButton anchor={anchor} onEdit={onStartEditBlock} /> : null}
-      {onPinBlock ? <PinButton anchor={anchor} onPin={onPinBlock} /> : null}
-      <ReaderParagraph data-block-id={blockId} className={blockClasses(notedBlockIds, blockId)}>
+    <EditableBlock anchor={anchor} onEdit={ctx.onStartEditBlock} onPin={ctx.onPinBlock}>
+      <ReaderParagraph data-block-id={blockId} className={blockClasses(ctx.notedBlockIds, blockId)}>
         {children}
       </ReaderParagraph>
-    </PinnableBlock>
+    </EditableBlock>
   );
 }
 
 type PinCodeBlockProps = {
   code: string;
   language?: string;
-  onPinBlock?: (anchor: BlockAnchor) => void;
-  onStartEditBlock?: (anchor: BlockAnchor) => void;
-  editingBlockId?: string | null;
-  onSaveBlockEdit?: (anchor: BlockAnchor, newMarkdown: string) => void;
-  onCancelBlockEdit?: () => void;
-  content?: string;
-  plan: AnchorPlan;
-  notedBlockIds: ReadonlySet<string>;
-  resolveImageSrc?: ImageSrcResolver;
+  ctx: PinContext;
 };
 
-function PinCodeBlock({
-  code,
-  language,
-  onPinBlock,
-  onStartEditBlock,
-  editingBlockId,
-  onSaveBlockEdit,
-  onCancelBlockEdit,
-  content,
-  plan,
-  notedBlockIds,
-  resolveImageSrc,
-}: PinCodeBlockProps) {
-  const special = renderSpecialFence(language, code, { resolveImageSrc });
+function PinCodeBlock({ code, language, ctx }: PinCodeBlockProps) {
+  const special = renderSpecialFence(language, code, { resolveImageSrc: ctx.resolveImageSrc });
   if (special !== null) return special;
 
-  const anchor = plan.nextCode(code, language);
+  const anchor = ctx.plan.nextCode(code, language);
   const blockId = anchor.blockId;
 
-  if (editingBlockId === blockId) {
+  if (ctx.editingBlockId === blockId) {
     const fallback = `\`\`\`${language ?? ""}\n${code}\n\`\`\``;
-    const raw = content ? (resolveBlockRawMarkdown(content, anchor) ?? fallback) : fallback;
-    return (
-      <InlineBlockEditor
-        anchor={anchor}
-        initialValue={raw}
-        onSave={(newMarkdown) => onSaveBlockEdit?.(anchor, newMarkdown)}
-        onCancel={() => onCancelBlockEdit?.()}
-      />
-    );
+    return <BlockSourceEditor anchor={anchor} fallback={fallback} ctx={ctx} />;
   }
 
   return (
-    <PinnableBlock onDoubleClick={() => onStartEditBlock?.(anchor)}>
-      {onStartEditBlock ? <EditBlockButton anchor={anchor} onEdit={onStartEditBlock} /> : null}
-      {onPinBlock ? <PinButton anchor={anchor} onPin={onPinBlock} /> : null}
-      <ReaderCodeWrap data-block-id={blockId} className={blockClasses(notedBlockIds, blockId)}>
+    <EditableBlock anchor={anchor} onEdit={ctx.onStartEditBlock} onPin={ctx.onPinBlock}>
+      <ReaderCodeWrap data-block-id={blockId} className={blockClasses(ctx.notedBlockIds, blockId)}>
         <CodeBlock code={code} language={language} isCollapsible />
       </ReaderCodeWrap>
-    </PinnableBlock>
+    </EditableBlock>
   );
 }
 
@@ -156,28 +130,15 @@ export const createPinComponents = (ctx: PinContext): Partial<MarkdownComponents
     const { anchor, domId } = ctx.plan.nextHeading(level, text);
 
     if (ctx.editingBlockId === anchor.blockId) {
-      const fallback = `${"#".repeat(level)} ${text}`;
-      const raw = ctx.content
-        ? (resolveBlockRawMarkdown(ctx.content, anchor) ?? fallback)
-        : fallback;
       return (
-        <InlineBlockEditor
-          anchor={anchor}
-          initialValue={raw}
-          onSave={(newMarkdown) => ctx.onSaveBlockEdit?.(anchor, newMarkdown)}
-          onCancel={() => ctx.onCancelBlockEdit?.()}
-        />
+        <BlockSourceEditor anchor={anchor} fallback={`${"#".repeat(level)} ${text}`} ctx={ctx} />
       );
     }
 
     const Heading = readerHeadingByLevel[level];
 
     return (
-      <PinnableBlock onDoubleClick={() => ctx.onStartEditBlock?.(anchor)}>
-        {ctx.onStartEditBlock ? (
-          <EditBlockButton anchor={anchor} onEdit={ctx.onStartEditBlock} />
-        ) : null}
-        {ctx.onPinBlock ? <PinButton anchor={anchor} onPin={ctx.onPinBlock} /> : null}
+      <EditableBlock anchor={anchor} onEdit={ctx.onStartEditBlock} onPin={ctx.onPinBlock}>
         <Heading
           id={domId}
           data-block-id={domId}
@@ -185,41 +146,14 @@ export const createPinComponents = (ctx: PinContext): Partial<MarkdownComponents
         >
           {children}
         </Heading>
-      </PinnableBlock>
+      </EditableBlock>
     );
   },
   paragraph({ children }) {
-    return (
-      <PinParagraph
-        onPinBlock={ctx.onPinBlock}
-        onStartEditBlock={ctx.onStartEditBlock}
-        editingBlockId={ctx.editingBlockId}
-        onSaveBlockEdit={ctx.onSaveBlockEdit}
-        onCancelBlockEdit={ctx.onCancelBlockEdit}
-        content={ctx.content}
-        plan={ctx.plan}
-        notedBlockIds={ctx.notedBlockIds}
-      >
-        {children}
-      </PinParagraph>
-    );
+    return <PinParagraph ctx={ctx}>{children}</PinParagraph>;
   },
   code({ code, language }) {
-    return (
-      <PinCodeBlock
-        code={code}
-        language={language}
-        onPinBlock={ctx.onPinBlock}
-        onStartEditBlock={ctx.onStartEditBlock}
-        editingBlockId={ctx.editingBlockId}
-        onSaveBlockEdit={ctx.onSaveBlockEdit}
-        onCancelBlockEdit={ctx.onCancelBlockEdit}
-        content={ctx.content}
-        plan={ctx.plan}
-        notedBlockIds={ctx.notedBlockIds}
-        resolveImageSrc={ctx.resolveImageSrc}
-      />
-    );
+    return <PinCodeBlock code={code} language={language} ctx={ctx} />;
   },
   image({ src, alt }) {
     return <ReaderImage src={src} alt={alt} resolveImageSrc={ctx.resolveImageSrc} />;

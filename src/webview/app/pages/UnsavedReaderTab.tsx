@@ -3,10 +3,12 @@ import { EmptyState } from "@astryxdesign/core/EmptyState";
 import type { ResizableRegion } from "@astryxdesign/core/Resizable";
 import type { BlockAnchor } from "@mdreadr/domain";
 import { applyBlockEdit } from "@mdreadr/domain";
+import { err, ok, type Result } from "@onrails/result";
 import { useContainer, useStoreValues } from "@re-reduced/react";
 import { useEffect, useRef, useState } from "react";
 import { DocumentView } from "../components/DocumentView.tsx";
 import { useFileDrop } from "../hooks/useFileDrop.ts";
+import type { BlockEditError } from "../session/block-edit.ts";
 import { ReaderTabShell } from "./ReaderTabShell.tsx";
 import { readerPageContainer } from "./reader-page-container.ts";
 
@@ -53,11 +55,11 @@ export function UnsavedReaderTab({
     onDirtyChange(UNSAVED_TAB_ID, dirty);
   }, [dirty, onDirtyChange]);
 
-  const onEditBlock = (anchor: BlockAnchor, newMarkdown: string) => {
+  const onEditBlock = (anchor: BlockAnchor, newMarkdown: string): Result<void, BlockEditError> => {
     const updated = applyBlockEdit(text, anchor, newMarkdown);
-    if (updated !== undefined) {
-      setText(updated);
-    }
+    if (updated === undefined) return err({ _tag: "BlockNotFound" });
+    setText(updated);
+    return ok(undefined);
   };
 
   return (

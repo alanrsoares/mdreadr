@@ -254,9 +254,7 @@ export function partitionReaderSegments(prepared: string): ReaderSegment[] {
   return segments;
 }
 
-export function flashAnchor(blockId: string, className = "reader-block-highlight"): boolean {
-  const element = document.querySelector(`[data-block-id="${CSS.escape(blockId)}"]`);
-  if (!(element instanceof HTMLElement)) return false;
+function flashElement(element: HTMLElement, className: string): void {
   element.classList.remove(className);
   // Force restart when re-pinning the same block.
   void element.offsetWidth;
@@ -264,6 +262,70 @@ export function flashAnchor(blockId: string, className = "reader-block-highlight
   window.setTimeout(() => {
     element.classList.remove(className);
   }, 1800);
+}
+
+export function flashAnchor(blockId: string, className = "reader-block-highlight"): boolean {
+  const element = document.querySelector(`[data-block-id="${CSS.escape(blockId)}"]`);
+  if (!(element instanceof HTMLElement)) return false;
+  flashElement(element, className);
+  return true;
+}
+
+/** Every anchored block in the document, in document order. */
+const blockElements = (): HTMLElement[] =>
+  Array.from(document.querySelectorAll<HTMLElement>("[data-block-id]"));
+
+/** Where a block sits in document order, or `-1`. */
+export const indexOfBlock = (blockId: string): number =>
+  blockElements().findIndex((element) => element.dataset.blockId === blockId);
+
+/**
+ * Focuses, and optionally flashes, the block at `index` in document order.
+ *
+ * Position, not id: paragraph and heading ids are derived from their own
+ * content, so a block that was just edited comes back with a *different* id,
+ * and anything looking for the old one silently finds nothing. Its place in the
+ * document is the handle that survives the edit. Focus rather than scroll, so
+ * the `j`/`k` cursor and the hover-only gutter controls stay reachable from the
+ * keyboard once the editor closes.
+ */
+export function focusBlockAtIndex(index: number, className?: string): boolean {
+  const element = blockElements()[index];
+  if (!element) return false;
+  element.tabIndex = -1;
+  element.focus({ preventScroll: true });
+  if (className) flashElement(element, className);
+  return true;
+}
+
+/** Selector for the open inline block editor, used by callers that need to
+ *  know an edit is in progress without owning that state. */
+export const INLINE_EDITOR_SELECTOR = ".reader-block-edit";
+
+/**
+ * Pulses the open inline editor and puts the caret back in it. Used when a
+ * gesture elsewhere would have discarded an edit in progress: the editor
+ * answers the click instead of the text disappearing.
+ */
+export function callAttentionToInlineEditor(): boolean {
+  const editor = document.querySelector(INLINE_EDITOR_SELECTOR);
+  if (!(editor instanceof HTMLElement)) return false;
+
+  const className = "reader-block-edit-attention";
+  editor.classList.remove(className);
+  // Force restart when the same editor is nudged twice.
+  void editor.offsetWidth;
+  editor.classList.add(className);
+  editor.addEventListener(
+    "animationend",
+    () => {
+      editor.classList.remove(className);
+    },
+    { once: true },
+  );
+
+  editor.querySelector("textarea")?.focus({ preventScroll: true });
+  editor.scrollIntoView({ behavior: "smooth", block: "nearest" });
   return true;
 }
 

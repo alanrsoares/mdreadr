@@ -3,6 +3,7 @@ import type { ResizableRegion } from "@astryxdesign/core/Resizable";
 import type { EditorView } from "@codemirror/view";
 import type { BlockAnchor, Suggestion, TocEntry } from "@mdreadr/domain";
 import { applyBlockEdit, applySuggestion, extractHeadings } from "@mdreadr/domain";
+import { err, ok, type Result } from "@onrails/result";
 import { useContainer, useStoreValues } from "@re-reduced/react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { DocumentView } from "../components/DocumentView.tsx";
@@ -16,6 +17,7 @@ import { useLiveDocumentUpdates } from "../hooks/useLiveDocumentUpdates.ts";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
 import { useViewModeHandoff } from "../hooks/useViewModeHandoff.ts";
 import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
+import type { BlockEditError } from "../session/block-edit.ts";
 import { isDirty } from "../session/document-draft.ts";
 import { scrollEditorToSettled } from "../session/editor-scroll.ts";
 import type { ReaderApi } from "../session/reader-api.ts";
@@ -222,17 +224,21 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
     [reader],
   );
 
+  // An `Err` leaves the inline editor open with the reader's text in it, which
+  // is the only copy of it at that point.
   const onEditBlock = useCallback(
-    (anchor: BlockAnchor, newMarkdown: string) => {
-      if (!documentPath) return;
+    (anchor: BlockAnchor, newMarkdown: string): Result<void, BlockEditError> => {
+      if (!documentPath) return err({ _tag: "NoDocument" });
       const updated = applyBlockEdit(editorValue, anchor, newMarkdown);
       if (updated === undefined) {
         showError("Edit block", "Could not locate that block in the document.");
-        return;
+        return err({ _tag: "BlockNotFound" });
       }
       store.actions.draftEdited({ path: documentPath, text: updated, savedContent: content });
-      flashAnchor(anchor.blockId, "reader-block-edit-flash");
+      // The flash is MarkdownView's: the edited block comes back with a new
+      // content-derived id, so only it can still find the block by position.
       onAnnounce(`Updated ${anchor.label ?? anchor.kind} in draft`);
+      return ok(undefined);
     },
     [documentPath, editorValue, content, showError, store, onAnnounce],
   );
