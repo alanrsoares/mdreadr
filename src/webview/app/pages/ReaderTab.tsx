@@ -305,6 +305,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
           onAnnounce(`Pinning note to ${anchor.label ?? anchor.kind}`);
         }}
         onEditBlock={onEditBlock}
+        onOpenDocument={onOpenPath}
         editorValue={editorValue}
         onEditorChange={onEditorChange}
         onEditorReady={(view) => {

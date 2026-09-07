@@ -92,6 +92,7 @@ export function UnsavedReaderTab({
         viewMode={documentViewMode}
         onViewModeChange={store.actions.documentViewModeChanged}
         onEditBlock={onEditBlock}
+        onOpenDocument={onOpenPath}
         editorValue={text}
         onEditorChange={setText}
         chromeEnd={

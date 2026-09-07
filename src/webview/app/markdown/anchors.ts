@@ -336,6 +336,15 @@ export function scrollToAnchor(blockId: string): boolean {
   return flashAnchor(blockId);
 }
 
+/**
+ * Scrolls to the heading a `#slug` link points at. Markdown fragments are
+ * GitHub-style slugs (`#hard-bans`) while the reader's own heading ids carry a
+ * `heading-` prefix (`blockIdForHeading`), so both spellings are tried.
+ */
+export function scrollToHeadingSlug(slug: string): boolean {
+  return scrollToAnchor(`heading-${slug}`) || scrollToAnchor(slug);
+}
+
 export function anchorDisplayLabel(anchor: BlockAnchor): string {
   if (anchor.label?.trim()) return anchor.label.trim();
   if (anchor.headingPath?.length) return anchor.headingPath.join(" › ");

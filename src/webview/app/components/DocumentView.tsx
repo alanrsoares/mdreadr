@@ -31,6 +31,8 @@ type DocumentViewProps = {
   onPinBlock?: (anchor: BlockAnchor) => void;
   /** An `Err` keeps the inline editor open, showing why it did not apply. */
   onEditBlock?: (anchor: BlockAnchor, newMarkdown: string) => Result<void, BlockEditError>;
+  /** Opens another Document in a Tab, for links between markdown files. */
+  onOpenDocument?: (path: string) => void;
   editorValue: string;
   onEditorChange: (text: string) => void;
   onEditorReady?: (view: EditorView) => void;
@@ -47,6 +49,7 @@ export const DocumentView = ({
   onViewModeChange,
   onPinBlock,
   onEditBlock,
+  onOpenDocument,
   editorValue,
   onEditorChange,
   onEditorReady,
@@ -100,6 +103,7 @@ export const DocumentView = ({
               notes={notes}
               onPinBlock={onPinBlock}
               onEditBlock={onEditBlock}
+              onOpenDocument={onOpenDocument}
             />
           </ReaderColumn>
         ) : (

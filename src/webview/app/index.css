@@ -233,6 +233,29 @@ body,
   text-decoration-thickness: 2px;
 }
 
+/* An external link says where it goes: it leaves the app for the OS browser,
+   which is a different act from following a link inside the document. The
+   arrow's space is reserved at rest, so brightening it on hover cannot reflow
+   the line. The full destination arrives as a native tooltip, set on hover by
+   `MarkdownView`. */
+.reader-prose a[href^="http"]::after,
+.reader-prose a[href^="mailto:"]::after {
+  content: "↗";
+  display: inline-block;
+  margin-inline-start: 0.12em;
+  font-size: 0.78em;
+  line-height: 1;
+  opacity: 0.45;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.reader-prose a[href^="http"]:hover::after,
+.reader-prose a[href^="http"]:focus-visible::after,
+.reader-prose a[href^="mailto:"]:hover::after,
+.reader-prose a[href^="mailto:"]:focus-visible::after {
+  opacity: 1;
+}
+
 .reader-prose img {
   display: block;
   max-width: 100%;
@@ -367,7 +390,9 @@ body,
     transition: none;
   }
 
-  .reader-prose a {
+  .reader-prose a,
+  .reader-prose a[href^="http"]::after,
+  .reader-prose a[href^="mailto:"]::after {
     transition: none;
   }
 

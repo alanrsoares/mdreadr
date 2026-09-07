@@ -1,14 +1,17 @@
 import { Markdown } from "@astryxdesign/core/Markdown";
 import type { BlockAnchor, Note } from "@mdreadr/domain";
+import { match } from "@onrails/pattern";
 import { err, isErr, type Result } from "@onrails/result";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { type MouseEvent, useCallback, useMemo, useRef, useState } from "react";
 import {
   callAttentionToInlineEditor,
   createAnchorPlan,
   focusBlockAtIndex,
   indexOfBlock,
   partitionReaderSegments,
+  scrollToHeadingSlug,
 } from "../markdown/anchors.ts";
+import { resolveReaderLink } from "../markdown/document-links.ts";
 import {
   BlockSourceEditor,
   blockClasses,
@@ -20,6 +23,7 @@ import {
   preprocessReaderMarkdown,
 } from "../markdown/pipeline.tsx";
 import type { BlockEditError } from "../session/block-edit.ts";
+import { openExternalLink } from "../session/open-external.ts";
 import { useFontSettings } from "../theme/FontSettingsContext.tsx";
 import { getReaderMeasurePx } from "../theme/measure.ts";
 import { getApiBase } from "../treaty.ts";
@@ -34,6 +38,8 @@ type MarkdownViewProps = {
   /** An `Err` leaves the inline editor open with the reader's text in it,
    *  rather than dropping the only copy of it. */
   onEditBlock?: (anchor: BlockAnchor, newMarkdown: string) => Result<void, BlockEditError>;
+  /** Opens another Document in a Tab, for links between markdown files. */
+  onOpenDocument?: (path: string) => void;
 };
 
 export function MarkdownView({
@@ -42,6 +48,7 @@ export function MarkdownView({
   documentPath,
   onPinBlock,
   onEditBlock,
+  onOpenDocument,
 }: MarkdownViewProps) {
   const { readerFontSize, readerFontFamily } = useFontSettings();
   const measurePx = getReaderMeasurePx(readerFontSize, readerFontFamily);
@@ -62,6 +69,63 @@ export function MarkdownView({
   const inlinePlugins = useMemo(
     () => createReaderInlinePlugins(resolveImageSrc),
     [resolveImageSrc],
+  );
+
+  /**
+   * Links are handled here, delegated, rather than through a `link` component
+   * override: list and table segments render without the override, and that is
+   * exactly where a Document's links to its neighbours tend to live.
+   */
+  const handleClick = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      const link = event.target instanceof HTMLElement ? event.target.closest("a[href]") : null;
+      if (!(link instanceof HTMLAnchorElement)) return;
+
+      // The attribute, not `link.href`: the DOM resolves a relative href
+      // against the webview's own bundle url (`views://mainview/CONTEXT.md`),
+      // which is exactly the navigation being prevented.
+      const target = resolveReaderLink(link.getAttribute("href") ?? "", documentPath);
+
+      match(target)
+        // Left to the browser: absolute urls, other file types, unresolvable
+        // relative paths.
+        .with({ kind: "other" }, () => undefined)
+        .with({ kind: "fragment" }, ({ id }) => {
+          event.preventDefault();
+          scrollToHeadingSlug(id);
+        })
+        .with({ kind: "document" }, ({ path }) => {
+          // Prevented even with no handler wired: following the link would
+          // navigate the app off its own bundle and lose the session.
+          event.preventDefault();
+          onOpenDocument?.(path);
+        })
+        .with({ kind: "external" }, ({ url }) => {
+          event.preventDefault();
+          void openExternalLink(url);
+        })
+        .exhaustive();
+    },
+    [documentPath, onOpenDocument],
+  );
+
+  /** Fills in the native tooltip the first time a link is hovered: a reader
+   *  cannot otherwise see where a link goes, and there is no status bar. */
+  const handleMouseOver = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      const link = event.target instanceof HTMLElement ? event.target.closest("a[href]") : null;
+      if (!(link instanceof HTMLAnchorElement) || link.title) return;
+
+      const href = link.getAttribute("href") ?? "";
+      const target = resolveReaderLink(href, documentPath);
+      link.title = match(target)
+        .with({ kind: "external" }, ({ url }) => url)
+        .with({ kind: "document" }, ({ path }) => path)
+        .with({ kind: "fragment" }, ({ id }) => `On this page: ${id}`)
+        .with({ kind: "other" }, () => href)
+        .exhaustive();
+    },
+    [documentPath],
   );
 
   const handleEditorDirtyChange = useCallback((isDirty: boolean) => {
@@ -148,7 +212,7 @@ export function MarkdownView({
   plan.begin();
 
   return (
-    <ReaderArticle>
+    <ReaderArticle onClick={handleClick} onMouseOver={handleMouseOver}>
       <ReaderFlow>
         {segments.map((segment) => {
           if (segment.kind === "markdown") {
