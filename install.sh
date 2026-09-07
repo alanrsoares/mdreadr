@@ -77,6 +77,13 @@ case "$(uname -m)" in
   *) fail "unsupported architecture: $(uname -m)" ;;
 esac
 
+# Releases since v0.13.1 carry no macOS x64 build: the Electrobun 2 toolchain
+# has no Intel host target. Say so, rather than letting the asset lookup fail
+# with a generic "no matching asset".
+if [ "$OS" = "macos" ] && [ "$ARCH" = "x64" ]; then
+  fail "Intel Macs are not supported by the current builds. Install v0.13.0, the last release with a macOS x64 asset: MDREADR_VERSION=v0.13.0 sh install.sh"
+fi
+
 PREFIX="${CHANNEL}-${OS}-${ARCH}"
 
 # --- release lookup ----------------------------------------------------------

@@ -31,7 +31,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.hutch
-          key: hutch-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package.json') }}
+          key: hutch-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package.json') }}
 
       - run: bun install --frozen-lockfile
 
@@ -52,11 +52,25 @@ jobs:
   # release.yml packages the app, but it only runs after release-please has
   # already cut the tag — so a packaging bug becomes a published release with
   # missing or broken assets, which is how v0.11.0 and v0.12.0 shipped. Prove
-  # the app packages and boots before the PR lands. One platform is enough:
-  # Linux is where the packaging differs most from the dev loop.
+  # the app packages and boots before the PR lands.
+  #
+  # Both shipped platforms, because one is not enough: the Electrobun 2 upgrade
+  # passed a Linux-only gate and then failed both macOS release builds, so
+  # v0.13.1 shipped with no macOS assets at all.
   package:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      # A macOS packaging failure says nothing about Linux, and vice versa.
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          # Apple Silicon only: Hutch has no darwin-x64 toolchain, so there is
+          # no Intel Mac target to gate. See release.yml.
+          - os: macos-latest
+            platform: macos
     steps:
       - uses: actions/checkout@v5
 
@@ -65,6 +79,7 @@ jobs:
           bun-version: latest
 
       - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
           # Runtime libraries only — nothing here is compiled from source, the
@@ -79,7 +94,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.hutch
-          key: hutch-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package.json') }}
+          key: hutch-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package.json') }}
 
       - run: bun install --frozen-lockfile
 
