@@ -5,21 +5,24 @@
  * neighbours (`[DESIGN.md](DESIGN.md)`), and the reader is a webview: following
  * one navigates the app itself off its own bundle (`views://mainview/...`,
  * `asar_read_file failed`) and the session is gone. So every link is classified
- * before the browser gets it: Documents open in a Tab, in-page fragments scroll,
+ * before the browser gets it: local files open in a Tab, in-page fragments scroll,
  * web and mail addresses go to the OS, and everything else is left alone.
  */
 
 export type ReaderLinkTarget =
-  /** Another markdown Document on disk. Opens in a Tab. */
+  /** A file on disk next to the Document. Opens in a Tab: markdown renders,
+   *  an image shows, anything else opens as source. */
   | { kind: "document"; path: string; fragment?: string }
   /** A heading in the Document already open. Scrolls. */
   | { kind: "fragment"; id: string }
   /** A web or mail address. Goes to the OS, never followed in place. */
   | { kind: "external"; url: string }
-  /** Anything else: other file types, unresolvable relative paths. */
+  /** Anything else: extensionless targets, unresolvable relative paths. */
   | { kind: "other" };
 
-const MARKDOWN_EXTENSION = /\.(md|markdown|mdx)$/i;
+// A linked target only opens in a Tab if it names a file. Extensionless hrefs
+// are far more likely to be a route or a directory than something to read.
+const FILE_EXTENSION = /\.[a-z0-9]+$/i;
 
 const ABSOLUTE_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
@@ -67,7 +70,7 @@ export function resolveReaderLink(href: string, documentPath?: string): ReaderLi
 
   const [pathPart = "", fragment] = trimmed.split("#", 2);
   const withoutQuery = pathPart.split("?", 1)[0] ?? "";
-  if (!MARKDOWN_EXTENSION.test(withoutQuery)) return { kind: "other" };
+  if (!FILE_EXTENSION.test(withoutQuery)) return { kind: "other" };
 
   const decoded = decodeURIComponent(withoutQuery);
   const path = decoded.startsWith("/")
