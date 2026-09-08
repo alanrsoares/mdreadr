@@ -1,8 +1,8 @@
 import { Markdown } from "@astryxdesign/core/Markdown";
-import type { BlockAnchor, Note } from "@mdreadr/domain";
+import type { BlockAnchor, Note, SubBlockTarget } from "@mdreadr/domain";
 import { match } from "@onrails/pattern";
 import { err, isErr, type Result } from "@onrails/result";
-import { type MouseEvent, useCallback, useMemo, useRef, useState } from "react";
+import { Fragment, type MouseEvent, useCallback, useMemo, useRef, useState } from "react";
 import {
   callAttentionToInlineEditor,
   createAnchorPlan,
@@ -22,6 +22,7 @@ import {
   createReaderInlinePlugins,
   preprocessReaderMarkdown,
 } from "../markdown/pipeline.tsx";
+import { sameSubBlockTarget, splitAroundSubBlock } from "../markdown/sub-blocks.ts";
 import type { BlockEditError } from "../session/block-edit.ts";
 import { openExternalLink } from "../session/open-external.ts";
 import { useFontSettings } from "../theme/FontSettingsContext.tsx";
@@ -37,7 +38,11 @@ type MarkdownViewProps = {
   onPinBlock?: (anchor: BlockAnchor) => void;
   /** An `Err` leaves the inline editor open with the reader's text in it,
    *  rather than dropping the only copy of it. */
-  onEditBlock?: (anchor: BlockAnchor, newMarkdown: string) => Result<void, BlockEditError>;
+  onEditBlock?: (
+    anchor: BlockAnchor,
+    newMarkdown: string,
+    target?: SubBlockTarget,
+  ) => Result<void, BlockEditError>;
   /** Opens another Document in a Tab, for links between markdown files. */
   onOpenDocument?: (path: string) => void;
 };
@@ -52,7 +57,13 @@ export function MarkdownView({
 }: MarkdownViewProps) {
   const { readerFontSize, readerFontFamily } = useFontSettings();
   const measurePx = getReaderMeasurePx(readerFontSize, readerFontFamily);
-  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
+  /** The open inline editor: which block, and which part of it (`null` for the
+   *  whole block). One at a time, so a second one cannot discard the first. */
+  const [editing, setEditing] = useState<{
+    blockId: string;
+    target: SubBlockTarget | null;
+  } | null>(null);
+  const editingBlockId = editing?.blockId ?? null;
   const isEditorDirtyRef = useRef(false);
   // Where the block being edited sits in document order, captured before the
   // editor takes its place: an applied edit changes the block's own id.
@@ -146,30 +157,48 @@ export function MarkdownView({
     });
   }, []);
 
-  const handleStartEditBlock = useCallback(
-    (anchor: BlockAnchor) => {
-      // Only one block is editable at a time, so opening a second editor would
-      // silently discard the first one's text. The open editor gets the nudge.
-      if (editingBlockId && editingBlockId !== anchor.blockId && isEditorDirtyRef.current) {
+  const startEditing = useCallback(
+    (anchor: BlockAnchor, target: SubBlockTarget | null) => {
+      // Only one editor is open at a time, so opening a second would silently
+      // discard the first one's text. The open editor gets the nudge. A second
+      // part of the *same* block is the same block, and its editor is the one
+      // being replaced, so that too has to be refused while dirty.
+      const isSame =
+        editing?.blockId === anchor.blockId && sameSubBlockTarget(editing.target, target);
+      if (editing && !isSame && isEditorDirtyRef.current) {
         callAttentionToInlineEditor();
         return;
       }
       editingIndexRef.current = indexOfBlock(anchor.blockId);
-      setEditingBlockId(anchor.blockId);
+      setEditing({ blockId: anchor.blockId, target });
     },
-    [editingBlockId],
+    [editing],
+  );
+
+  const handleStartEditBlock = useCallback(
+    (anchor: BlockAnchor) => startEditing(anchor, null),
+    [startEditing],
+  );
+
+  const handleStartEditSubBlock = useCallback(
+    (anchor: BlockAnchor, target: SubBlockTarget) => startEditing(anchor, target),
+    [startEditing],
   );
 
   const handleCancelBlockEdit = useCallback(() => {
-    setEditingBlockId(null);
+    setEditing(null);
     returnFocusToBlock();
   }, [returnFocusToBlock]);
 
   const handleSaveBlockEdit = useCallback(
-    (anchor: BlockAnchor, newMarkdown: string): Result<void, BlockEditError> => {
-      const applied = onEditBlock?.(anchor, newMarkdown) ?? err({ _tag: "BlockNotFound" });
+    (
+      anchor: BlockAnchor,
+      newMarkdown: string,
+      target?: SubBlockTarget,
+    ): Result<void, BlockEditError> => {
+      const applied = onEditBlock?.(anchor, newMarkdown, target) ?? err({ _tag: "BlockNotFound" });
       if (isErr(applied)) return applied;
-      setEditingBlockId(null);
+      setEditing(null);
       returnFocusToBlock("reader-block-edit-flash");
       return applied;
     },
@@ -180,7 +209,9 @@ export function MarkdownView({
     () => ({
       onPinBlock,
       onStartEditBlock: onEditBlock ? handleStartEditBlock : undefined,
+      onStartEditSubBlock: onEditBlock ? handleStartEditSubBlock : undefined,
       editingBlockId,
+      editingSubTarget: editing?.target ?? null,
       onSaveBlockEdit: handleSaveBlockEdit,
       onCancelBlockEdit: handleCancelBlockEdit,
       onEditorDirtyChange: handleEditorDirtyChange,
@@ -193,7 +224,9 @@ export function MarkdownView({
       onPinBlock,
       onEditBlock,
       handleStartEditBlock,
+      handleStartEditSubBlock,
       editingBlockId,
+      editing,
       handleSaveBlockEdit,
       handleCancelBlockEdit,
       handleEditorDirtyChange,
@@ -232,15 +265,47 @@ export function MarkdownView({
 
           const isList = segment.kind === "list";
           const anchor = isList ? plan.nextList(segment.rawText) : plan.nextTable(segment.rawText);
+          const subKind = isList ? ("list-item" as const) : ("table-row" as const);
+          const editingTarget = editingBlockId === anchor.blockId ? editing?.target : undefined;
+          // A part of the block is open: the rest of it stays rendered around
+          // the editor, sliced out of the block's own source so ordered markers
+          // keep their numbers and the table keeps its columns.
+          const split = editingTarget
+            ? splitAroundSubBlock(segment.text, editingTarget)
+            : undefined;
 
           if (editingBlockId === anchor.blockId) {
             return (
-              <BlockSourceEditor
-                key={segment.key}
-                anchor={anchor}
-                fallback={segment.text}
-                ctx={pinContext}
-              />
+              <Fragment key={segment.key}>
+                {split?.before ? (
+                  <Markdown
+                    className="reader-flow"
+                    contentWidth={measurePx}
+                    autolink="gfm"
+                    inlinePlugins={inlinePlugins}
+                  >
+                    {split.before}
+                  </Markdown>
+                ) : null}
+                <BlockSourceEditor
+                  anchor={anchor}
+                  // No split: the whole block is being edited, or the part it
+                  // named is gone, and the block's source is the honest seed.
+                  {...(split && editingTarget ? { target: editingTarget } : {})}
+                  fallback={split?.source ?? segment.text}
+                  ctx={pinContext}
+                />
+                {split?.after ? (
+                  <Markdown
+                    className="reader-flow"
+                    contentWidth={measurePx}
+                    autolink="gfm"
+                    inlinePlugins={inlinePlugins}
+                  >
+                    {split.after}
+                  </Markdown>
+                ) : null}
+              </Fragment>
             );
           }
 
@@ -249,6 +314,8 @@ export function MarkdownView({
               key={segment.key}
               anchor={anchor}
               onEdit={onEditBlock ? handleStartEditBlock : undefined}
+              onEditSub={onEditBlock ? handleStartEditSubBlock : undefined}
+              subKind={subKind}
               onPin={onPinBlock}
               content={content}
             >

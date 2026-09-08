@@ -1,6 +1,6 @@
 import { Button } from "@astryxdesign/core/Button";
 import { Icon } from "@astryxdesign/core/Icon";
-import type { BlockAnchor } from "@mdreadr/domain";
+import type { BlockAnchor, SubBlockTarget } from "@mdreadr/domain";
 import { match } from "@onrails/pattern";
 import { isErr, type Result } from "@onrails/result";
 import {
@@ -32,6 +32,7 @@ import {
   toggleLinePrefix,
   wrapSelection,
 } from "../markdown/inline-edit-ops.ts";
+import { subBlockNoun } from "../markdown/sub-blocks.ts";
 import { shortcutLabel } from "../platform.ts";
 import { type BlockEditError, blockEditErrorMessage } from "../session/block-edit.ts";
 import { useFontSettings } from "../theme/FontSettingsContext.tsx";
@@ -39,6 +40,9 @@ import { SourceEditor, type SourceEditorHandle } from "./SourceEditor.tsx";
 
 type InlineBlockEditorProps = {
   anchor: BlockAnchor;
+  /** Set when the editor holds one part of the block (a list item, a table
+   *  row) rather than all of it, so it says which. */
+  subKind?: SubBlockTarget["kind"];
   initialValue: string;
   /** Applies the edit. An `Err` keeps the editor open with the text in it and
    *  states the reason, since at that point it is the only copy. */
@@ -150,6 +154,7 @@ const HEADING_TOOLS: Tool[] = [1, 2, 3].map((level) => ({
 
 export function InlineBlockEditor({
   anchor,
+  subKind,
   initialValue,
   onSave,
   onCancel,
@@ -167,6 +172,8 @@ export function InlineBlockEditor({
 
   const isDirty = text !== initialValue;
   const isMono = isMonospaceKind(anchor.kind);
+  /** What the editor is holding: the block, or one part of it. */
+  const subject = subKind ? subBlockNoun(subKind) : (anchor.label ?? anchor.kind);
   const tools = useMemo(
     () =>
       anchor.kind === "heading" || anchor.kind === "paragraph"
@@ -324,7 +331,7 @@ export function InlineBlockEditor({
       data-kind={anchor.kind}
       data-level={anchor.kind === "heading" ? headingLevelOf(initialValue) : undefined}
       data-measure={isMono ? "full" : "capped"}
-      aria-label={`Editing ${anchor.label ?? anchor.kind} source`}
+      aria-label={`Editing ${subject} source`}
       onKeyDown={handleKeyDown}
     >
       <div
@@ -341,7 +348,7 @@ export function InlineBlockEditor({
           sizing="content"
           typography={sourceStyle}
           hasSpellCheck={!isMono}
-          ariaLabel={`${anchor.kind} source`}
+          ariaLabel={`${subKind ? subBlockNoun(subKind) : anchor.kind} source`}
           onCreateEditor={(view) => {
             editorDomRef.current = view.dom;
             view.contentDOM.setAttribute("aria-keyshortcuts", "Meta+Enter Control+Enter Escape");

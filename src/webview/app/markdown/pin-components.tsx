@@ -1,6 +1,11 @@
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import type { MarkdownComponents } from "@astryxdesign/core/Markdown";
-import { type BlockAnchor, resolveBlockRawMarkdown } from "@mdreadr/domain";
+import {
+  type BlockAnchor,
+  resolveBlockRawMarkdown,
+  resolveSubBlockRawMarkdown,
+  type SubBlockTarget,
+} from "@mdreadr/domain";
 import { err, type Result } from "@onrails/result";
 import type { ReactNode } from "react";
 import { InlineBlockEditor } from "../components/InlineBlockEditor.tsx";
@@ -18,9 +23,17 @@ import { type ImageSrcResolver, ReaderImage, renderSpecialFence } from "./pipeli
 export type PinContext = {
   onPinBlock?: (anchor: BlockAnchor) => void;
   onStartEditBlock?: (anchor: BlockAnchor) => void;
+  /** Opens one part of a block with parts (a list item, a table row). */
+  onStartEditSubBlock?: (anchor: BlockAnchor, target: SubBlockTarget) => void;
   editingBlockId?: string | null;
+  /** Which part of the editing block is open, `null` for the whole block. */
+  editingSubTarget?: SubBlockTarget | null;
   /** An `Err` leaves the editor open, showing why the edit did not apply. */
-  onSaveBlockEdit?: (anchor: BlockAnchor, newMarkdown: string) => Result<void, BlockEditError>;
+  onSaveBlockEdit?: (
+    anchor: BlockAnchor,
+    newMarkdown: string,
+    target?: SubBlockTarget,
+  ) => Result<void, BlockEditError>;
   onCancelBlockEdit?: () => void;
   onEditorDirtyChange?: (isDirty: boolean) => void;
   content?: string;
@@ -50,6 +63,8 @@ type BlockSourceEditorProps = {
   anchor: BlockAnchor;
   /** Source to edit when the exact range cannot be resolved in the document. */
   fallback: string;
+  /** Edits one part of the block rather than all of it. */
+  target?: SubBlockTarget;
   ctx: PinContext;
 };
 
@@ -58,15 +73,20 @@ type BlockSourceEditorProps = {
  * source range. Shared by every block kind so the seeding rule (real range,
  * else reconstructed fallback) lives in one place.
  */
-export function BlockSourceEditor({ anchor, fallback, ctx }: BlockSourceEditorProps) {
-  const raw = ctx.content ? (resolveBlockRawMarkdown(ctx.content, anchor) ?? fallback) : fallback;
+export function BlockSourceEditor({ anchor, fallback, target, ctx }: BlockSourceEditorProps) {
+  const resolve = (content: string): string | undefined =>
+    target
+      ? resolveSubBlockRawMarkdown(content, anchor, target)
+      : resolveBlockRawMarkdown(content, anchor);
+  const raw = ctx.content ? (resolve(ctx.content) ?? fallback) : fallback;
 
   return (
     <InlineBlockEditor
       anchor={anchor}
+      subKind={target?.kind}
       initialValue={raw}
       onSave={(newMarkdown) =>
-        ctx.onSaveBlockEdit?.(anchor, newMarkdown) ?? err({ _tag: "BlockNotFound" })
+        ctx.onSaveBlockEdit?.(anchor, newMarkdown, target) ?? err({ _tag: "BlockNotFound" })
       }
       onCancel={() => ctx.onCancelBlockEdit?.()}
       onDirtyChange={ctx.onEditorDirtyChange}
