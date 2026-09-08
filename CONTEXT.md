@@ -28,6 +28,10 @@ _Avoid_: Pin, reference, location
 The per-render sequence that assigns each pinnable block (heading, paragraph, code) its Anchor id, in document order, for one Document's prepared markdown.
 _Avoid_: Allocator, id map
 
+**Sub-block**:
+One editable part inside a pinnable block: a list Item at any depth, or a table Row. Addressed by position within its block (an item by its path of nested positions) for as long as an inline editor is open, never persisted — a Note still anchors to the block around it.
+_Avoid_: sub-anchor, cell, fragment
+
 **Session Notes**:
 The in-memory Note collection for the current app session before the user explicitly saves them.
 _Avoid_: Draft notes, cache

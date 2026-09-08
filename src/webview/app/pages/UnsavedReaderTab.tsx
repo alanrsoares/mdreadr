@@ -1,8 +1,8 @@
 import { Button } from "@astryxdesign/core/Button";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import type { ResizableRegion } from "@astryxdesign/core/Resizable";
-import type { BlockAnchor } from "@mdreadr/domain";
-import { applyBlockEdit } from "@mdreadr/domain";
+import type { BlockAnchor, SubBlockTarget } from "@mdreadr/domain";
+import { applyBlockEdit, applySubBlockEdit } from "@mdreadr/domain";
 import { err, ok, type Result } from "@onrails/result";
 import { useContainer, useStoreValues } from "@re-reduced/react";
 import { useEffect, useRef, useState } from "react";
@@ -55,8 +55,14 @@ export function UnsavedReaderTab({
     onDirtyChange(UNSAVED_TAB_ID, dirty);
   }, [dirty, onDirtyChange]);
 
-  const onEditBlock = (anchor: BlockAnchor, newMarkdown: string): Result<void, BlockEditError> => {
-    const updated = applyBlockEdit(text, anchor, newMarkdown);
+  const onEditBlock = (
+    anchor: BlockAnchor,
+    newMarkdown: string,
+    target?: SubBlockTarget,
+  ): Result<void, BlockEditError> => {
+    const updated = target
+      ? applySubBlockEdit(text, anchor, target, newMarkdown)
+      : applyBlockEdit(text, anchor, newMarkdown);
     if (updated === undefined) return err({ _tag: "BlockNotFound" });
     setText(updated);
     return ok(undefined);

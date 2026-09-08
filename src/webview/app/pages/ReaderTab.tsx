@@ -1,9 +1,10 @@
 import { Button } from "@astryxdesign/core/Button";
 import type { ResizableRegion } from "@astryxdesign/core/Resizable";
 import type { EditorView } from "@codemirror/view";
-import type { BlockAnchor, Suggestion, TocEntry } from "@mdreadr/domain";
+import type { BlockAnchor, SubBlockTarget, Suggestion, TocEntry } from "@mdreadr/domain";
 import {
   applyBlockEdit,
+  applySubBlockEdit,
   applySuggestion,
   documentKindForPath,
   extractHeadings,
@@ -236,9 +237,18 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
   // An `Err` leaves the inline editor open with the reader's text in it, which
   // is the only copy of it at that point.
   const onEditBlock = useCallback(
-    (anchor: BlockAnchor, newMarkdown: string): Result<void, BlockEditError> => {
+    (
+      anchor: BlockAnchor,
+      newMarkdown: string,
+      // Set when only one part of the block was edited (a list item, a table
+      // row): the splice is that part's range, so the rest of the list or table
+      // survives byte for byte.
+      target?: SubBlockTarget,
+    ): Result<void, BlockEditError> => {
       if (!documentPath) return err({ _tag: "NoDocument" });
-      const updated = applyBlockEdit(editorValue, anchor, newMarkdown);
+      const updated = target
+        ? applySubBlockEdit(editorValue, anchor, target, newMarkdown)
+        : applyBlockEdit(editorValue, anchor, newMarkdown);
       if (updated === undefined) {
         showError("Edit block", "Could not locate that block in the document.");
         return err({ _tag: "BlockNotFound" });

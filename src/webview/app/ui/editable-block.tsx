@@ -1,9 +1,10 @@
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
-import type { BlockAnchor } from "@mdreadr/domain";
+import type { BlockAnchor, SubBlockTarget } from "@mdreadr/domain";
 import { resolveBlockRawMarkdown, resolveBlockText } from "@mdreadr/domain";
-import type { MouseEvent, ReactNode } from "react";
+import { type MouseEvent, type ReactNode, useRef } from "react";
 import { useCopy } from "../hooks/useCopy.ts";
 import { anchorDisplayLabel } from "../markdown/anchors.ts";
+import { subBlockNoun, subBlockTargetFromNode } from "../markdown/sub-blocks.ts";
 import { EditBlockButton, PinButton } from "./block-actions.tsx";
 import { PinnableBlock } from "./pinnable-block.tsx";
 
@@ -21,6 +22,12 @@ type EditableBlockProps = {
   /** Document source, for the copy actions. Absent for a block whose source
    *  we do not have, which drops those two items rather than copying nothing. */
   content?: string;
+  /** Set for a block that has parts a reader can edit on their own: a list's
+   *  items, a table's rows. Absent for a block that is edited whole. */
+  subKind?: SubBlockTarget["kind"];
+  /** Edits one part of the block. Falls back to `onEdit` when the gesture did
+   *  not land in one. */
+  onEditSub?: (anchor: BlockAnchor, target: SubBlockTarget) => void;
   children: ReactNode;
 };
 
@@ -30,10 +37,41 @@ type EditableBlockProps = {
  * out loud. Every anchored block kind (heading, paragraph, code, list, table)
  * goes through here, so the gestures and the controls cannot drift apart
  * between them.
+ *
+ * A block with parts (`subKind`) resolves the pointer to the part it landed on,
+ * so a double-click inside a list item edits that item and not the forty-item
+ * list around it. The gutter control stays whole-block: it is the block's
+ * affordance, and it is the only route that never needs a pointer.
  */
-export function EditableBlock({ anchor, onEdit, onPin, content, children }: EditableBlockProps) {
+export function EditableBlock({
+  anchor,
+  onEdit,
+  onPin,
+  content,
+  subKind,
+  onEditSub,
+  children,
+}: EditableBlockProps) {
   const label = anchorDisplayLabel(anchor);
   const copy = useCopy();
+  // The menu's labels are fixed at render, but which part was right-clicked is
+  // only known when the pointer arrives, so the target rides in a ref.
+  const menuTargetRef = useRef<SubBlockTarget | null>(null);
+
+  /** The part the pointer landed on, or `null` for the block itself. */
+  const targetFrom = (event: MouseEvent): SubBlockTarget | null => {
+    if (!subKind || !onEditSub || !(event.currentTarget instanceof HTMLElement)) return null;
+    return subBlockTargetFromNode(event.currentTarget, event.target as Node, subKind) ?? null;
+  };
+
+  const editFrom = (event: MouseEvent): void => {
+    const target = targetFrom(event);
+    if (target && onEditSub) {
+      onEditSub(anchor, target);
+      return;
+    }
+    onEdit?.(anchor);
+  };
 
   // The gutter controls stay: a menu nobody thinks to open cannot be the only
   // route to anchoring a note (and right-click is not a keyboard gesture).
@@ -43,6 +81,18 @@ export function EditableBlock({ anchor, onEdit, onPin, content, children }: Edit
   const text = content ? resolveBlockText(content, anchor) : undefined;
   const actions: ContextMenuOption[] = [
     ...(onPin ? [{ label: "Anchor a note", onClick: () => onPin(anchor) }] : []),
+    ...(subKind && onEditSub
+      ? [
+          {
+            label: `Edit ${subBlockNoun(subKind)}`,
+            onClick: () => {
+              const target = menuTargetRef.current;
+              // Right-clicked between the rows: the block is what they hit.
+              target ? onEditSub(anchor, target) : onEdit?.(anchor);
+            },
+          },
+        ]
+      : []),
     ...(onEdit ? [{ label: "Edit block", onClick: () => onEdit(anchor) }] : []),
   ];
   const copies: ContextMenuOption[] = [
@@ -58,17 +108,27 @@ export function EditableBlock({ anchor, onEdit, onPin, content, children }: Edit
     <PinnableBlock
       onDoubleClick={(event: MouseEvent) => {
         if (!onEdit || isOwnGesture(event)) return;
-        onEdit(anchor);
+        editFrom(event);
       }}
       onContextMenuCapture={(event: MouseEvent) => {
         // Stopping the synthetic event here keeps it from reaching
         // ContextMenu's own `onContextMenu`, so nothing calls preventDefault
         // and the browser's menu (Open link, Copy link address) runs instead.
-        if (isOwnGesture(event)) event.stopPropagation();
+        if (isOwnGesture(event)) {
+          event.stopPropagation();
+          return;
+        }
+        menuTargetRef.current = targetFrom(event);
       }}
     >
-      {onEdit ? <EditBlockButton anchor={anchor} onEdit={onEdit} /> : null}
-      {onPin ? <PinButton anchor={anchor} onPin={onPin} /> : null}
+      {/* One column in the left gutter: edit above, pin below. Positioned as a
+          pair so neither control can drift over the block's own content. */}
+      {onEdit || onPin ? (
+        <span className="reader-block-actions">
+          {onEdit ? <EditBlockButton anchor={anchor} onEdit={onEdit} /> : null}
+          {onPin ? <PinButton anchor={anchor} onPin={onPin} /> : null}
+        </span>
+      ) : null}
       {items.length === 0 ? (
         children
       ) : (

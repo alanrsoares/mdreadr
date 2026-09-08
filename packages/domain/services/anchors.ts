@@ -26,7 +26,9 @@ export type HeadingStackEntry = { level: number; text: string };
 
 export type HeadingPathResult = { stack: HeadingStackEntry[]; path: string[] };
 
-type ResolveBlockTextOptions = { isPinnableCode?: (language: string | undefined) => boolean };
+export type ResolveBlockTextOptions = {
+  isPinnableCode?: (language: string | undefined) => boolean;
+};
 
 export const inlineToText = (nodes: InlineNode[]): string =>
   nodes

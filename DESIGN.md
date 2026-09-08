@@ -33,7 +33,7 @@ copy of the values.
 ## 3. Anchor & Interaction Laws
 - **Gutter affordances**:
   - Block controls live in the margin gutter, outside the prose column. Never over prose text.
-  - Both controls are driven by one token, `--reader-gutter` (`1.75rem`, `2rem` from the `sm` breakpoint up): the edit control at `calc(-1 * var(--reader-gutter))`, the anchor control just past the end of the text column. Sheet padding is what reserves the room, so its narrow-width value cannot drop below the gutter.
+  - Both controls sit in the **left** gutter, stacked as one column at `calc(-1 * var(--reader-gutter))` (`1.75rem`, `2rem` from the `sm` breakpoint up): edit above, anchor below. Sheet padding is what reserves the room, so its narrow-width value cannot drop below the gutter. The anchor control used to sit at the end of the measure, inside the block box, where a table or a wide code fence running past the measure came out underneath it.
   - Reveal on block hover or `:focus-within` via `opacity` + `transform`, honouring `prefers-reduced-motion`.
 - **Note indication**:
   - Blocks carrying Notes get a tinted background wash plus an inset marker. **No layout shift**: never animate or add `padding` / `border` that reflows prose. `.reader-block-has-note` uses an accent wash, an `inset` box shadow for the rule, and a negative inline margin that cancels its own padding, so toggling a Note moves nothing.
