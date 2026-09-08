@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.13.2](https://github.com/alanrsoares/mdreadr/compare/v0.13.1...v0.13.2) (2026-09-07)
+
+
+### Bug Fixes
+
+* **release:** drop the Intel macOS target ([d3b0479](https://github.com/alanrsoares/mdreadr/commit/d3b04799013b337111606bac07699da05f7dceab))
+* restore the macOS release build ([916e843](https://github.com/alanrsoares/mdreadr/commit/916e843936955d70738f834e368eed07dad1afad))
+* **smoke:** prove the app is serving instead of watching stdout ([6babb80](https://github.com/alanrsoares/mdreadr/commit/6babb80723e11e24e6d4a6451a897df6c44837d2))
+* **smoke:** stop the teardown from killing the test itself ([a03ded7](https://github.com/alanrsoares/mdreadr/commit/a03ded7f3d0510f3926b1381bc38c417dfb8c39d))
+
 ## [0.13.1](https://github.com/alanrsoares/mdreadr/compare/v0.13.0...v0.13.1) (2026-09-07)
 
 
