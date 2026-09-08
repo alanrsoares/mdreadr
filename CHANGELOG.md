@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/alanrsoares/mdreadr/compare/v0.15.1...v0.16.0) (2026-09-08)
+
+
+### Features
+
+* **repo:** add rpm, deb, and flatpak packaging ([62e806a](https://github.com/alanrsoares/mdreadr/commit/62e806abc1bfe76809487845d1f5e3f5156769fb))
+
 ## [0.15.1](https://github.com/alanrsoares/mdreadr/compare/v0.15.0...v0.15.1) (2026-09-08)
 
 
