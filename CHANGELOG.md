@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.1](https://github.com/alanrsoares/mdreadr/compare/v0.15.0...v0.15.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **ui:** remap targets in split tails ([e5c914b](https://github.com/alanrsoares/mdreadr/commit/e5c914b9a3adb869cfc8e3b603fc86190e225e3a))
+
 ## [0.15.0](https://github.com/alanrsoares/mdreadr/compare/v0.14.0...v0.15.0) (2026-09-08)
 
 
