@@ -70,3 +70,40 @@ export function truncateAnchorLabel(text: string, maxLength = 72): string {
   const singleLine = text.replace(/\s+/g, " ").trim();
   return singleLine.length <= maxLength ? singleLine : `${singleLine.slice(0, maxLength - 1)}…`;
 }
+
+const MARKDOWN_EXTENSIONS = [".md", ".markdown"];
+
+// What a webview can decode on its own, so the reader can hand it the bytes
+// and stop there. TIFF and friends stay out: no browser renders them.
+const IMAGE_EXTENSIONS = [
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".avif",
+  ".svg",
+  ".bmp",
+  ".ico",
+];
+
+/**
+ * How a Document is presented: prose with a source toggle, a picture, or
+ * source only — anything the app can open but cannot render as markdown.
+ */
+export type DocumentKind = "markdown" | "image" | "source";
+
+const hasExtension = (path: string, extensions: string[]): boolean => {
+  const lower = path.toLowerCase();
+  return extensions.some((extension) => lower.endsWith(extension));
+};
+
+/** True for paths the reader can render as prose. */
+export function isMarkdownPath(path: string): boolean {
+  return hasExtension(path, MARKDOWN_EXTENSIONS);
+}
+
+export function documentKindForPath(path: string): DocumentKind {
+  if (isMarkdownPath(path)) return "markdown";
+  return hasExtension(path, IMAGE_EXTENSIONS) ? "image" : "source";
+}

@@ -77,9 +77,18 @@ describe("resolveReaderLink", () => {
   });
 
   it.each([
+    ["image.png", "image"],
+    ["src/index.ts", "source file"],
+  ])("opens %s in a tab too (%s)", (href) => {
+    expect(resolveReaderLink(href, DOC)).toMatchObject({ kind: "document" });
+  });
+
+  it.each([
     ["views://mainview/CONTEXT.md", "webview-internal url"],
     ["file:///etc/passwd", "file url"],
-    ["image.png", "non-markdown file"],
+    ["../notes", "extensionless target"],
+    ["image%.png", "malformed percent escape in a path"],
+    ["#%zz", "malformed percent escape in a fragment"],
     ["", "empty href"],
     ["#", "empty fragment"],
   ])("leaves %s alone (%s)", (href) => {

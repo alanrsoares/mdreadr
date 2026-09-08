@@ -4,6 +4,9 @@ import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 import { type CSSProperties, forwardRef, useImperativeHandle, useMemo, useRef } from "react";
 
+/** What the editor highlights. Plain source is left unstyled rather than lit up as markdown it is not. */
+export type SourceLanguage = "markdown" | "plain";
+
 /** Character offsets into the source, the same shape `inline-edit-ops` uses. */
 export type SourceSelection = { start: number; end: number };
 
@@ -27,6 +30,7 @@ export type SourceEditorProps = {
    * taller than the block it replaced.
    */
   sizing: "fill" | "content";
+  language?: SourceLanguage;
   /** Typography of the surface the source is standing in for. */
   typography: CSSProperties;
   /** Caps the source column, so it wraps where the rendered text wrapped. */
@@ -51,6 +55,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(fu
     value,
     onChange,
     sizing,
+    language = "markdown",
     typography,
     maxWidth,
     hasActiveLine = false,
@@ -125,6 +130,14 @@ export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(fu
     [isDark, sizing, maxWidth, hasActiveLine],
   );
 
+  const extensions = useMemo(
+    () =>
+      language === "markdown"
+        ? [markdown(), EditorView.lineWrapping, editorTheme]
+        : [EditorView.lineWrapping, editorTheme],
+    [language, editorTheme],
+  );
+
   return (
     <CodeMirror
       value={value}
@@ -140,7 +153,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(fu
       // Tab is owned by the caller: in the inline editor it runs the tested
       // `indent` / `outdent` ops, and in the toolbar it still moves focus out.
       indentWithTab={false}
-      extensions={[markdown(), EditorView.lineWrapping, editorTheme]}
+      extensions={extensions}
       onCreateEditor={(view) => {
         viewRef.current = view;
         if (ariaLabel) view.contentDOM.setAttribute("aria-label", ariaLabel);
