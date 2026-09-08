@@ -60,3 +60,11 @@ export const ReaderEditor = tw.div(
 export const ReaderFlow = tw.div("reader-flow min-w-0");
 
 export const ReaderBlockWrap = tw.div("min-w-0");
+
+// An image Document: centred in the well, never larger than it, and never
+// upscaled past its own pixels — a 16px icon stays a 16px icon.
+export const ReaderImageFrame = tw.div(
+  "flex h-full min-h-0 w-full flex-1 items-center justify-center p-8",
+);
+
+export const ReaderImage = tw.img("max-h-full max-w-full object-contain");

@@ -1,6 +1,7 @@
 import { HStack } from "@astryxdesign/core/HStack";
 import type { EditorView } from "@codemirror/view";
-import type { BlockAnchor, Note } from "@mdreadr/domain";
+import type { BlockAnchor, DocumentKind, Note } from "@mdreadr/domain";
+import { match } from "@onrails/pattern";
 import type { Result } from "@onrails/result";
 import { type CSSProperties, type ReactNode, useRef } from "react";
 import { useReaderBlockNavigation } from "../hooks/useReaderBlockNavigation.ts";
@@ -18,6 +19,7 @@ import {
 import { DocumentEditor } from "./DocumentEditor.tsx";
 import { type DocumentViewMode, DocumentViewModeSwitch } from "./DocumentViewModeSwitch.tsx";
 import { FontAdjustmentControl } from "./FontAdjustmentControl.tsx";
+import { ImageDocumentView } from "./ImageDocumentView.tsx";
 import { MarkdownView } from "./MarkdownView.tsx";
 
 export type { DocumentViewMode };
@@ -26,6 +28,8 @@ type DocumentViewProps = {
   content: string;
   notes: Note[];
   documentPath?: string;
+  /** Only a markdown Document has a preview to toggle to; the rest open flat. */
+  kind?: DocumentKind;
   viewMode: DocumentViewMode;
   onViewModeChange: (mode: DocumentViewMode) => void;
   onPinBlock?: (anchor: BlockAnchor) => void;
@@ -45,6 +49,7 @@ export const DocumentView = ({
   content,
   notes,
   documentPath,
+  kind = "markdown",
   viewMode,
   onViewModeChange,
   onPinBlock,
@@ -60,8 +65,14 @@ export const DocumentView = ({
     useFontSettings();
   const readerFontFamilyCss = getReaderFontFamilyCss(readerFontFamily);
   const previewRef = useRef<HTMLDivElement>(null);
+  // Only markdown owns both modes; the others are pinned to the one they have.
+  const mode = match(kind)
+    .with("markdown", () => viewMode)
+    .with("image", () => "preview" as const)
+    .with("source", () => "edit" as const)
+    .exhaustive();
 
-  useReaderBlockNavigation(previewRef, isActive && viewMode === "preview");
+  useReaderBlockNavigation(previewRef, isActive && kind === "markdown" && mode === "preview");
 
   const readerStyles = {
     "--text-body-size": `${readerFontSize}px`,
@@ -78,15 +89,20 @@ export const DocumentView = ({
     "--reader-editor-measure": `${getReaderMeasurePx(editorFontSize, editorFontFamily)}px`,
   } as CSSProperties;
 
+  // An image fits the well instead of growing it: the sheet takes the height of
+  // the scroll container, so `max-h-full` on the image has something definite
+  // to measure against.
   return (
-    <ReaderSheet className="reader-sheet-enter">
+    <ReaderSheet className={kind === "image" ? "reader-sheet-enter h-full" : "reader-sheet-enter"}>
       <ReaderDocumentChrome>
         <ReaderChromeControls>
-          <DocumentViewModeSwitch value={viewMode} onChange={onViewModeChange} />
+          <DocumentViewModeSwitch value={mode} onChange={onViewModeChange} kind={kind} />
         </ReaderChromeControls>
         <ReaderChromeEnd>
           <HStack gap={2} vAlign="center">
-            <FontAdjustmentControl viewMode={viewMode} isActive={isActive} />
+            {kind === "image" ? null : (
+              <FontAdjustmentControl viewMode={mode} isActive={isActive} />
+            )}
             {chromeEnd}
           </HStack>
         </ReaderChromeEnd>
@@ -94,27 +110,52 @@ export const DocumentView = ({
 
       {/* No `key={viewMode}`: keying here remounts the whole body on every
           toggle, which replays the enter animation and reads as a flash. */}
-      <ReaderDocumentBody className="reader-document-body">
-        {viewMode === "preview" ? (
-          <ReaderColumn ref={previewRef} style={readerStyles}>
-            <MarkdownView
-              content={content}
-              documentPath={documentPath}
-              notes={notes}
-              onPinBlock={onPinBlock}
-              onEditBlock={onEditBlock}
-              onOpenDocument={onOpenDocument}
-            />
-          </ReaderColumn>
-        ) : (
-          <ReaderColumn style={readerStyles}>
-            <DocumentEditor
-              value={editorValue}
-              onChange={onEditorChange}
-              onEditorReady={onEditorReady}
-            />
-          </ReaderColumn>
-        )}
+      {/* An image is centred in the well rather than flowing down it, so the
+          body becomes the flex parent it needs. */}
+      <ReaderDocumentBody
+        className={
+          kind === "image"
+            ? "reader-document-body flex min-h-0 overflow-hidden"
+            : "reader-document-body"
+        }
+      >
+        {match(kind)
+          .with("image", () =>
+            documentPath ? <ImageDocumentView documentPath={documentPath} /> : null,
+          )
+          .with("source", () => (
+            <ReaderColumn style={readerStyles}>
+              <DocumentEditor
+                value={editorValue}
+                onChange={onEditorChange}
+                onEditorReady={onEditorReady}
+                language="plain"
+              />
+            </ReaderColumn>
+          ))
+          .with("markdown", () =>
+            mode === "preview" ? (
+              <ReaderColumn ref={previewRef} style={readerStyles}>
+                <MarkdownView
+                  content={content}
+                  documentPath={documentPath}
+                  notes={notes}
+                  onPinBlock={onPinBlock}
+                  onEditBlock={onEditBlock}
+                  onOpenDocument={onOpenDocument}
+                />
+              </ReaderColumn>
+            ) : (
+              <ReaderColumn style={readerStyles}>
+                <DocumentEditor
+                  value={editorValue}
+                  onChange={onEditorChange}
+                  onEditorReady={onEditorReady}
+                />
+              </ReaderColumn>
+            ),
+          )
+          .exhaustive()}
       </ReaderDocumentBody>
     </ReaderSheet>
   );

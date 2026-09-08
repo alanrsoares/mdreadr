@@ -2,7 +2,12 @@ import { Button } from "@astryxdesign/core/Button";
 import type { ResizableRegion } from "@astryxdesign/core/Resizable";
 import type { EditorView } from "@codemirror/view";
 import type { BlockAnchor, Suggestion, TocEntry } from "@mdreadr/domain";
-import { applyBlockEdit, applySuggestion, extractHeadings } from "@mdreadr/domain";
+import {
+  applyBlockEdit,
+  applySuggestion,
+  documentKindForPath,
+  extractHeadings,
+} from "@mdreadr/domain";
 import { err, ok, type Result } from "@onrails/result";
 import { useContainer, useStoreValues } from "@re-reduced/react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
@@ -92,6 +97,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
 
   const content = reader.session.data?.documentContent ?? "";
   const documentPath = reader.session.data?.document?.path;
+  const kind = documentPath ? documentKindForPath(documentPath) : "markdown";
   const dirty = isDirty(draft, documentPath);
   const editorValue = (draft.path === documentPath ? draft.text : null) ?? content;
 
@@ -150,7 +156,9 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
   const suggestions = reader.suggestions.data ?? [];
   // The outline stays live in edit mode by reading the draft instead of the
   // saved content, so the column never degrades into an apology.
-  const isEditing = documentViewMode === "edit";
+  // A non-markdown Document has no preview to switch back to, so it is always
+  // the editor — and an image is neither.
+  const isEditing = kind === "source" || (kind === "markdown" && documentViewMode === "edit");
 
   // Keeps the reading position across a Preview <-> Edit toggle.
   const changeViewMode = useViewModeHandoff({
@@ -160,9 +168,11 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
     editorViewRef,
     onChange: store.actions.documentViewModeChanged,
   });
+  // Only markdown has headings: `# ` in a shell script or a Python file is a
+  // comment, and an outline built from those is noise.
   const toc = useMemo(
-    () => extractHeadings(isEditing ? editorValue : content),
-    [isEditing, editorValue, content],
+    () => (kind === "markdown" ? extractHeadings(isEditing ? editorValue : content) : []),
+    [kind, isEditing, editorValue, content],
   );
 
   // The DOM scroll spy inside TocSidebar has no heading elements to watch in
@@ -289,6 +299,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
         key={tabId}
         content={editorValue}
         documentPath={documentPath}
+        kind={kind}
         notes={notes}
         isActive={isActive}
         viewMode={documentViewMode}
