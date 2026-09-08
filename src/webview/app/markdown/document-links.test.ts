@@ -87,6 +87,8 @@ describe("resolveReaderLink", () => {
     ["views://mainview/CONTEXT.md", "webview-internal url"],
     ["file:///etc/passwd", "file url"],
     ["../notes", "extensionless target"],
+    ["image%.png", "malformed percent escape in a path"],
+    ["#%zz", "malformed percent escape in a fragment"],
     ["", "empty href"],
     ["#", "empty fragment"],
   ])("leaves %s alone (%s)", (href) => {

@@ -47,6 +47,17 @@ function resolveAgainst(base: string, relative: string): string {
   return `/${segments.join("/")}`;
 }
 
+/** `decodeURIComponent` throws on a malformed escape (`image%.png`), and a
+ *  handwritten link is exactly where that turns up — a link cannot be allowed
+ *  to take the click handler down with it. */
+function decodeOrNull(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Classifies one `href` from a rendered Document. `documentPath` is the absolute
  * path of the Document the link was found in, and is what relative links
@@ -58,8 +69,8 @@ export function resolveReaderLink(href: string, documentPath?: string): ReaderLi
   if (trimmed.length === 0) return { kind: "other" };
 
   if (trimmed.startsWith("#")) {
-    const id = decodeURIComponent(trimmed.slice(1));
-    return id.length > 0 ? { kind: "fragment", id } : { kind: "other" };
+    const id = decodeOrNull(trimmed.slice(1));
+    return id && id.length > 0 ? { kind: "fragment", id } : { kind: "other" };
   }
 
   if (ABSOLUTE_SCHEME.test(trimmed)) {
@@ -72,7 +83,9 @@ export function resolveReaderLink(href: string, documentPath?: string): ReaderLi
   const withoutQuery = pathPart.split("?", 1)[0] ?? "";
   if (!FILE_EXTENSION.test(withoutQuery)) return { kind: "other" };
 
-  const decoded = decodeURIComponent(withoutQuery);
+  const decoded = decodeOrNull(withoutQuery);
+  if (decoded === null) return { kind: "other" };
+
   const path = decoded.startsWith("/")
     ? decoded
     : documentPath
