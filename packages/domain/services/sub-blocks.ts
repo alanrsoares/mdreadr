@@ -50,6 +50,9 @@ export const subBlockKindForAnchor = (anchor: BlockAnchor): SubBlockTarget["kind
 /** A list item's opening line: bullet or ordered marker, any indentation. */
 const LIST_MARKER = /^(\s*)(?:[-*+]|\d{1,9}[.)])(?:\s|$)/;
 
+/** A fenced code block's opening or closing line, at any indentation. */
+const FENCE = /^\s*(`{3,}|~{3,})/;
+
 /** A table's alignment row, e.g. `|:---|---:|`. */
 const TABLE_DELIMITER = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/;
 
@@ -66,6 +69,36 @@ const toLines = (source: string): SourceLine[] => {
 };
 
 const indentOf = (line: string): number => LIST_MARKER.exec(line)?.[1]?.length ?? 0;
+
+/**
+ * The opening marker of a list item's line — its indentation and bullet, with
+ * the item's own text dropped. An empty item at the same depth, which is what
+ * a split list's tail needs to keep nesting at the depth the author wrote.
+ */
+export const listItemMarkerPrefix = (line: string): string | undefined =>
+  LIST_MARKER.exec(line)?.[0].replace(/\s+$/, "");
+
+/**
+ * The lines that open a list item, fenced code skipped: `- not an item` inside
+ * a fence is code the author wrote, and counting it would shift every path
+ * after it away from the item the reader actually aimed at.
+ */
+function markerLines(lines: SourceLine[]): { indent: number; lineIndex: number }[] {
+  let fence: string | undefined;
+  return lines.flatMap((line, lineIndex) => {
+    const marker = FENCE.exec(line.text)?.[1];
+    if (fence !== undefined) {
+      // Only a run of the same character, at least as long, closes a fence.
+      if (marker && marker[0] === fence[0] && marker.length >= fence.length) fence = undefined;
+      return [];
+    }
+    if (marker) {
+      fence = marker;
+      return [];
+    }
+    return LIST_MARKER.test(line.text) ? [{ indent: indentOf(line.text), lineIndex }] : [];
+  });
+}
 
 /** Drops the blank lines a loose list leaves between items, so an item's range
  *  ends at its last real line and applying an edit does not eat the gap. */
@@ -97,9 +130,7 @@ type ItemNode = {
  */
 function listItemTree(source: string): ItemNode[] {
   const lines = toLines(source);
-  const markers = lines.flatMap((line, lineIndex) =>
-    LIST_MARKER.test(line.text) ? [{ indent: indentOf(line.text), lineIndex }] : [],
-  );
+  const markers = markerLines(lines);
 
   // An item runs to the last line before the next marker that is not indented
   // deeper than its own, blank tail dropped: that sweeps up its continuation
@@ -152,11 +183,13 @@ function itemAtPath(nodes: ItemNode[], path: number[]): ItemNode | undefined {
 }
 
 function tableRowSpans(source: string): SubBlockSpan[] {
-  const lines = toLines(source).filter((line) => line.text.trim() !== "");
-  const rows = lines.filter((line) => !TABLE_DELIMITER.test(line.text));
+  const [header, delimiter, ...body] = toLines(source).filter((line) => line.text.trim() !== "");
   // A header and its delimiter are what make a table a table; without the
   // delimiter this is not one, and splicing a "row" of it would be a guess.
-  if (rows.length === lines.length) return [];
+  // Only the second line can be that delimiter — a dash-only line further down
+  // is a body row GFM renders, so dropping it would shift every row after it.
+  if (!header || !delimiter || !TABLE_DELIMITER.test(delimiter.text)) return [];
+  const rows = [header, ...body];
 
   return rows.map((line, row) => ({
     target: { kind: "table-row" as const, row },

@@ -106,6 +106,27 @@ describe("collectSubBlocks: list items", () => {
   test("source with no marker at all has no items", () => {
     expect(collectSubBlocks("just a paragraph", "list-item")).toEqual([]);
   });
+
+  test("a list marker inside a fenced code block is code, not an item", () => {
+    const source = [
+      "- alpha",
+      "  ```sh",
+      "  - not an item",
+      "  ```",
+      "  - alpha one",
+      "- beta",
+    ].join("\n");
+    expect(sliced(source)).toEqual([
+      ["- alpha", "  ```sh", "  - not an item", "  ```", "  - alpha one"].join("\n"),
+      "  - alpha one",
+      "- beta",
+    ]);
+    expect(collectSubBlocks(source, "list-item").map((span) => span.target)).toEqual([
+      { kind: "list-item", path: [0] },
+      { kind: "list-item", path: [0, 0] },
+      { kind: "list-item", path: [1] },
+    ]);
+  });
 });
 
 describe("collectSubBlocks: table rows", () => {
@@ -127,6 +148,19 @@ describe("collectSubBlocks: table rows", () => {
 
   test("without a delimiter row there is no table to split", () => {
     expect(collectSubBlocks("| Name | Size |\n| alpha | 1 |", "table-row")).toEqual([]);
+  });
+
+  test("a dash-only body row is a row, not a second delimiter", () => {
+    // GFM renders it as a body cell; dropping it would shift every row under it.
+    const dashed = ["| Name | Size |", "| :--- | ---: |", "| --- | --- |", "| beta | 2 |"].join(
+      "\n",
+    );
+    const spans = collectSubBlocks(dashed, "table-row");
+    expect(spans.map((span) => dashed.slice(span.range.start, span.range.end))).toEqual([
+      "| Name | Size |",
+      "| --- | --- |",
+      "| beta | 2 |",
+    ]);
   });
 });
 
@@ -207,6 +241,18 @@ describe("findSubBlockRange, resolveSubBlockRawMarkdown, applySubBlockEdit", () 
     const anchor = anchorFor(content, "table");
     expect(resolveSubBlockRawMarkdown(content, anchor, { kind: "table-row", row: 0 })).toBe(
       "| Name | Size |",
+    );
+  });
+
+  test("editing a dash-only body row edits that row, not the one after it", () => {
+    const dashed = ["| Name | Size |", "| :--- | ---: |", "| --- | --- |", "| beta | 2 |", ""].join(
+      "\n",
+    );
+    const anchor = anchorFor(dashed, "table");
+    const target = { kind: "table-row" as const, row: 1 };
+    expect(resolveSubBlockRawMarkdown(dashed, anchor, target)).toBe("| --- | --- |");
+    expect(applySubBlockEdit(dashed, anchor, target, "| alpha | 1 |")).toBe(
+      dashed.replace("| --- | --- |", "| alpha | 1 |"),
     );
   });
 
