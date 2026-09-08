@@ -89,7 +89,12 @@ function PinParagraph({ children, ctx }: PinParagraphProps) {
   }
 
   return (
-    <EditableBlock anchor={anchor} onEdit={ctx.onStartEditBlock} onPin={ctx.onPinBlock}>
+    <EditableBlock
+      anchor={anchor}
+      onEdit={ctx.onStartEditBlock}
+      onPin={ctx.onPinBlock}
+      content={ctx.content}
+    >
       <ReaderParagraph data-block-id={blockId} className={blockClasses(ctx.notedBlockIds, blockId)}>
         {children}
       </ReaderParagraph>
@@ -116,7 +121,12 @@ function PinCodeBlock({ code, language, ctx }: PinCodeBlockProps) {
   }
 
   return (
-    <EditableBlock anchor={anchor} onEdit={ctx.onStartEditBlock} onPin={ctx.onPinBlock}>
+    <EditableBlock
+      anchor={anchor}
+      onEdit={ctx.onStartEditBlock}
+      onPin={ctx.onPinBlock}
+      content={ctx.content}
+    >
       <ReaderCodeWrap data-block-id={blockId} className={blockClasses(ctx.notedBlockIds, blockId)}>
         <CodeBlock code={code} language={language} isCollapsible />
       </ReaderCodeWrap>
@@ -138,7 +148,12 @@ export const createPinComponents = (ctx: PinContext): Partial<MarkdownComponents
     const Heading = readerHeadingByLevel[level];
 
     return (
-      <EditableBlock anchor={anchor} onEdit={ctx.onStartEditBlock} onPin={ctx.onPinBlock}>
+      <EditableBlock
+        anchor={anchor}
+        onEdit={ctx.onStartEditBlock}
+        onPin={ctx.onPinBlock}
+        content={ctx.content}
+      >
         <Heading
           id={domId}
           data-block-id={domId}

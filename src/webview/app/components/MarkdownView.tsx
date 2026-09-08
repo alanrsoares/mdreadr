@@ -250,6 +250,7 @@ export function MarkdownView({
               anchor={anchor}
               onEdit={onEditBlock ? handleStartEditBlock : undefined}
               onPin={onPinBlock}
+              content={content}
             >
               <ReaderBlockWrap
                 data-block-id={anchor.blockId}
