@@ -185,6 +185,57 @@ export function splitAroundSubBlock(
   };
 }
 
+/**
+ * Maps a target resolved from a split tail back into the parent block's
+ * coordinate space. The tail is a standalone markdown document, so its DOM
+ * starts list paths and table body rows over at zero/one.
+ */
+export function remapSubBlockTargetFromAfter(
+  blockSource: string,
+  editingTarget: SubBlockTarget,
+  localTarget: SubBlockTarget,
+): SubBlockTarget | undefined {
+  if (editingTarget.kind !== localTarget.kind) return undefined;
+
+  if (editingTarget.kind === "table-row" && localTarget.kind === "table-row") {
+    // The repeated header remains row 0. Body rows in the tail begin directly
+    // after the row in the editor; when the header is open, that offset is 0.
+    return {
+      kind: "table-row",
+      row: localTarget.row === 0 ? 0 : editingTarget.row + localTarget.row,
+    };
+  }
+
+  if (editingTarget.kind !== "list-item" || localTarget.kind !== "list-item") {
+    return undefined;
+  }
+
+  const spans = collectSubBlocks(blockSource, "list-item");
+  const editingSpan = spans.find(
+    (entry) => entry.target.kind === "list-item" && samePath(entry.target.path, editingTarget.path),
+  );
+  if (!editingSpan) return undefined;
+
+  const rawAfter = blockSource.slice(editingSpan.range.end);
+  const after = rawAfter.replace(/^\n+/, "");
+  const reopened = ancestorMarkers(blockSource, spans, editingTarget.path);
+  const syntheticPrefixLength = reopened.length > 0 ? reopened.join("\n").length + 1 : 0;
+  const localSpan = collectSubBlocks(
+    [...reopened, after].filter((part) => part.length > 0).join("\n"),
+    "list-item",
+  ).find(
+    (entry) => entry.target.kind === "list-item" && samePath(entry.target.path, localTarget.path),
+  );
+  // Reopened ancestor markers have no source counterpart. Treating a gesture
+  // on one as a whole-block gesture is more honest than guessing an item.
+  if (!localSpan || localSpan.range.start < syntheticPrefixLength) return undefined;
+
+  const originalTailStart = editingSpan.range.end + rawAfter.length - after.length;
+  const originalStart = originalTailStart + localSpan.range.start - syntheticPrefixLength;
+  const originalSpan = spans.find((entry) => entry.range.start === originalStart);
+  return originalSpan?.target;
+}
+
 /** What the sub-block is called in a menu item, a hint or an accessible name. */
 export const subBlockNoun = (kind: SubBlockTarget["kind"]): string =>
   kind === "list-item" ? "item" : "row";

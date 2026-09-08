@@ -22,7 +22,11 @@ import {
   createReaderInlinePlugins,
   preprocessReaderMarkdown,
 } from "../markdown/pipeline.tsx";
-import { sameSubBlockTarget, splitAroundSubBlock } from "../markdown/sub-blocks.ts";
+import {
+  remapSubBlockTargetFromAfter,
+  sameSubBlockTarget,
+  splitAroundSubBlock,
+} from "../markdown/sub-blocks.ts";
 import type { BlockEditError } from "../session/block-edit.ts";
 import { openExternalLink } from "../session/open-external.ts";
 import { useFontSettings } from "../theme/FontSettingsContext.tsx";
@@ -278,14 +282,23 @@ export function MarkdownView({
             return (
               <Fragment key={segment.key}>
                 {split?.before ? (
-                  <Markdown
-                    className="reader-flow"
-                    contentWidth={measurePx}
-                    autolink="gfm"
-                    inlinePlugins={inlinePlugins}
+                  <EditableBlock
+                    anchor={anchor}
+                    onEdit={onEditBlock ? handleStartEditBlock : undefined}
+                    onEditSub={onEditBlock ? handleStartEditSubBlock : undefined}
+                    subKind={subKind}
+                    onPin={onPinBlock}
+                    content={content}
                   >
-                    {split.before}
-                  </Markdown>
+                    <Markdown
+                      className="reader-flow"
+                      contentWidth={measurePx}
+                      autolink="gfm"
+                      inlinePlugins={inlinePlugins}
+                    >
+                      {split.before}
+                    </Markdown>
+                  </EditableBlock>
                 ) : null}
                 <BlockSourceEditor
                   anchor={anchor}
@@ -296,14 +309,28 @@ export function MarkdownView({
                   ctx={pinContext}
                 />
                 {split?.after ? (
-                  <Markdown
-                    className="reader-flow"
-                    contentWidth={measurePx}
-                    autolink="gfm"
-                    inlinePlugins={inlinePlugins}
+                  <EditableBlock
+                    anchor={anchor}
+                    onEdit={onEditBlock ? handleStartEditBlock : undefined}
+                    onEditSub={onEditBlock ? handleStartEditSubBlock : undefined}
+                    mapSubTarget={(target) =>
+                      editingTarget
+                        ? remapSubBlockTargetFromAfter(segment.text, editingTarget, target)
+                        : target
+                    }
+                    subKind={subKind}
+                    onPin={onPinBlock}
+                    content={content}
                   >
-                    {split.after}
-                  </Markdown>
+                    <Markdown
+                      className="reader-flow"
+                      contentWidth={measurePx}
+                      autolink="gfm"
+                      inlinePlugins={inlinePlugins}
+                    >
+                      {split.after}
+                    </Markdown>
+                  </EditableBlock>
                 ) : null}
               </Fragment>
             );

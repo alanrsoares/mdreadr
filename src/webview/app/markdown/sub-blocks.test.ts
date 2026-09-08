@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { splitAroundSubBlock, subBlockNoun } from "./sub-blocks.ts";
+import { remapSubBlockTargetFromAfter, splitAroundSubBlock, subBlockNoun } from "./sub-blocks.ts";
 
 describe("subBlockNoun", () => {
   test("names the part in reader language", () => {
@@ -115,5 +115,55 @@ describe("splitAroundSubBlock: tables", () => {
 
   test("a row that is no longer there splits into nothing", () => {
     expect(splitAroundSubBlock(source, { kind: "table-row", row: 9 })).toBeUndefined();
+  });
+});
+
+describe("remapSubBlockTargetFromAfter", () => {
+  test("maps a tail list item's local path back to the parent list", () => {
+    const source = ["- alpha", "- beta", "- gamma"].join("\n");
+    expect(
+      remapSubBlockTargetFromAfter(
+        source,
+        { kind: "list-item", path: [0] },
+        {
+          kind: "list-item",
+          path: [0],
+        },
+      ),
+    ).toEqual({ kind: "list-item", path: [1] });
+  });
+
+  test("maps a nested tail item past the reopened ancestors", () => {
+    const source = ["- alpha", "  - one", "  - two", "- beta"].join("\n");
+    expect(
+      remapSubBlockTargetFromAfter(
+        source,
+        { kind: "list-item", path: [0, 0] },
+        {
+          kind: "list-item",
+          path: [0, 0],
+        },
+      ),
+    ).toEqual({ kind: "list-item", path: [0, 1] });
+  });
+
+  test("maps a tail table body row back to the parent table", () => {
+    const source = [
+      "| Name | Size |",
+      "| :--- | ---: |",
+      "| alpha | 1 |",
+      "| beta | 2 |",
+      "| gamma | 3 |",
+    ].join("\n");
+    expect(
+      remapSubBlockTargetFromAfter(
+        source,
+        { kind: "table-row", row: 1 },
+        {
+          kind: "table-row",
+          row: 1,
+        },
+      ),
+    ).toEqual({ kind: "table-row", row: 2 });
   });
 });

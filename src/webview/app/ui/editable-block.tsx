@@ -28,6 +28,8 @@ type EditableBlockProps = {
   /** Edits one part of the block. Falls back to `onEdit` when the gesture did
    *  not land in one. */
   onEditSub?: (anchor: BlockAnchor, target: SubBlockTarget) => void;
+  /** Maps a target from a rendered source slice to its parent block. */
+  mapSubTarget?: (target: SubBlockTarget) => SubBlockTarget | undefined;
   children: ReactNode;
 };
 
@@ -50,6 +52,7 @@ export function EditableBlock({
   content,
   subKind,
   onEditSub,
+  mapSubTarget,
   children,
 }: EditableBlockProps) {
   const label = anchorDisplayLabel(anchor);
@@ -61,7 +64,8 @@ export function EditableBlock({
   /** The part the pointer landed on, or `null` for the block itself. */
   const targetFrom = (event: MouseEvent): SubBlockTarget | null => {
     if (!subKind || !onEditSub || !(event.currentTarget instanceof HTMLElement)) return null;
-    return subBlockTargetFromNode(event.currentTarget, event.target as Node, subKind) ?? null;
+    const target = subBlockTargetFromNode(event.currentTarget, event.target as Node, subKind);
+    return target ? (mapSubTarget ? (mapSubTarget(target) ?? null) : target) : null;
   };
 
   const editFrom = (event: MouseEvent): void => {
