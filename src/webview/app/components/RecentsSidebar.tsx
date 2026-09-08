@@ -3,6 +3,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
+import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import {
   SideNav,
   SideNavCollapseButton,
@@ -13,7 +14,9 @@ import {
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useMemo, useRef } from "react";
 import packageJson from "../../../../package.json";
+import { useCopy } from "../hooks/useCopy.ts";
 import { DocumentTextIcon } from "../icons.ts";
+import { RecentItemActions, RecentItemRow } from "../ui/layout.tsx";
 import { formatDisplayPath, formatRecentMenuLabels, pathFileName } from "./path-display.ts";
 import { useRecentsSidebar } from "./RecentsSidebarContext.tsx";
 
@@ -53,26 +56,31 @@ function RecentsSidebarOpenAction({
 }
 
 type RecentSideNavItemProps = {
+  path: string;
   menuLabel: string;
   displayPath: string;
   isSelected: boolean;
   isOpening: boolean;
   onOpen: () => void;
+  onForget: () => void;
 };
 
 function RecentSideNavItem({
+  path,
   menuLabel,
   displayPath,
   isSelected,
   isOpening,
   onOpen,
+  onForget,
 }: RecentSideNavItemProps) {
   const { isCollapsed } = useSideNavCollapse();
+  const copy = useCopy();
   const anchorRef = useRef<HTMLDivElement>(null);
   const itemLabel = isCollapsed ? displayPath : menuLabel;
 
   return (
-    <div ref={anchorRef} style={{ width: "100%" }}>
+    <RecentItemRow ref={anchorRef}>
       <SideNavItem
         label={itemLabel}
         icon={DocumentTextIcon}
@@ -82,11 +90,33 @@ function RecentSideNavItem({
         // leaving the click looking dropped until the document lands.
         isSelected={isSelected || isOpening}
         onClick={onOpen}
+        // Collapsed, the rail is icon-width: there is nowhere to put the menu,
+        // and the row's own tooltip is already doing the explaining.
+        actions={
+          isCollapsed ? undefined : (
+            <RecentItemActions>
+              <MoreMenu
+                label={`Actions for ${menuLabel}`}
+                size="sm"
+                alignment="end"
+                items={[
+                  { label: "Copy path", onClick: () => void copy(path, "Path") },
+                  { type: "divider" },
+                  {
+                    label: "Remove from recents",
+                    variant: "destructive",
+                    onClick: onForget,
+                  },
+                ]}
+              />
+            </RecentItemActions>
+          )
+        }
       />
       {!isCollapsed && displayPath !== menuLabel ? (
         <Tooltip content={displayPath} placement="end" alignment="start" anchorRef={anchorRef} />
       ) : null}
-    </div>
+    </RecentItemRow>
   );
 }
 
@@ -108,6 +138,7 @@ type RecentsSidebarProps = {
   openingPath?: string | null;
   homeDirectory?: string;
   onOpen: (path: string) => void;
+  onForget: (path: string) => void;
   onPickDocument: () => void;
   isOpening?: boolean;
   /**
@@ -123,6 +154,7 @@ export function RecentsSidebar({
   openingPath = null,
   homeDirectory,
   onOpen,
+  onForget,
   onPickDocument,
   isOpening = false,
   openActionVariant = "primary",
@@ -170,11 +202,13 @@ export function RecentsSidebar({
             return (
               <RecentSideNavItem
                 key={path}
+                path={path}
                 menuLabel={menuLabel}
                 displayPath={displayPaths.get(path) ?? menuLabel}
                 isSelected={path === selectedPath}
                 isOpening={path === openingPath}
                 onOpen={() => onOpen(path)}
+                onForget={() => onForget(path)}
               />
             );
           })

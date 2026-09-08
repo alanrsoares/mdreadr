@@ -7,8 +7,7 @@ import { err, ok, type Result } from "@onrails/result";
 import { useContainer, useStoreValues } from "@re-reduced/react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { DocumentView } from "../components/DocumentView.tsx";
-import { NotesPanel } from "../components/NotesPanel.tsx";
-import { SuggestionsPanel } from "../components/SuggestionsPanel.tsx";
+import { ReviewPanel } from "../components/ReviewPanel.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
 import { registerEditorView } from "../editorCommands.ts";
 import { useEditorOutlineSpy } from "../hooks/useEditorOutlineSpy.ts";
@@ -260,35 +259,30 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
         />
       }
       notes={
-        <>
-          <SuggestionsPanel
-            suggestions={suggestions}
-            onAccept={onAcceptSuggestion}
-            onReject={onRejectSuggestion}
-            onScrollToAnchor={onScrollToAnchor}
-          />
-          <NotesPanel
-            notes={notes}
-            pendingAnchor={pendingAnchor}
-            isSaving={reader.isSaving}
-            isLoadingNotes={isLoadingNotes}
-            isCreatingNote={reader.isCreatingNote}
-            onCreateNote={async (input) => {
-              await reader.createNote(input);
-            }}
-            onAddReply={async (noteId, body) => {
-              await reader.addReply(noteId, body);
-            }}
-            onUpdateStatus={async (noteId, status) => {
-              await reader.setStatus(noteId, status);
-            }}
-            onSaveNotes={async () => {
-              await reader.save();
-            }}
-            onLoadNotes={onLoadNotes}
-            onScrollToAnchor={onScrollToAnchor}
-          />
-        </>
+        <ReviewPanel
+          notes={notes}
+          suggestions={suggestions}
+          pendingAnchor={pendingAnchor}
+          isSaving={reader.isSaving}
+          isLoadingNotes={isLoadingNotes}
+          isCreatingNote={reader.isCreatingNote}
+          onCreateNote={async (input) => {
+            await reader.createNote(input);
+          }}
+          onAddReply={async (noteId, body) => {
+            await reader.addReply(noteId, body);
+          }}
+          onUpdateStatus={async (noteId, status) => {
+            await reader.setStatus(noteId, status);
+          }}
+          onAcceptSuggestion={onAcceptSuggestion}
+          onRejectSuggestion={onRejectSuggestion}
+          onSaveNotes={async () => {
+            await reader.save();
+          }}
+          onLoadNotes={onLoadNotes}
+          onScrollToAnchor={onScrollToAnchor}
+        />
       }
     >
       <DocumentView
@@ -302,7 +296,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
         onPinBlock={(anchor) => {
           store.actions.pendingAnchorChanged(anchor);
           flashAnchor(anchor.blockId, "reader-block-pin-flash");
-          onAnnounce(`Pinning note to ${anchor.label ?? anchor.kind}`);
+          onAnnounce(`Anchoring a note to ${anchor.label ?? anchor.kind}`);
         }}
         onEditBlock={onEditBlock}
         onOpenDocument={onOpenPath}

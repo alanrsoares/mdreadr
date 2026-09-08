@@ -210,6 +210,7 @@ export type DocumentTabs = {
   activeDocument: DocumentRef | null;
   homeDirectory: string | undefined;
   recents: string[];
+  forgetRecent: (path: string) => void;
   activateTab: (id: string) => void;
   closeTab: (id: string) => void;
   open: (path: string) => void;
@@ -271,6 +272,18 @@ export function useDocumentTabs(
   const invalidateSession = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["session"] });
   }, [queryClient]);
+
+  const forgetRecentMutation = useMutation({
+    mutationFn: (path: string) => readerApi.forgetRecent(path),
+    onSuccess: (paths) => {
+      // The route hands the new list straight back, so seed it rather than
+      // paying a second round trip to read what we were just told.
+      queryClient.setQueryData(["recents"], paths);
+    },
+    onError: (error) => {
+      showError("Remove from recents", error);
+    },
+  });
 
   const invalidateAfterTabChange = useCallback(() => {
     invalidateTabs();
@@ -421,6 +434,9 @@ export function useDocumentTabs(
     activeDocument: activeSessionQuery.data?.document ?? null,
     homeDirectory: activeSessionQuery.data?.homeDirectory,
     recents: recentsQuery.data ?? [],
+    forgetRecent: (path: string) => {
+      forgetRecentMutation.mutate(path);
+    },
     activateTab: (id) => {
       activateTabMutation.mutate(id);
     },

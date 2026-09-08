@@ -51,7 +51,7 @@ import {
   handleMcpRequest,
   MAX_WAIT_TIMEOUT_MS,
 } from "./mcp/index.ts";
-import { readRecents, toRecentsHttpError } from "./recents.ts";
+import { forgetRecent, readRecents, toRecentsHttpError } from "./recents.ts";
 import { sessionStore } from "./session.ts";
 
 function domainError(error: NotesDomainError): { error: string; code: string } {
@@ -144,6 +144,23 @@ export const app = new Elysia()
     }
     return { paths: result.value };
   })
+  .delete(
+    "/documents/recent",
+    async ({ body, set }) => {
+      const parsed = OpenDocumentBodySchema.safeParse(body);
+      if (!parsed.success) {
+        set.status = 422;
+        return { error: parsed.error.message };
+      }
+      const result = await forgetRecent(parsed.data.path);
+      if (isErr(result)) {
+        set.status = 500;
+        return toRecentsHttpError(result.error);
+      }
+      return { paths: result.value };
+    },
+    { body: OpenDocumentBodySchema },
+  )
   .post(
     "/documents/open",
     async ({ body, set }) => {

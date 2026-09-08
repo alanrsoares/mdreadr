@@ -75,6 +75,14 @@ export const touchRecent = (path: string): ResultAsync<string[], RecentsError> =
     return saveRecents(next).map(() => next);
   });
 
+/** Drops one path from the list. A path that is not in it is not an error:
+ *  the caller wanted it gone, and it is. */
+export const forgetRecent = (path: string): ResultAsync<string[], RecentsError> =>
+  loadRecents().andThen((paths) => {
+    const next = paths.filter((item) => item !== path);
+    return saveRecents(next).map(() => next);
+  });
+
 export const readRecents = (): ResultAsync<string[], RecentsError> =>
   loadRecents().orElse(() => okAsync([]));
 

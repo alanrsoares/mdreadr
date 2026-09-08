@@ -38,6 +38,9 @@ function createInMemoryReaderApi() {
     async getRecents() {
       return [];
     },
+    async forgetRecent() {
+      return [];
+    },
     async getNotes() {
       return [];
     },

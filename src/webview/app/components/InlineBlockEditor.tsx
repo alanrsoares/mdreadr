@@ -35,6 +35,7 @@ import {
 import { shortcutLabel } from "../platform.ts";
 import { type BlockEditError, blockEditErrorMessage } from "../session/block-edit.ts";
 import { useFontSettings } from "../theme/FontSettingsContext.tsx";
+import { SourceEditor, type SourceEditorHandle } from "./SourceEditor.tsx";
 
 type InlineBlockEditorProps = {
   anchor: BlockAnchor;
@@ -157,7 +158,8 @@ export function InlineBlockEditor({
   const [text, setText] = useState(initialValue);
   const [isDiscardArmed, setIsDiscardArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<SourceEditorHandle>(null);
+  const editorDomRef = useRef<HTMLElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const hintId = useId();
   const errorId = useId();
@@ -173,22 +175,12 @@ export function InlineBlockEditor({
     [anchor.kind],
   );
 
-  // Auto-size to the content. No minimum beyond one line: a one-line paragraph
-  // has to stay one line tall or entering edit shifts everything below it.
   useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    void text;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [text]);
-
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.focus({ preventScroll: true });
-    const end = el.value.length;
-    el.setSelectionRange(end, end);
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const end = editor.getValue().length;
+    editor.setSelection({ start: end, end });
   }, []);
 
   useEffect(() => {
@@ -209,18 +201,18 @@ export function InlineBlockEditor({
     setIsDiscardArmed(false);
     setError(null);
     window.requestAnimationFrame(() => {
-      const el = textareaRef.current;
-      if (!el) return;
-      el.focus({ preventScroll: true });
-      el.setSelectionRange(edit.selection.start, edit.selection.end);
+      const editor = editorRef.current;
+      if (!editor) return;
+      editor.focus();
+      editor.setSelection(edit.selection);
     });
   }, []);
 
   const runTool = useCallback(
     (tool: Tool) => {
-      const el = textareaRef.current;
-      if (!el) return;
-      applyEdit(tool.apply(el.value, { start: el.selectionStart, end: el.selectionEnd }));
+      const editor = editorRef.current;
+      if (!editor) return;
+      applyEdit(tool.apply(editor.getValue(), editor.getSelection()));
     },
     [applyEdit],
   );
@@ -229,7 +221,7 @@ export function InlineBlockEditor({
     const applied = onSave(text);
     if (!isErr(applied)) return;
     setError(blockEditErrorMessage(applied.error));
-    textareaRef.current?.focus({ preventScroll: true });
+    editorRef.current?.focus();
   }, [onSave, text]);
 
   const handleCancel = useCallback(() => {
@@ -271,12 +263,17 @@ export function InlineBlockEditor({
 
       // Indentation is the textarea's business; in the toolbar, Tab still moves
       // focus out of the editor, which is the only reason it is not a trap.
-      if (event.key === "Tab" && event.target === textareaRef.current) {
-        const el = textareaRef.current;
-        if (!el) return;
+      // `event.target` is CodeMirror's contenteditable, not the section, so
+      // the test is containment rather than identity.
+      const isInEditor =
+        event.target instanceof Node && editorDomRef.current?.contains(event.target) === true;
+      if (event.key === "Tab" && isInEditor) {
+        const editor = editorRef.current;
+        if (!editor) return;
         event.preventDefault();
-        const selection = { start: el.selectionStart, end: el.selectionEnd };
-        applyEdit(event.shiftKey ? outdent(el.value, selection) : indent(el.value, selection));
+        const value = editor.getValue();
+        const selection = editor.getSelection();
+        applyEdit(event.shiftKey ? outdent(value, selection) : indent(value, selection));
       }
     },
     [applyEdit, handleApply, handleCancel, runTool, tools],
@@ -330,23 +327,27 @@ export function InlineBlockEditor({
       aria-label={`Editing ${anchor.label ?? anchor.kind} source`}
       onKeyDown={handleKeyDown}
     >
-      <textarea
-        ref={textareaRef}
-        value={text}
-        onChange={(event) => {
-          setText(event.target.value);
-          setIsDiscardArmed(false);
-        }}
-        rows={1}
+      <div
         className="reader-block-edit-input"
-        placeholder="Markdown source"
-        style={sourceStyle}
-        spellCheck={!isMono}
-        aria-label={`${anchor.kind} source`}
         aria-describedby={error ? `${hintId} ${errorId}` : hintId}
-        aria-invalid={error !== null}
-        aria-keyshortcuts="Meta+Enter Control+Enter Escape"
-      />
+      >
+        <SourceEditor
+          ref={editorRef}
+          value={text}
+          onChange={(next) => {
+            setText(next);
+            setIsDiscardArmed(false);
+          }}
+          sizing="content"
+          typography={sourceStyle}
+          hasSpellCheck={!isMono}
+          ariaLabel={`${anchor.kind} source`}
+          onCreateEditor={(view) => {
+            editorDomRef.current = view.dom;
+            view.contentDOM.setAttribute("aria-keyshortcuts", "Meta+Enter Control+Enter Escape");
+          }}
+        />
+      </div>
 
       <div className="reader-block-edit-chrome">
         <div
