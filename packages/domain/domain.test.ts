@@ -11,6 +11,7 @@ import {
   CreateNoteBodySchema,
   createNote,
   createSuggestion,
+  documentKindForPath,
   extractHeadings,
   findBlockRange,
   findNote,
@@ -463,5 +464,18 @@ describe("listDocumentBlocks", () => {
     expect(first?.blockId).toBe(blockIdForParagraph("dup", 0));
     expect(second?.blockId).toBe(blockIdForParagraph("dup", 1));
     expect(first?.blockId).not.toBe(second?.blockId);
+  });
+});
+
+describe("documentKindForPath", () => {
+  test.each([
+    ["/docs/DESIGN.md", "markdown"],
+    ["/docs/plan.MARKDOWN", "markdown"],
+    ["/docs/hero.png", "image"],
+    ["/docs/Logo.SVG", "image"],
+    ["/src/index.ts", "source"],
+    ["/etc/hosts", "source"],
+  ])("reads %s as %s", (path, kind) => {
+    expect(documentKindForPath(path)).toBe(kind as ReturnType<typeof documentKindForPath>);
   });
 });

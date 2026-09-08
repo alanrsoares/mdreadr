@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
-import type { PickFileInput } from "@mdreadr/domain";
+import { isMarkdownPath, type PickFileInput } from "@mdreadr/domain";
 import { matchTag } from "@onrails/pattern/tag";
 import { ResultAsync } from "@onrails/result";
 import { touchRecent } from "./recents.ts";
@@ -101,13 +101,8 @@ export const toPathNotAllowedError = (path: string): { error: string; code: stri
   code: "PathNotAllowed",
 });
 
-const SUPPORTED_DOCUMENT_EXTENSIONS = [".md", ".markdown"];
-
-/** MCP `open_document` only opens Markdown files; the app itself has no such restriction (native dialogs, drag-and-drop, argv). */
-export function isSupportedDocumentPath(path: string): boolean {
-  const lower = path.toLowerCase();
-  return SUPPORTED_DOCUMENT_EXTENSIONS.some((extension) => lower.endsWith(extension));
-}
+/** MCP `open_document` only opens Markdown files; the app itself has no such restriction (native dialogs, drag-and-drop, argv, links to neighbouring files). */
+export const isSupportedDocumentPath = isMarkdownPath;
 
 export const toDocumentHttpError = (
   error: DocumentError,
