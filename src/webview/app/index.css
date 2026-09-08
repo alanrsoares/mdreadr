@@ -520,11 +520,18 @@ body,
 }
 
 .reader-block-edit {
+  /* Breathing room above the source, cancelled on the block axis by the
+     negative margin below: the padding must not push the block down, the same
+     device the inline padding already uses. Every rule that sets
+     `margin-block-start` on this element has to subtract it. */
+  --reader-block-edit-pad-block: 0.5rem;
+
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-inner);
   margin-inline: -0.75rem;
   padding-inline: 0.75rem;
+  padding-block-start: var(--reader-block-edit-pad-block);
   background: color-mix(in srgb, var(--color-accent) 4%, transparent);
   /* An inset ring takes no box space, so switching a block into edit cannot
      reflow the prose around it. A full ring, not a side rule: the left rule is
@@ -533,41 +540,45 @@ body,
   animation: reader-block-edit-enter var(--duration-fast) var(--ease-standard) both;
 }
 
+/* The cancelling margin needs this selector, not the bare class: `.reader-prose
+   .reader-flow > *` resets `margin-block` to 0 and outranks it, which would
+   leave the padding free to push the block down by its own height. The ring
+   grows upward into the gap instead, so the reader still gets the breathing
+   room and the text they pointed at still does not move. The heading rules
+   below are more specific again, and subtract the same amount. */
+.reader-prose .reader-flow > .reader-block-edit {
+  margin-block-start: calc(-1 * var(--reader-block-edit-pad-block));
+}
+
 /* The rendered heading carried a `margin-block-start` from `.reader-flow`; the
    editor is a `section`, so without this the block jumps up by the heading gap
    the moment it is edited. Level comes off the source's own `#` run. */
 .reader-prose
   .reader-flow
   > .reader-block-edit:not(:first-child):is([data-level="1"], [data-level="2"], [data-level="3"]) {
-  margin-block-start: var(--reader-heading-major-gap);
+  margin-block-start: calc(var(--reader-heading-major-gap) - var(--reader-block-edit-pad-block));
 }
 
 .reader-prose
   .reader-flow
   > .reader-block-edit:not(:first-child):is([data-level="4"], [data-level="5"], [data-level="6"]) {
-  margin-block-start: var(--reader-heading-minor-gap);
+  margin-block-start: calc(var(--reader-heading-minor-gap) - var(--reader-block-edit-pad-block));
 }
 
+/* A wrapper around CodeMirror now, not the input itself: it must contribute
+   nothing of its own, or entering edit would move the block it replaced. The
+   caret, the selection paint and the padding reset live in `SourceEditor`. */
 .reader-block-edit-input {
   width: 100%;
   padding: 0;
   border: none;
   background: transparent;
   color: var(--color-text-primary);
-  caret-color: var(--color-text-accent);
-  outline: none;
-  overflow: hidden;
-  resize: none;
-  white-space: pre-wrap;
-}
-
-.reader-block-edit-input::placeholder {
-  color: var(--color-text-disabled);
 }
 
 /* Prose and headings keep the reader's measure, so the source wraps where the
    rendered text wrapped. Code and tables stay full width, as they render. */
-.reader-block-edit[data-measure="capped"] .reader-block-edit-input {
+.reader-block-edit[data-measure="capped"] .reader-block-edit-input .cm-content {
   max-width: var(--reader-measure, none);
 }
 
@@ -696,12 +707,18 @@ body,
 }
 
 /* CodeMirror's bundled dark theme paints its own slate background. The reader is
-   one sheet of paper in both modes, so the editor has to be transparent and let
-   `--reader-paper-bg` through. The class is repeated to outrank the bundled
-   theme's own two-class rule without reaching for `!important`. */
+   one sheet of paper in both modes, so the editor has to be transparent: the
+   document editor lets `--reader-paper-bg` through, and the inline editor lets
+   `.reader-block-edit`'s own accent wash through. Without this the inline
+   editor's slate rectangle stops short of the wrapper's `padding-inline` and
+   reads as a left and right gutter. The class is repeated to outrank the
+   bundled theme's own two-class rule without reaching for `!important`. */
 .reader-editor .cm-editor.cm-editor,
 .reader-editor .cm-editor.cm-editor .cm-scroller,
-.reader-editor .cm-editor.cm-editor .cm-gutters {
+.reader-editor .cm-editor.cm-editor .cm-gutters,
+.reader-block-edit-input .cm-editor.cm-editor,
+.reader-block-edit-input .cm-editor.cm-editor .cm-scroller,
+.reader-block-edit-input .cm-editor.cm-editor .cm-gutters {
   background: transparent;
 }
 
@@ -760,4 +777,29 @@ body,
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Astryx's ContextMenu trigger ships `user-select: none`, which on a reading
+   surface costs the reader the ability to select the prose it wraps. The menu
+   needs the right-click, not the selection. The `:not(#\#)` chain is stylex's
+   own specificity device, matched here so the override lands without
+   `!important`. */
+.reader-block-host > div:not(#\#):not(#\#):not(#\#) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* The block menu is chrome, not prose. It sits inside the reader sheet in the
+   DOM, so without this it inherits `--reader-prose-family` and the reader's
+   font size and renders the actions in 22px serif whenever the reader has
+   scaled the text up. Restore the app-level typography tokens inside it. */
+.reader-block-host [popover] {
+  --text-body-size: var(--font-size-base);
+  --text-body-leading: normal;
+  --reader-prose-family: var(--font-family-body);
+  --reader-heading-family: var(--font-family-body);
+
+  font-family: var(--font-family-body);
+  line-height: normal;
 }
