@@ -55,6 +55,30 @@ Installer extracts to `~/.local/share/` and adds a desktop shortcut.
 
 **Do not** run `build/.../bin/launcher` directly — that is the inner bundle, not the self-extracting installer.
 
+## Package RPM, DEB & Flatpak
+
+To package proper distro packages:
+
+```bash
+bun run build
+bun run package:linux
+```
+
+This extracts the clean `artifacts/stable-linux-*.tar.zst` runtime bundle and calls `nfpm` to output:
+- `artifacts/mdreadr_<version>_<arch>.deb`
+- `artifacts/mdreadr-<version>-1.<arch>.rpm`
+
+Each package installs:
+- Binaries and app assets to `/usr/lib/mdreadr`
+- Wrapper launcher script to `/usr/bin/mdreadr` (with Wayland/WebKit environment presets)
+- Desktop entry to `/usr/share/applications/dev.mdreadr.app.desktop`
+- Application icon to `/usr/share/icons/hicolor/512x512/apps/dev.mdreadr.app.png`
+
+For **Flatpak**, the manifests and AppStream metainfo are located in `packaging/flatpak/`:
+- `packaging/flatpak/dev.mdreadr.app.yml` (Flatpak builder manifest)
+- `packaging/flatpak/dev.mdreadr.app.metainfo.xml` (AppStream metadata)
+- `packaging/flatpak/dev.mdreadr.app.desktop` (XDG desktop entry)
+
 ## Troubleshooting
 
 | Symptom | Fix |

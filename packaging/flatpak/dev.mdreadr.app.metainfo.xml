@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.mdreadr.app</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>mdreadr</name>
+  <summary>Desktop markdown reader with anchored notes for human-agent review loops</summary>
+  <description>
+    <p>
+      mdreadr is an opinionated, read-only desktop markdown reader designed for review workflows.
+      It anchors notes to markdown passages without modifying the source document, providing
+      a clean interface for human-agent pair reviewing.
+    </p>
+  </description>
+  <launchable type="desktop-id">dev.mdreadr.app.desktop</launchable>
+  <url type="homepage">https://github.com/alanrsoares/mdreadr</url>
+  <url type="bugtracker">https://github.com/alanrsoares/mdreadr/issues</url>
+  <developer id="dev.mdreadr">
+    <name>Alan Soares</name>
+  </developer>
+  <provides>
+    <mediatype>text/markdown</mediatype>
+    <mediatype>text/x-markdown</mediatype>
+  </provides>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.15.0" date="2026-09-08"/>
+  </releases>
+</component>
