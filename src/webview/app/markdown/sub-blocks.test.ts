@@ -52,7 +52,17 @@ describe("splitAroundSubBlock: lists", () => {
     expect(splitAroundSubBlock(nested, { kind: "list-item", path: [0, 0] })).toEqual({
       before: "- alpha",
       source: "  - alpha one",
-      after: "  - alpha two\n- beta",
+      // The parent reopens empty so the sibling left behind still nests.
+      after: "-\n  - alpha two\n- beta",
+    });
+  });
+
+  test("a deeper item reopens every ancestor above its tail", () => {
+    const nested = ["- alpha", "  - alpha one", "    - deep a", "    - deep b"].join("\n");
+    expect(splitAroundSubBlock(nested, { kind: "list-item", path: [0, 0, 0] })).toEqual({
+      before: "- alpha\n  - alpha one",
+      source: "    - deep a",
+      after: "-\n  -\n    - deep b",
     });
   });
 
@@ -90,9 +100,16 @@ describe("splitAroundSubBlock: tables", () => {
     });
   });
 
-  test("editing the header swaps the whole table: a table split around its header is not one", () => {
+  test("editing the header keeps the body under a blank header of its own", () => {
     expect(splitAroundSubBlock(source, { kind: "table-row", row: 0 })).toEqual({
       source: "| Name | Size |",
+      after: [
+        "|   |   |",
+        "| :--- | ---: |",
+        "| alpha | 1 |",
+        "| beta | 2 |",
+        "| gamma | 3 |",
+      ].join("\n"),
     });
   });
 
