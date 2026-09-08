@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.0](https://github.com/alanrsoares/mdreadr/compare/v0.14.0...v0.15.0) (2026-09-08)
+
+
+### Features
+
+* granular inline-edit targeting for list items and table rows ([ad50113](https://github.com/alanrsoares/mdreadr/commit/ad50113889664b064c6382d3891b8a79cf8654c3))
+
+
+### Bug Fixes
+
+* **domain:** count only real items and rows ([0d58536](https://github.com/alanrsoares/mdreadr/commit/0d58536108e1db48e1f8009988a083c58afc6350))
+* **ui:** keep the block around a header or nested edit ([abc0744](https://github.com/alanrsoares/mdreadr/commit/abc0744845570fd6567181f36ae8e0d1c27cf218))
+
 ## [0.14.0](https://github.com/alanrsoares/mdreadr/compare/v0.13.2...v0.14.0) (2026-09-08)
 
 
