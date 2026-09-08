@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isOk } from "@onrails/result";
-import { loadRecents, touchRecent } from "./recents.ts";
+import { forgetRecent, loadRecents, touchRecent } from "./recents.ts";
 
 describe("recents", () => {
   let tempHome: string;
@@ -49,5 +49,40 @@ describe("recents", () => {
 
     const raw = await Bun.file(join(tempHome, ".config", "mdreadr", "recents.json")).json();
     expect(raw.paths).toEqual([file2]);
+  });
+
+  test("forgetRecent drops one path and leaves the rest in order", async () => {
+    const keep = join(tempHome, "keep.md");
+    const drop = join(tempHome, "drop.md");
+    await writeFile(keep, "# Keep");
+    await writeFile(drop, "# Drop");
+    await touchRecent(keep);
+    await touchRecent(drop);
+
+    const forgotten = await forgetRecent(drop);
+
+    expect(isOk(forgotten)).toBe(true);
+    if (isOk(forgotten)) {
+      expect(forgotten.value).toEqual([keep]);
+    }
+
+    const reloaded = await loadRecents();
+    expect(isOk(reloaded)).toBe(true);
+    if (isOk(reloaded)) {
+      expect(reloaded.value).toEqual([keep]);
+    }
+  });
+
+  test("forgetRecent on a path that is not listed is a no-op, not an error", async () => {
+    const keep = join(tempHome, "keep.md");
+    await writeFile(keep, "# Keep");
+    await touchRecent(keep);
+
+    const forgotten = await forgetRecent(join(tempHome, "never-added.md"));
+
+    expect(isOk(forgotten)).toBe(true);
+    if (isOk(forgotten)) {
+      expect(forgotten.value).toEqual([keep]);
+    }
   });
 });
