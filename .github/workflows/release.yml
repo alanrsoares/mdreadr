@@ -99,6 +99,17 @@ jobs:
       - name: Smoke test the built app
         run: bun run scripts/smoke-test.ts
 
+      - name: Install nfpm
+        if: matrix.platform == 'linux'
+        run: |
+          NFPM_VERSION="2.41.3"
+          ARCH="${{ runner.arch == 'ARM64' && 'arm64' || 'x86_64' }}"
+          curl -sSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_${ARCH}.tar.gz" | sudo tar -xz -C /usr/local/bin nfpm
+
+      - name: Package Linux bundles (.deb and .rpm)
+        if: matrix.platform == 'linux'
+        run: bun run package:linux
+
       - name: Upload Release Asset
         if: ${{ needs.release-please.outputs.release_created || inputs.tag_name }}
         uses: softprops/action-gh-release@v2

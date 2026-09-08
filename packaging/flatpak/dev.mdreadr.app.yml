@@ -1,0 +1,49 @@
+app-id: dev.mdreadr.app
+runtime: org.gnome.Platform
+runtime-version: '46'
+sdk: org.gnome.Sdk
+command: mdreadr
+separate-locales: false
+
+finish-args:
+  # X11 & Wayland sockets
+  - --socket=x11
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --share=ipc
+  # Network access for loopback Elysia API on 127.0.0.1
+  - --share=network
+  # Filesystem access for opening user markdown files
+  - --filesystem=host:ro
+  - --filesystem=xdg-run/dconf
+  # Notifications and StatusNotifier (tray)
+  - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.kde.StatusNotifierWatcher
+
+modules:
+  - name: mdreadr
+    buildsystem: simple
+    build-commands:
+      # Extract unpacked application into /app/lib/mdreadr
+      - install -d /app/lib/mdreadr
+      - cp -a . /app/lib/mdreadr/
+
+      # Install launcher wrapper
+      - install -d /app/bin
+      - |
+        cat << 'WRAPPER' > /app/bin/mdreadr
+        #!/bin/sh
+        export GDK_BACKEND="${GDK_BACKEND:-x11}"
+        export WEBKIT_DISABLE_DMABUF_RENDERER="${WEBKIT_DISABLE_DMABUF_RENDERER:-1}"
+        exec /app/lib/mdreadr/bin/launcher "$@"
+        WRAPPER
+      - chmod +x /app/bin/mdreadr
+
+      # Desktop and icons
+      - install -Dm644 packaging/flatpak/dev.mdreadr.app.desktop /app/share/applications/dev.mdreadr.app.desktop
+      - install -Dm644 packaging/flatpak/dev.mdreadr.app.metainfo.xml /app/share/metainfo/dev.mdreadr.app.metainfo.xml
+      - install -Dm644 icon.png /app/share/icons/hicolor/512x512/apps/dev.mdreadr.app.png
+    sources:
+      # In local flatpak-builder runs or CI, point to the extracted bundle directory
+      - type: dir
+        path: ../../build/linux-packages/x64/bundle/mdreadr
