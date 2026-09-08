@@ -43,6 +43,7 @@ export type TabsResult = { tabs: TabSummary[]; activeId: string | null };
 export type ReaderApi = {
   getSession(): Promise<SessionSnapshot>;
   getRecents(): Promise<string[]>;
+  forgetRecent(path: string): Promise<string[]>;
   getNotes(): Promise<Note[]>;
   openDocument(path: string): Promise<OpenDocumentSnapshot>;
   createDocument(path: string, content: string): Promise<OpenDocumentResult>;
@@ -118,6 +119,10 @@ export const createTreatyReaderApi = (): ReaderApi => ({
   },
   async getRecents() {
     const data = unwrap(await api.documents.recent.get());
+    return readPaths(data);
+  },
+  async forgetRecent(path) {
+    const data = unwrap(await api.documents.recent.delete({ path }));
     return readPaths(data);
   },
   async getNotes() {

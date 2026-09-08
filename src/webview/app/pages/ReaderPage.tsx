@@ -337,6 +337,7 @@ function ReaderPageContent() {
           openingPath={tabs.openingPath}
           homeDirectory={tabs.homeDirectory}
           onOpen={handleOpenPath}
+          onForget={tabs.forgetRecent}
           onPickDocument={tabs.pick}
           isOpening={tabs.isOpening}
           openActionVariant={isEmpty ? "secondary" : "primary"}
