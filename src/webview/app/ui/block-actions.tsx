@@ -40,7 +40,7 @@ export function PinButton({ onPin, anchor }: PinButtonProps) {
   const accessibleLabel = `Anchor a note to ${targetLabel}`;
 
   return (
-    <Tooltip content="Anchor a note" placement="start">
+    <Tooltip content="Anchor a note" placement="end">
       <button
         type="button"
         className="reader-pin-button"
