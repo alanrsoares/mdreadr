@@ -44,6 +44,10 @@ as a description of current behaviour.
 ### 2.4 Inline block editing - Shipped
 - Entered by double-click on a block or by the gutter edit control. A double-click on a link, a code block's own control, or any other embedded control is that control's gesture and does not open the editor (`EditableBlock`, `src/webview/app/ui/editable-block.tsx`, which every anchored block kind goes through).
 - Swaps the block in place for `InlineBlockEditor`, surrounding document context preserved.
+- **One CodeMirror, two sizings.** `SourceEditor` (`src/webview/app/components/SourceEditor.tsx`) backs both the document well (`sizing="fill"`) and the inline fragment (`sizing="content"`, which grows with the text rather than scrolling, so the block cannot gain a scrollbar). The inline editor was a plain `<textarea>`, so the same markdown had syntax highlighting in Edit mode and none inline; now both go through one component and cannot drift on theme, measure or keys.
+  - The toolbar drives it through a small imperative handle (`getValue` / `getSelection` / `setSelection` / `focus`) rather than textarea `selectionStart`, so the tested pure ops in `inline-edit-ops.ts` are unchanged. `setSelection` clamps: an edit can shorten the document below the offsets the caller computed.
+  - Tab is the caller's, not CodeMirror's (`indentWithTab={false}`), so `indent` / `outdent` still run and Tab in the toolbar still moves focus out. Verified in build: Tab grows the source by one `INDENT`.
+  - The inline editor paints no background of its own; it sits on `.reader-block-edit`'s accent wash. CodeMirror's bundled dark theme paints a slate fill that stopped short of the wrapper's `padding-inline` and read as a left and right gutter, so the transparency rule in `index.css` covers both wrappers, not just `.reader-editor`.
 - **Zero shift on the block itself**: padding cancelled by a negative inline margin, an `inset` ring rather than a border, no padding on the textarea, and the source capped at `--reader-measure` so it wraps where the rendered text wrapped. Measured in the build at 1440px: rendered and source both at `left: 240, top: 299.31, width: 475`, block above unmoved. Everything below moves down by the height of the chrome, which sits *below* the text on purpose.
 - `Escape` cancels, `Cmd+Enter` / `Ctrl+Enter` saves, from the textarea and from a focused toolbar button (the handler is on the editor section, not the textarea).
 - The formatting toolbar is one Tab stop with roving focus: `ArrowLeft` / `ArrowRight` / `Home` / `End` move within it. Verified: `Bold` -> `ArrowRight` -> `Italic` -> `End` -> `Heading 3`. Its buttons cancel `mousedown`, so a click acts on the selection the reader had.
@@ -59,6 +63,84 @@ as a description of current behaviour.
   - **Anything else** (other file types, relative paths with no Document to resolve against): left to the browser untouched.
 - Handled by delegation on the reader article, not by a `link` component override: list and table segments render without the override, which is exactly where a Document's links to its neighbours tend to sit.
 - External links carry a `↗` after the text, at rest and brighter on hover or focus. The glyph's space is reserved always, so revealing it cannot reflow the line. The full destination is filled into a native tooltip on first hover, since the reader has no status bar.
+
+### 2.6 Review column - Shipped
+
+- One stream, not two panels. `buildReviewStream` (`src/webview/app/review/stream.ts`)
+  pairs each Note with the Suggestions whose `noteId` points at it, so an agent's
+  proposed edit renders inside the thread that argued for it. A Suggestion with no
+  `noteId`, or one pointing at a Note this Document no longer has, falls back to a
+  card of its own rather than dropping out of the column.
+- Recency is the latest of a Note's own `updatedAt` and its Suggestions', so an
+  agent attaching an edit lifts the thread back to where the reader will see it.
+- The column is a frame (`ReviewColumn`, `grid-rows-[auto_1fr_auto]`): the header
+  keeps the open count and the filter reachable at any scroll depth, only the
+  body scrolls, and the footer holds Save to file / Load from file. Verified in
+  build at 1440px with 53 threads: body scrolled to 12788 of 13446, header and
+  footer both still on screen.
+- Filter is Open / Done / All, defaulting to **Open**. "Open" means still asking
+  something of the reader: a Note with status `open`, **or** a settled Note that
+  an agent has since hung a `pending` Suggestion on. Settled threads are hidden
+  rather than dimmed in place.
+- **Provenance without a stripe** (DESIGN.md §4): a human turn sits on the muted
+  fill, an agent turn is outlined on the panel surface and carries a terminal
+  glyph beside `formatAuthorLabel`. The two alternate visibly down a long thread
+  and neither uses a left rule.
+- Status is set by quiet actions, not a per-card dropdown: `Resolve` and `Won't
+  fix` are icon-only buttons, invisible at rest and revealed by
+  `group-hover/thread` or `focus-within`, so they stay in the tab order. Verified
+  in build: computed `opacity` on the action group goes 0 to 1 under both a real
+  mouse hover and a programmatic `.focus()` on the Resolve button.
+- The anchor label owns its own line (`line-clamp-2`); badges and the timestamp
+  drop beneath it. At the panel's default 280px, sharing one row truncated
+  "Edit request" to "Edit requ...".
+- Every grid and flex node in the column carries `min-w-0`. Without it the cards
+  set their own width from their longest line and overflowed the resizable panel.
+
+### 2.7 Block context menu - Shipped
+
+- Right-click on any anchored block opens an Astryx `ContextMenu` at the cursor
+  with `Anchor a note` and `Edit block` (`src/webview/app/ui/editable-block.tsx`).
+  Both actions are the same handlers the gutter controls call, so right-click is
+  a second route rather than a private one; a menu nobody thinks to open must not
+  be the only way to anchor a Note, and right-click is not a keyboard gesture.
+- **Right-click on a link or an embedded control is that control's gesture.**
+  `onContextMenuCapture` stops the synthetic event before it reaches
+  ContextMenu's own handler, so nothing calls `preventDefault` and the browser's
+  own menu (Open link, Copy link address) runs instead. Verified in build:
+  right-clicking a Document link leaves `defaultPrevented` false and opens zero
+  popovers.
+- **Zero reflow.** The trigger is a plain `position: relative` div with no
+  padding, margin or display change. Verified in build at 1440px: the first five
+  blocks of `PRODUCT.md` sit at identical left/top/width before and after the
+  menu was added.
+- Two overrides earn the menu its place on a reading surface, both in
+  `index.css`:
+  - Astryx's trigger ships `user-select: none`, which would cost the reader the
+    ability to select prose. `.reader-block-host > div` restores
+    `user-select: text` using stylex's own `:not(#\#)` specificity device, so no
+    `!important` is needed. Verified: computed `user-select` is `text` on both
+    the wrapper and the block.
+  - The menu is chrome but sits inside the reader sheet in the DOM, so it would
+    inherit `--reader-prose-family` and the reader's font size and draw its
+    actions in 22px serif whenever the reader scales text up. The popover
+    restores the app-level typography tokens. Verified: menu items compute to
+    Figtree at 14px while the reader runs at 17px serif.
+- Below a divider the menu carries `Copy text` and `Copy markdown`, resolved
+  from the document source by `resolveBlockText` / `resolveBlockRawMarkdown`. A
+  block whose source cannot be resolved drops those two items rather than
+  copying nothing. Verified in build: `Copy markdown` hands `writeText` the raw
+  source (link syntax intact), `Copy text` the rendered text.
+- **A copy that fails says so.** `copyText` falls back from
+  `navigator.clipboard` to `execCommand`, and `useCopy` toasts either way, so a
+  missing clipboard permission cannot look like a no-op. Both APIs need user
+  activation: verified that a real click copies and toasts "Path copied", while
+  a scripted `.click()` fails both paths.
+- **Known cost**: every block renders its (closed) menu eagerly, so a Document
+  carries two extra nodes per block. Closed popovers are `display: none`, so they
+  are outside layout and outside the accessibility tree, and ContextMenu gates
+  its `document` listeners on `isOpen`. Verified: with a menu open exactly one
+  popover matches `:popover-open`.
 
 ---
 
