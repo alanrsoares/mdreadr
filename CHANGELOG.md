@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.14.0](https://github.com/alanrsoares/mdreadr/compare/v0.13.2...v0.14.0) (2026-09-08)
+
+
+### Features
+
+* **api:** add a route to forget one recent ([0dd4ce2](https://github.com/alanrsoares/mdreadr/commit/0dd4ce2ce454e3fff8c6f300fdca3b2ecb86b9cf))
+* **domain:** classify a document by its path ([bab9464](https://github.com/alanrsoares/mdreadr/commit/bab9464ffbae258898aa50a67bcdc5086b766520))
+* **ui:** add a right-click menu to anchored blocks ([2a213b2](https://github.com/alanrsoares/mdreadr/commit/2a213b2e6781825555eea0f81eae0ffc4c726a36))
+* **ui:** follow links to non-markdown neighbours ([a237380](https://github.com/alanrsoares/mdreadr/commit/a2373809e7552b15702afa5e3a95f4c14db9918a))
+* **ui:** give recents rows a quick actions menu ([b269360](https://github.com/alanrsoares/mdreadr/commit/b269360d5060913be82b7ef30d343ebdfe2133f7))
+* **ui:** merge notes and suggestions into one review column ([39aff1e](https://github.com/alanrsoares/mdreadr/commit/39aff1e91276d4c492800d87ec23831cafc989c8))
+* **ui:** open non-markdown files in a tab ([fa54b83](https://github.com/alanrsoares/mdreadr/commit/fa54b8373a79dbd9c77fbcb2bed438e910e8deaa))
+* **ui:** open source and image files in a tab ([7c1ad69](https://github.com/alanrsoares/mdreadr/commit/7c1ad69edbf5312e9c5d454d193ebefd73b93638))
+
+
+### Bug Fixes
+
+* **ui:** say Anchor, not Pin, in block control copy ([45cd058](https://github.com/alanrsoares/mdreadr/commit/45cd0589771956d24493ed9d91047f7c00645ea7))
+* **ui:** survive a malformed link escape ([6922ded](https://github.com/alanrsoares/mdreadr/commit/6922dedcdc1d4b4fde4edea33f3bfef3ff586fde))
+
 ## [0.13.2](https://github.com/alanrsoares/mdreadr/compare/v0.13.1...v0.13.2) (2026-09-07)
 
 
