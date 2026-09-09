@@ -9,6 +9,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { installEditBridge } from "./app/editorCommands.ts";
+import { installReaderPerformanceObserver } from "./app/performance.ts";
 import { AppProviders } from "./app/providers.tsx";
 import { router } from "./app/router.tsx";
 import { ColorSchemeProvider } from "./app/theme/ColorSchemeContext.tsx";
@@ -22,6 +23,7 @@ if (!root) {
 // Must exist before the native Edit menu can call into it, so install it here
 // rather than from a component effect.
 installEditBridge();
+installReaderPerformanceObserver();
 
 createRoot(root).render(
   <StrictMode>

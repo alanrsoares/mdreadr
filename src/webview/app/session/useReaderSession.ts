@@ -292,31 +292,33 @@ export function useDocumentTabs(
     void queryClient.invalidateQueries({ queryKey: ["suggestions"] });
   }, [invalidateTabs, invalidateSession, queryClient]);
 
-  // Tab switch/close are pure in-memory work server-side, so the only real cost
-  // is the round trip. Both mutations therefore paint optimistically and then
-  // seed the cache from the response the server already sent back, instead of
-  // invalidating `["tabs"]` and paying a second round trip before the UI moves.
+  // Tab switch/close are pure in-memory work server-side. Activation deliberately
+  // waits for its snapshot before moving `activeId`: setting it optimistically
+  // enables the new tab's `getSession` query while the server still considers
+  // the old tab active, causing an avoidable full-Document response and a
+  // second render when the activate response arrives.
   const activateTabMutation = useMutation({
+    // The SessionStore has one active tab. Serializing activations keeps the
+    // client and server ordered when a user clicks several tabs quickly.
+    scope: { id: "reader-tab-activation" },
     mutationFn: (id: string) => readerApi.activateTab(id),
-    onMutate: async (id) => {
+    onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["tabs"] });
-      const previousTabs = queryClient.getQueryData<TabsResult>(["tabs"]);
-      if (previousTabs) {
-        queryClient.setQueryData<TabsResult>(["tabs"], { ...previousTabs, activeId: id });
-      }
-      return { previousTabs };
     },
     onSuccess: (snapshot, id) => {
-      // The activate response *is* the newly active tab's snapshot — seeding it
-      // (plus its notes/suggestions, which ride along) means the tab renders
-      // populated on first paint rather than after three more fetches.
+      // Seed before selecting the tab. The active ReaderTab can therefore paint
+      // from the response it already has, without issuing getSession/getNotes/
+      // getSuggestions against server state that has not switched yet.
       queryClient.setQueryData<SessionSnapshot>(["session", id], snapshot);
       queryClient.setQueryData<Note[]>(["notes", id], snapshot.notes);
       queryClient.setQueryData<Suggestion[]>(["suggestions", id], snapshot.suggestions);
+      const current = queryClient.getQueryData<TabsResult>(["tabs"]);
+      if (current) queryClient.setQueryData<TabsResult>(["tabs"], { ...current, activeId: id });
     },
-    onError: (error, _id, context) => {
-      if (context?.previousTabs) queryClient.setQueryData(["tabs"], context.previousTabs);
-      invalidateTabs();
+    onError: (error) => {
+      // An activation can have reached the server even when its response fails,
+      // so refresh every active-tab-derived cache before surfacing the failure.
+      invalidateAfterTabChange();
       showError("Switch tab", error);
     },
   });

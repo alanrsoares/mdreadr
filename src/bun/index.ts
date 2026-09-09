@@ -81,6 +81,23 @@ async function handleOpenUrl(urlStr: string, mainWindow: BrowserWindow) {
   }
 }
 
+const devServerUrl = (): string | null => {
+  const configured = process.env.MDREADR_DEV_SERVER_URL;
+  if (!configured) return null;
+
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== "http:" || !["127.0.0.1", "::1", "localhost"].includes(url.hostname)) {
+      console.warn(`Ignoring non-loopback MDREADR_DEV_SERVER_URL: ${configured}`);
+      return null;
+    }
+    return url.href;
+  } catch {
+    console.warn(`Ignoring invalid MDREADR_DEV_SERVER_URL: ${configured}`);
+    return null;
+  }
+};
+
 // The api base is injected via preload instead of a query string: the macOS
 // views:// handler treats the query as part of the ASAR file path and 404s.
 async function getMainViewUrl(): Promise<string> {
@@ -94,13 +111,14 @@ async function getMainViewUrl(): Promise<string> {
     // If version info can't be read, continue with dev check fallback
   }
 
-  try {
-    const response = await fetch("http://localhost:5173");
-    if (response.ok) {
-      return "http://localhost:5173/";
+  const configuredDevServer = devServerUrl();
+  if (configuredDevServer) {
+    try {
+      const response = await fetch(configuredDevServer, { redirect: "error" });
+      if (response.ok) return configuredDevServer;
+    } catch {
+      console.warn(`Could not reach MDREADR_DEV_SERVER_URL: ${configuredDevServer}`);
     }
-  } catch {
-    // Vite dev server not running, use bundled views
   }
 
   return "views://mainview/index.html";

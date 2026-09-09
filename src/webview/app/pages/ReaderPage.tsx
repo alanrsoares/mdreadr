@@ -10,7 +10,7 @@ import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { VStack } from "@astryxdesign/core/VStack";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppLogo } from "../components/AppLogo.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
 import { McpClientsIndicator } from "../components/McpClientsIndicator.tsx";
@@ -21,6 +21,7 @@ import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
 import { RecentsSidebarProvider } from "../components/RecentsSidebarContext.tsx";
 import { TabStrip } from "../components/TabStrip.tsx";
 import { Cog6ToothIcon, ViewColumnsIcon } from "../icons.ts";
+import { beginReaderTiming } from "../performance.ts";
 import { createTreatyReaderApi } from "../session/reader-api.ts";
 import { useDocumentTabs } from "../session/useReaderSession.ts";
 import { ReaderTab, type ReaderTabHandle } from "./ReaderTab.tsx";
@@ -103,7 +104,7 @@ function ReaderPageContent() {
   const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false);
   const [discardTargetLabel, setDiscardTargetLabel] = useState("");
   const pendingActionRef = useRef<(() => void) | null>(null);
-  const tabRefs = useRef<Record<string, ReaderTabHandle | null>>({});
+  const tabRefs = useRef<Record<string, { current: ReaderTabHandle | null }>>({});
   const hasUserCollapsedNotesRef = useRef(false);
   const unsavedDropSeqRef = useRef(0);
 
@@ -114,6 +115,29 @@ function ReaderPageContent() {
       setIsUnsavedActive(false);
     },
   });
+  // `useDocumentTabs` returns a view-model object, so its wrapper functions
+  // naturally have a new identity on every query update. Keep event props
+  // stable: otherwise every parked ReaderTab re-renders on an unrelated tab
+  // activation just because a callback prop changed.
+  const tabsRef = useRef(tabs);
+  const dirtyIdsRef = useRef(dirtyIds);
+  const unsavedDropRef = useRef(unsavedDrop);
+
+  // Event handlers must observe values from the last committed render. Writing
+  // refs during render could expose work React later abandons in concurrent mode.
+  useLayoutEffect(() => {
+    tabsRef.current = tabs;
+    dirtyIdsRef.current = dirtyIds;
+    unsavedDropRef.current = unsavedDrop;
+  }, [tabs, dirtyIds, unsavedDrop]);
+
+  const tabRefFor = useCallback((id: string) => {
+    const existing = tabRefs.current[id];
+    if (existing) return existing;
+    const created = { current: null };
+    tabRefs.current[id] = created;
+    return created;
+  }, []);
 
   // Auto-collapse the notes sidebar on narrow viewports (<= 1024px). Evaluated on
   // mount as well as on breakpoint crossings, and never re-expands a sidebar the
@@ -147,45 +171,38 @@ function ReaderPageContent() {
     });
   }, []);
 
-  const handleOpenPath = useCallback(
-    (path: string) => {
-      setIsUnsavedActive(false);
-      tabs.open(path);
-    },
-    [tabs],
-  );
+  const handleOpenPath = useCallback((path: string) => {
+    setIsUnsavedActive(false);
+    tabsRef.current.open(path);
+  }, []);
 
-  const handleDropUnsaved = useCallback(
-    (name: string, content: string) => {
-      const replace = () => {
-        unsavedDropSeqRef.current += 1;
-        setUnsavedDrop({ name, content, key: unsavedDropSeqRef.current });
-        setIsUnsavedActive(true);
-      };
+  const handleDropUnsaved = useCallback((name: string, content: string) => {
+    const replace = () => {
+      unsavedDropSeqRef.current += 1;
+      setUnsavedDrop({ name, content, key: unsavedDropSeqRef.current });
+      setIsUnsavedActive(true);
+    };
 
-      if (unsavedDrop && dirtyIds.has(UNSAVED_TAB_ID)) {
-        pendingActionRef.current = replace;
-        setDiscardTargetLabel(unsavedDrop.name);
-        setIsDiscardDialogOpen(true);
-        return;
-      }
+    const currentUnsavedDrop = unsavedDropRef.current;
+    if (currentUnsavedDrop && dirtyIdsRef.current.has(UNSAVED_TAB_ID)) {
+      pendingActionRef.current = replace;
+      setDiscardTargetLabel(currentUnsavedDrop.name);
+      setIsDiscardDialogOpen(true);
+      return;
+    }
 
-      replace();
-    },
-    [unsavedDrop, dirtyIds],
-  );
+    replace();
+  }, []);
 
-  const handleActivateTab = useCallback(
-    (id: string) => {
-      if (id === UNSAVED_TAB_ID) {
-        setIsUnsavedActive(true);
-        return;
-      }
-      setIsUnsavedActive(false);
-      tabs.activateTab(id);
-    },
-    [tabs],
-  );
+  const handleActivateTab = useCallback((id: string) => {
+    if (id === UNSAVED_TAB_ID) {
+      setIsUnsavedActive(true);
+      return;
+    }
+    setIsUnsavedActive(false);
+    beginReaderTiming(`tab:${id}`, "tab activation", { tabId: id });
+    tabsRef.current.activateTab(id);
+  }, []);
 
   const handleRequestCloseTab = useCallback(
     (id: string) => {
@@ -195,9 +212,9 @@ function ReaderPageContent() {
           setIsUnsavedActive(false);
           handleDirtyChange(UNSAVED_TAB_ID, false);
         };
-        if (dirtyIds.has(UNSAVED_TAB_ID)) {
+        if (dirtyIdsRef.current.has(UNSAVED_TAB_ID)) {
           pendingActionRef.current = close;
-          setDiscardTargetLabel(unsavedDrop?.name ?? "This document");
+          setDiscardTargetLabel(unsavedDropRef.current?.name ?? "This document");
           setIsDiscardDialogOpen(true);
           return;
         }
@@ -205,21 +222,23 @@ function ReaderPageContent() {
         return;
       }
 
-      if (dirtyIds.has(id)) {
+      if (dirtyIdsRef.current.has(id)) {
         pendingActionRef.current = () => {
-          tabRefs.current[id]?.discardDraft();
-          tabs.closeTab(id);
+          tabRefs.current[id]?.current?.discardDraft();
+          tabsRef.current.closeTab(id);
         };
-        const path = tabs.tabs.find((tab) => tab.id === id)?.document.path;
+        const path = tabsRef.current.tabs.find((tab) => tab.id === id)?.document.path;
         setDiscardTargetLabel(path ? pathFileName(path) : "This document");
         setIsDiscardDialogOpen(true);
         return;
       }
 
-      tabs.closeTab(id);
+      tabsRef.current.closeTab(id);
     },
-    [dirtyIds, tabs, unsavedDrop, handleDirtyChange],
+    [handleDirtyChange],
   );
+
+  const handleLoadNotes = useCallback(() => tabsRef.current.load(), []);
 
   const handleSaveAs = useCallback(
     (content: string) => {
@@ -379,9 +398,7 @@ function ReaderPageContent() {
             {tabs.tabs.map((tab) => (
               <div key={tab.id} className="h-full" hidden={effectiveActiveId !== tab.id}>
                 <ReaderTab
-                  ref={(handle) => {
-                    tabRefs.current[tab.id] = handle;
-                  }}
+                  ref={tabRefFor(tab.id)}
                   readerApi={readerApi}
                   tabId={tab.id}
                   isActive={effectiveActiveId === tab.id}
@@ -390,7 +407,7 @@ function ReaderPageContent() {
                   onDropUnsaved={handleDropUnsaved}
                   onDirtyChange={handleDirtyChange}
                   onAnnounce={setLiveMessage}
-                  onLoadNotes={tabs.load}
+                  onLoadNotes={handleLoadNotes}
                   isLoadingNotes={tabs.isLoadingNotes}
                 />
               </div>

@@ -10,8 +10,16 @@ import {
   extractHeadings,
 } from "@mdreadr/domain";
 import { err, ok, type Result } from "@onrails/result";
-import { useContainer, useStoreValues } from "@re-reduced/react";
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import { useContainer, useSelect, useStoreValues } from "@re-reduced/react";
+import {
+  forwardRef,
+  memo,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+} from "react";
 import { DocumentView } from "../components/DocumentView.tsx";
 import { ReviewPanel } from "../components/ReviewPanel.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
@@ -22,8 +30,9 @@ import { useLiveDocumentUpdates } from "../hooks/useLiveDocumentUpdates.ts";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
 import { useViewModeHandoff } from "../hooks/useViewModeHandoff.ts";
 import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
+import { beginReaderTiming, completeReaderTiming } from "../performance.ts";
 import type { BlockEditError } from "../session/block-edit.ts";
-import { isDirty } from "../session/document-draft.ts";
+import { emptyDraft, isDirty } from "../session/document-draft.ts";
 import { scrollEditorToSettled } from "../session/editor-scroll.ts";
 import type { ReaderApi } from "../session/reader-api.ts";
 import { useReaderSession } from "../session/useReaderSession.ts";
@@ -47,7 +56,7 @@ type ReaderTabProps = {
   isLoadingNotes: boolean;
 };
 
-export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function ReaderTab(
+const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function ReaderTab(
   {
     readerApi,
     tabId,
@@ -64,7 +73,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
 ) {
   const { showError } = useMutationToast();
   const store = useContainer(readerPageContainer);
-  const { pendingAnchor, documentViewMode, isDragOver, draft } = useStoreValues(store);
+  const { pendingAnchor, documentViewMode, isDragOver } = useStoreValues(store);
   const readerMainRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
 
@@ -98,6 +107,11 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
 
   const content = reader.session.data?.documentContent ?? "";
   const documentPath = reader.session.data?.document?.path;
+  // A single Draft belongs to one Document. Selecting the draft for this tab
+  // prevents an edit in the active Document from waking every parked tab.
+  const draft = useSelect(store, (state) =>
+    state.draft.value.path === documentPath ? state.draft.value : emptyDraft,
+  );
   const kind = documentPath ? documentKindForPath(documentPath) : "markdown";
   const dirty = isDirty(draft, documentPath);
   const editorValue = (draft.path === documentPath ? draft.text : null) ?? content;
@@ -105,6 +119,21 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
   useEffect(() => {
     onDirtyChange(tabId, dirty);
   }, [tabId, dirty, onDirtyChange]);
+
+  useEffect(() => {
+    if (!isActive || !documentPath) return;
+    const frame = requestAnimationFrame(() => {
+      completeReaderTiming(`tab:${tabId}`, {
+        documentBytes: content.length,
+        documentPath,
+      });
+      completeReaderTiming(`inline-edit:${tabId}`, {
+        documentBytes: editorValue.length,
+        documentPath,
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isActive, tabId, documentPath, content.length, editorValue]);
 
   const onEditorChange = useCallback(
     (text: string) => {
@@ -253,14 +282,32 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
         showError("Edit block", "Could not locate that block in the document.");
         return err({ _tag: "BlockNotFound" });
       }
+      beginReaderTiming(`inline-edit:${tabId}`, "inline edit apply", {
+        tabId,
+        anchorKind: anchor.kind,
+      });
       store.actions.draftEdited({ path: documentPath, text: updated, savedContent: content });
       // The flash is MarkdownView's: the edited block comes back with a new
       // content-derived id, so only it can still find the block by position.
       onAnnounce(`Updated ${anchor.label ?? anchor.kind} in draft`);
       return ok(undefined);
     },
-    [documentPath, editorValue, content, showError, store, onAnnounce],
+    [documentPath, editorValue, content, showError, store, onAnnounce, tabId],
   );
+
+  const onPinBlock = useCallback(
+    (anchor: BlockAnchor) => {
+      store.actions.pendingAnchorChanged(anchor);
+      flashAnchor(anchor.blockId, "reader-block-pin-flash");
+      onAnnounce(`Anchoring a note to ${anchor.label ?? anchor.kind}`);
+    },
+    [store, onAnnounce],
+  );
+
+  const onEditorReady = useCallback((view: EditorView) => {
+    editorViewRef.current = view;
+    registerEditorView(view);
+  }, []);
 
   return (
     <ReaderTabShell
@@ -314,19 +361,12 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
         isActive={isActive}
         viewMode={documentViewMode}
         onViewModeChange={changeViewMode}
-        onPinBlock={(anchor) => {
-          store.actions.pendingAnchorChanged(anchor);
-          flashAnchor(anchor.blockId, "reader-block-pin-flash");
-          onAnnounce(`Anchoring a note to ${anchor.label ?? anchor.kind}`);
-        }}
+        onPinBlock={onPinBlock}
         onEditBlock={onEditBlock}
         onOpenDocument={onOpenPath}
         editorValue={editorValue}
         onEditorChange={onEditorChange}
-        onEditorReady={(view) => {
-          editorViewRef.current = view;
-          registerEditorView(view);
-        }}
+        onEditorReady={onEditorReady}
         chromeEnd={
           isEditing || dirty ? (
             <Button
@@ -345,3 +385,7 @@ export const ReaderTab = forwardRef<ReaderTabHandle, ReaderTabProps>(function Re
     </ReaderTabShell>
   );
 });
+
+/** Parked tabs retain their editor/scroll state, but need not reconcile their
+ * complete markdown trees whenever ReaderPage's shell state changes. */
+export const ReaderTab = memo(ReaderTabInner);
