@@ -2,7 +2,7 @@ import { Markdown } from "@astryxdesign/core/Markdown";
 import type { BlockAnchor, Note, SubBlockTarget } from "@mdreadr/domain";
 import { match } from "@onrails/pattern";
 import { err, isErr, type Result } from "@onrails/result";
-import { Fragment, type MouseEvent, useCallback, useMemo, useRef, useState } from "react";
+import { Fragment, type MouseEvent, memo, useCallback, useMemo, useRef, useState } from "react";
 import {
   callAttentionToInlineEditor,
   createAnchorPlan,
@@ -51,7 +51,7 @@ type MarkdownViewProps = {
   onOpenDocument?: (path: string) => void;
 };
 
-export function MarkdownView({
+export const MarkdownView = memo(function MarkdownView({
   content,
   notes,
   documentPath,
@@ -365,4 +365,4 @@ export function MarkdownView({
       </ReaderFlow>
     </ReaderArticle>
   );
-}
+});
