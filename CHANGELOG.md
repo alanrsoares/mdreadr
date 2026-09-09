@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.16.1](https://github.com/alanrsoares/mdreadr/compare/v0.16.0...v0.16.1) (2026-09-09)
+
+
+### Bug Fixes
+
+* **ui:** harden tab activation ([4b30951](https://github.com/alanrsoares/mdreadr/commit/4b30951bcc6f7cf8cc1a0139d0331dfc0ef0a36c))
+
+
+### Performance Improvements
+
+* **ui:** contain reader tab rendering ([edbb126](https://github.com/alanrsoares/mdreadr/commit/edbb1269a9f51709204ffe25dec53d7b47b462a4))
+* **ui:** contain reader tab rendering ([8fff299](https://github.com/alanrsoares/mdreadr/commit/8fff29929cb29da4d4089a14aeb3f7b286ab1536))
+
 ## [0.16.0](https://github.com/alanrsoares/mdreadr/compare/v0.15.1...v0.16.0) (2026-09-08)
 
 
