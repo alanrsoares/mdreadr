@@ -114,7 +114,7 @@ async function getMainViewUrl(): Promise<string> {
   const configuredDevServer = devServerUrl();
   if (configuredDevServer) {
     try {
-      const response = await fetch(configuredDevServer);
+      const response = await fetch(configuredDevServer, { redirect: "error" });
       if (response.ok) return configuredDevServer;
     } catch {
       console.warn(`Could not reach MDREADR_DEV_SERVER_URL: ${configuredDevServer}`);

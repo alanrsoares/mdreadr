@@ -298,6 +298,9 @@ export function useDocumentTabs(
   // the old tab active, causing an avoidable full-Document response and a
   // second render when the activate response arrives.
   const activateTabMutation = useMutation({
+    // The SessionStore has one active tab. Serializing activations keeps the
+    // client and server ordered when a user clicks several tabs quickly.
+    scope: { id: "reader-tab-activation" },
     mutationFn: (id: string) => readerApi.activateTab(id),
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["tabs"] });
@@ -312,7 +315,12 @@ export function useDocumentTabs(
       const current = queryClient.getQueryData<TabsResult>(["tabs"]);
       if (current) queryClient.setQueryData<TabsResult>(["tabs"], { ...current, activeId: id });
     },
-    onError: (error) => showError("Switch tab", error),
+    onError: (error) => {
+      // An activation can have reached the server even when its response fails,
+      // so refresh every active-tab-derived cache before surfacing the failure.
+      invalidateAfterTabChange();
+      showError("Switch tab", error);
+    },
   });
 
   const closeTabMutation = useMutation({

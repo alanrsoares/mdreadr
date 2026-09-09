@@ -10,7 +10,7 @@ import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { VStack } from "@astryxdesign/core/VStack";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppLogo } from "../components/AppLogo.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
 import { McpClientsIndicator } from "../components/McpClientsIndicator.tsx";
@@ -120,11 +120,16 @@ function ReaderPageContent() {
   // stable: otherwise every parked ReaderTab re-renders on an unrelated tab
   // activation just because a callback prop changed.
   const tabsRef = useRef(tabs);
-  tabsRef.current = tabs;
   const dirtyIdsRef = useRef(dirtyIds);
-  dirtyIdsRef.current = dirtyIds;
   const unsavedDropRef = useRef(unsavedDrop);
-  unsavedDropRef.current = unsavedDrop;
+
+  // Event handlers must observe values from the last committed render. Writing
+  // refs during render could expose work React later abandons in concurrent mode.
+  useLayoutEffect(() => {
+    tabsRef.current = tabs;
+    dirtyIdsRef.current = dirtyIds;
+    unsavedDropRef.current = unsavedDrop;
+  }, [tabs, dirtyIds, unsavedDrop]);
 
   const tabRefFor = useCallback((id: string) => {
     const existing = tabRefs.current[id];

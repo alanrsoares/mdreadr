@@ -133,7 +133,7 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
       });
     });
     return () => cancelAnimationFrame(frame);
-  }, [isActive, tabId, documentPath, content.length, editorValue.length]);
+  }, [isActive, tabId, documentPath, content.length, editorValue]);
 
   const onEditorChange = useCallback(
     (text: string) => {
