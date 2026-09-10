@@ -22,12 +22,13 @@ import {
   createReaderInlinePlugins,
   preprocessReaderMarkdown,
 } from "../markdown/pipeline.tsx";
+import { remapSubBlockTargetFromAfter, splitAroundSubBlock } from "../markdown/sub-blocks.ts";
 import {
-  remapSubBlockTargetFromAfter,
-  sameSubBlockTarget,
-  splitAroundSubBlock,
-} from "../markdown/sub-blocks.ts";
-import type { BlockEditError } from "../session/block-edit.ts";
+  type BlockEditError,
+  type InlineEditState,
+  openInlineEdit,
+  openTargetIn,
+} from "../session/inline-edit.ts";
 import { openExternalLink } from "../session/open-external.ts";
 import { useFontSettings } from "../theme/FontSettingsContext.tsx";
 import { getReaderMeasurePx } from "../theme/measure.ts";
@@ -61,17 +62,13 @@ export const MarkdownView = memo(function MarkdownView({
 }: MarkdownViewProps) {
   const { readerFontSize, readerFontFamily } = useFontSettings();
   const measurePx = getReaderMeasurePx(readerFontSize, readerFontFamily);
-  /** The open inline editor: which block, and which part of it (`null` for the
-   *  whole block). One at a time, so a second one cannot discard the first. */
-  const [editing, setEditing] = useState<{
-    blockId: string;
-    target: SubBlockTarget | null;
-  } | null>(null);
-  const editingBlockId = editing?.blockId ?? null;
+  /** The open Inline Edit. Every decision about it — the one-at-a-time rule,
+   *  the refusal, the index focus returns to — lives in `session/inline-edit`. */
+  const [openEdit, setOpenEdit] = useState<InlineEditState>(null);
+  const editingBlockId = openEdit?.blockId ?? null;
+  // Dirtiness rides in a ref rather than in the state beside it: it changes on
+  // every keystroke, and rendering on that would rebuild the whole Document.
   const isEditorDirtyRef = useRef(false);
-  // Where the block being edited sits in document order, captured before the
-  // editor takes its place: an applied edit changes the block's own id.
-  const editingIndexRef = useRef(-1);
 
   const prepared = useMemo(() => preprocessReaderMarkdown(content), [content]);
   const plan = useMemo(() => createAnchorPlan(prepared), [prepared]);
@@ -150,33 +147,28 @@ export const MarkdownView = memo(function MarkdownView({
   /** Hands focus from the closing editor back to the block it replaced. Two
    *  frames: the first is React's commit, the second is when the restored block
    *  is really in the DOM to receive focus. */
-  const returnFocusToBlock = useCallback((flashClassName?: string) => {
-    const index = editingIndexRef.current;
+  const returnFocusToBlock = useCallback((index: number, flashClassName?: string) => {
     if (index < 0) return;
     window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        focusBlockAtIndex(index, flashClassName);
-        editingIndexRef.current = -1;
-      });
+      window.requestAnimationFrame(() => focusBlockAtIndex(index, flashClassName));
     });
   }, []);
 
   const startEditing = useCallback(
     (anchor: BlockAnchor, target: SubBlockTarget | null) => {
-      // Only one editor is open at a time, so opening a second would silently
-      // discard the first one's text. The open editor gets the nudge. A second
-      // part of the *same* block is the same block, and its editor is the one
-      // being replaced, so that too has to be refused while dirty.
-      const isSame =
-        editing?.blockId === anchor.blockId && sameSubBlockTarget(editing.target, target);
-      if (editing && !isSame && isEditorDirtyRef.current) {
+      const opened = openInlineEdit(
+        { open: openEdit, isDirty: isEditorDirtyRef.current },
+        { blockId: anchor.blockId, target, returnIndex: indexOfBlock(anchor.blockId) },
+      );
+      if (isErr(opened)) {
+        // Refused: the open editor holds the only copy of its text, so it gets
+        // the nudge rather than being replaced by the block that asked.
         callAttentionToInlineEditor();
         return;
       }
-      editingIndexRef.current = indexOfBlock(anchor.blockId);
-      setEditing({ blockId: anchor.blockId, target });
+      setOpenEdit(opened.value);
     },
-    [editing],
+    [openEdit],
   );
 
   const handleStartEditBlock = useCallback(
@@ -190,9 +182,10 @@ export const MarkdownView = memo(function MarkdownView({
   );
 
   const handleCancelBlockEdit = useCallback(() => {
-    setEditing(null);
-    returnFocusToBlock();
-  }, [returnFocusToBlock]);
+    const returnIndex = openEdit?.returnIndex ?? -1;
+    setOpenEdit(null);
+    returnFocusToBlock(returnIndex);
+  }, [openEdit, returnFocusToBlock]);
 
   const handleSaveBlockEdit = useCallback(
     (
@@ -202,11 +195,12 @@ export const MarkdownView = memo(function MarkdownView({
     ): Result<void, BlockEditError> => {
       const applied = onEditBlock?.(anchor, newMarkdown, target) ?? err({ _tag: "BlockNotFound" });
       if (isErr(applied)) return applied;
-      setEditing(null);
-      returnFocusToBlock("reader-block-edit-flash");
+      const returnIndex = openEdit?.returnIndex ?? -1;
+      setOpenEdit(null);
+      returnFocusToBlock(returnIndex, "reader-block-edit-flash");
       return applied;
     },
-    [onEditBlock, returnFocusToBlock],
+    [onEditBlock, openEdit, returnFocusToBlock],
   );
 
   const pinContext = useMemo(
@@ -215,7 +209,7 @@ export const MarkdownView = memo(function MarkdownView({
       onStartEditBlock: onEditBlock ? handleStartEditBlock : undefined,
       onStartEditSubBlock: onEditBlock ? handleStartEditSubBlock : undefined,
       editingBlockId,
-      editingSubTarget: editing?.target ?? null,
+      editingSubTarget: openEdit?.target ?? null,
       onSaveBlockEdit: handleSaveBlockEdit,
       onCancelBlockEdit: handleCancelBlockEdit,
       onEditorDirtyChange: handleEditorDirtyChange,
@@ -230,7 +224,7 @@ export const MarkdownView = memo(function MarkdownView({
       handleStartEditBlock,
       handleStartEditSubBlock,
       editingBlockId,
-      editing,
+      openEdit,
       handleSaveBlockEdit,
       handleCancelBlockEdit,
       handleEditorDirtyChange,
@@ -270,7 +264,7 @@ export const MarkdownView = memo(function MarkdownView({
           const isList = segment.kind === "list";
           const anchor = isList ? plan.nextList(segment.rawText) : plan.nextTable(segment.rawText);
           const subKind = isList ? ("list-item" as const) : ("table-row" as const);
-          const editingTarget = editingBlockId === anchor.blockId ? editing?.target : undefined;
+          const editingTarget = openTargetIn(openEdit, anchor.blockId);
           // A part of the block is open: the rest of it stays rendered around
           // the editor, sliced out of the block's own source so ordered markers
           // keep their numbers and the table keeps its columns.

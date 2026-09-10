@@ -5,7 +5,7 @@ import { match } from "@onrails/pattern";
 import type { Result } from "@onrails/result";
 import { type CSSProperties, type ReactNode, useRef } from "react";
 import { useReaderBlockNavigation } from "../hooks/useReaderBlockNavigation.ts";
-import type { BlockEditError } from "../session/block-edit.ts";
+import type { BlockEditError } from "../session/inline-edit.ts";
 import { getReaderFontFamilyCss, useFontSettings } from "../theme/FontSettingsContext.tsx";
 import { getReaderMeasurePx } from "../theme/measure.ts";
 import {

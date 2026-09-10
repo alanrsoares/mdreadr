@@ -9,7 +9,7 @@ import {
 import { err, type Result } from "@onrails/result";
 import type { ReactNode } from "react";
 import { InlineBlockEditor } from "../components/InlineBlockEditor.tsx";
-import type { BlockEditError } from "../session/block-edit.ts";
+import type { BlockEditError } from "../session/inline-edit.ts";
 import { EditableBlock } from "../ui/editable-block.tsx";
 import {
   ReaderBlockquote,
