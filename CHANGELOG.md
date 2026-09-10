@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.17.0](https://github.com/alanrsoares/mdreadr/compare/v0.16.1...v0.17.0) (2026-09-10)
+
+
+### Features
+
+* **domain:** confirm the pointed-at sub-block against the source scan ([#68](https://github.com/alanrsoares/mdreadr/issues/68)) ([161749b](https://github.com/alanrsoares/mdreadr/commit/161749b1e61d7b319ce9d52dbb8ac883165cb26c))
+
+
+### Bug Fixes
+
+* **ui:** draw diagrams in the reader's own colours ([#70](https://github.com/alanrsoares/mdreadr/issues/70)) ([fbbbbcf](https://github.com/alanrsoares/mdreadr/commit/fbbbbcfe77390398e31aed042204b345f7e2bd72))
+
 ## [0.16.1](https://github.com/alanrsoares/mdreadr/compare/v0.16.0...v0.16.1) (2026-09-09)
 
 
