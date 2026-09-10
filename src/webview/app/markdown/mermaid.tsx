@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useColorScheme } from "../theme/ColorSchemeContext.tsx";
 import { mermaidThemeVariables, readDiagramPalette } from "./diagram-palette.ts";
 import { DiagramViewer } from "./diagram-viewer.tsx";
+import { takeRenderTurn } from "./render-turns.ts";
 
 type MermaidChartProps = { chart: string };
 
@@ -30,17 +31,34 @@ export function MermaidChart({ chart }: MermaidChartProps) {
 
       try {
         const mermaid = await import("mermaid");
-        mermaid.default.initialize({
-          startOnLoad: false,
-          // `base` derives its colours from what it is given; every other theme
-          // brings its own, which is the pair of palettes this used to have.
-          theme: "base",
-          themeVariables: mermaidThemeVariables(readDiagramPalette(host, colorScheme)),
+        // Configuring and rendering are one turn: the configuration is global,
+        // so anything that gets between them renders this diagram in someone
+        // else's palette.
+        const result = await takeRenderTurn(async () => {
+          // A superseded effect must not write the configuration on its way
+          // out: the import it was waiting on can resolve after the scheme has
+          // already moved on.
+          if (cancelled) return undefined;
+
+          mermaid.default.initialize({
+            startOnLoad: false,
+            // `base` derives its colours from what it is given; every other
+            // theme brings its own, which is the pair of palettes this used to
+            // have.
+            theme: "base",
+            themeVariables: mermaidThemeVariables(readDiagramPalette(host, colorScheme)),
+            // The diagram's own frontmatter is applied after this, and would
+            // otherwise be free to name a theme of its own — a document could
+            // hand itself colours the reader's page never agreed to.
+            secure: ["theme", "themeVariables"],
+          });
+          // parse() turns syntax errors into a clean rejection before any DOM
+          // is created
+          await mermaid.default.parse(chart);
+          return mermaid.default.render(id, chart, host);
         });
-        // parse() turns syntax errors into a clean rejection before any DOM is created
-        await mermaid.default.parse(chart);
-        const result = await mermaid.default.render(id, chart, host);
-        if (!cancelled) {
+
+        if (!cancelled && result) {
           setSvgContent(result.svg);
           setState("ready");
         }

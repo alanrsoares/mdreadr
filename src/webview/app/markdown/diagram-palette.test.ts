@@ -15,16 +15,39 @@ const palette: DiagramPalette = {
   noteFill: "rgb(9, 9, 9)",
   noteBorder: "rgb(10, 10, 10)",
   noteText: "rgb(11, 11, 11)",
+  criticalFill: "rgb(12, 12, 12)",
+  criticalBorder: "rgb(13, 13, 13)",
+  accentText: "rgb(14, 14, 14)",
   fontFamily: "Figtree, sans-serif",
 };
 
 const variables = mermaidThemeVariables(palette);
 
+/** One variable's colour, or a failure loud enough to read: a test asserting
+ *  about a variable that is not there is asserting nothing. */
+const colourOf = (name: string): string => {
+  const value = variables[name];
+  if (!value) throw new Error(`mermaidThemeVariables names no ${name}`);
+  return value;
+};
+
 /** The colours the palette offers for text, and the ones it offers to draw
  *  behind text. Nothing may be in both: the bug this guards against is a fill
  *  reaching a text variable, which is how text lands on its own colour. */
-const TEXT_PARTS = [palette.nodeText, palette.text, palette.mutedText, palette.noteText];
-const FILL_PARTS = [palette.background, palette.nodeFill, palette.clusterFill, palette.noteFill];
+const TEXT_PARTS = [
+  palette.nodeText,
+  palette.text,
+  palette.mutedText,
+  palette.noteText,
+  palette.accentText,
+];
+const FILL_PARTS = [
+  palette.background,
+  palette.nodeFill,
+  palette.clusterFill,
+  palette.noteFill,
+  palette.criticalFill,
+];
 
 describe("mermaidThemeVariables", () => {
   test("every variable is given a colour: one left out is one mermaid picks", () => {
@@ -36,7 +59,7 @@ describe("mermaidThemeVariables", () => {
   test("every variable naming text is given a text colour, never a fill", () => {
     const textVariables = Object.entries(variables).filter(([name]) => /text/i.test(name));
     // Fewer than this and the check has stopped covering what it was written for.
-    expect(textVariables.length).toBe(10);
+    expect(textVariables.length).toBe(18);
 
     for (const [name, value] of textVariables) {
       expect(TEXT_PARTS, name).toContain(value);
@@ -86,5 +109,86 @@ describe("mermaidThemeVariables", () => {
     for (const [name, value] of Object.entries(variables)) {
       expect(value.includes("var("), name).toBe(false);
     }
+  });
+});
+
+/**
+ * Variables mermaid's `base` theme falls back to a fixed colour for, read out of
+ * mermaid 11.17.2's own `theme-base` defaults. These are the ones no derivation
+ * saves: whatever the reader's page is, the diagram draws `lightgrey` there. So
+ * each one is either named in the mapping or exempt below with a reason.
+ */
+const FIXED_IN_BASE: Record<string, string> = {
+  altBackground: "#555",
+  altSectionBkgColor: "white",
+  critBkgColor: "red",
+  critBorderColor: "#ff8888",
+  doneTaskBkgColor: "lightgrey",
+  doneTaskBorderColor: "grey",
+  excludeBkgColor: "#eeeeee",
+  gridColor: "lightgrey",
+  nodeBorder: "#999",
+  noteBkgColor: "#fff5ad",
+  noteTextColor: "#333",
+  pieOuterStrokeColor: "black",
+  pieStrokeColor: "black",
+  stateBorder: "#000",
+  taskTextClickableColor: "#003163",
+  todayLineColor: "red",
+  transitionColor: "#000",
+  vertLineColor: "navy",
+};
+
+/** Left to mermaid on purpose, with the reason it is better off there. */
+const EXEMPT: Record<string, string> = {
+  sequenceNumberColor:
+    "text on a circle filled with lineColor; base inverts that fill, which no token here can see",
+};
+
+describe("what mermaid is left to decide", () => {
+  test("every variable base would fix to a colour of its own is named, or exempt with a reason", () => {
+    for (const name of Object.keys(FIXED_IN_BASE)) {
+      const named = name in variables;
+      const exempt = name in EXEMPT;
+      expect(named || exempt, `${name} (base default ${FIXED_IN_BASE[name]})`).toBe(true);
+    }
+  });
+
+  test("an exemption is a decision, so it carries its reason and stays out", () => {
+    for (const [name, reason] of Object.entries(EXEMPT)) {
+      expect(variables[name], name).toBeUndefined();
+      expect(reason.length, name).toBeGreaterThan(20);
+    }
+  });
+
+  test("a categorical scale keeps mermaid's palette: one token would flatten it", () => {
+    const scales = Object.keys(variables).filter((name) =>
+      /^(cScale|git\d|pie\d|em[A-Z])/.test(name),
+    );
+    expect(scales).toEqual([]);
+  });
+
+  test("a gantt chart's finished tasks are a fill of ours under text of ours", () => {
+    expect(FILL_PARTS).toContain(colourOf("doneTaskBkgColor"));
+    expect(TEXT_PARTS).toContain(colourOf("taskTextColor"));
+    expect(variables.doneTaskBkgColor).not.toBe(variables.taskTextColor);
+    expect(variables.gridColor).toBe(palette.nodeBorder);
+  });
+
+  test("what a diagram calls out as critical uses the reader's own alarm colour", () => {
+    expect(variables.critBkgColor).toBe(palette.criticalFill);
+    expect(variables.critBorderColor).toBe(palette.criticalBorder);
+    expect(variables.todayLineColor).toBe(palette.criticalBorder);
+  });
+
+  test("a state's border and a transition are a node's border and an edge", () => {
+    expect(variables.stateBorder).toBe(palette.nodeBorder);
+    expect(variables.transitionColor).toBe(palette.line);
+    expect(variables.altBackground).toBe(palette.clusterFill);
+  });
+
+  test("a pie slice keeps its own fill but is outlined in something visible", () => {
+    expect(variables.pieStrokeColor).toBe(palette.nodeBorder);
+    expect(variables.pieOuterStrokeColor).toBe(palette.nodeBorder);
   });
 });
