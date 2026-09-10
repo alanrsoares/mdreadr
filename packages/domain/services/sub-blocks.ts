@@ -280,3 +280,200 @@ export function applySubBlockEdit(
   if (!range) return undefined;
   return `${content.slice(0, range.start)}${newMarkdown}${content.slice(range.end)}`;
 }
+
+/**
+ * The part of a block that renders *after* the open editor, with the map a
+ * gesture in it needs.
+ *
+ * The tail is a standalone markdown document: its own list paths start over at
+ * zero and its table body rows start over at one, so a double-click in it names
+ * a sub-block of the tail, not of the block. The map is built while the cut is
+ * made — the only moment both coordinate spaces are in hand — so no caller can
+ * hold a tail whose coordinates it has to re-derive.
+ */
+export type SubBlockTail = {
+  /** The tail's source, renderable on its own. */
+  source: string;
+  /** Every sub-block of `source`, paired with the block sub-block it is. */
+  targets: readonly SubBlockCorrespondence[];
+};
+
+/** One sub-block, named twice: as the tail sees it and as the block does. */
+export type SubBlockCorrespondence = {
+  local: SubBlockTarget;
+  parent: SubBlockTarget;
+};
+
+export type SubBlockSplit = {
+  /** The block's source before the edited sub-block, still valid markdown on
+   *  its own, or `undefined` when nothing precedes it. Needs no coordinate map:
+   *  it is a prefix of the block, so its sub-blocks are already the block's. */
+  before?: string;
+  /** The edited sub-block's own source, the editor's seed. */
+  source: string;
+  /** What renders after it, or `undefined` when it was the last sub-block. */
+  after?: SubBlockTail;
+};
+
+/** Which block sub-block a gesture in the tail landed on, or `undefined` for a
+ *  gesture the tail cannot place in the block — a reopened ancestor marker,
+ *  which has no source of its own, so the whole block is the honest answer. */
+export const mapTailTarget = (
+  tail: SubBlockTail,
+  local: SubBlockTarget,
+): SubBlockTarget | undefined =>
+  tail.targets.find((entry) => sameSubBlockTarget(entry.local, local))?.parent;
+
+/** The table's header line plus its alignment delimiter, which a tail slice
+ *  has to carry to still be a table. */
+const tableHead = (lines: string[]): string[] => lines.slice(0, 2);
+
+/** The alignment row with its dashes blanked out: a header of empty cells,
+ *  which is what the body needs above it to still render as a table while the
+ *  real header is the thing being edited. */
+const blankHeader = (delimiter: string): string => delimiter.replace(/[-:]+/g, " ");
+
+/**
+ * The tail of a split table, whose head is repeated above the remaining rows.
+ * Row 0 of the tail is that repeated head, which stands for the block's own
+ * header; every body row after it sits `editedRow` further down the block.
+ */
+function tableTail(source: string, editedRow: number): SubBlockTail {
+  return {
+    source,
+    targets: tableRowSpans(source).flatMap(({ target }) =>
+      target.kind === "table-row"
+        ? [
+            {
+              local: target,
+              parent: {
+                kind: "table-row" as const,
+                row: target.row === 0 ? 0 : editedRow + target.row,
+              },
+            },
+          ]
+        : [],
+    ),
+  };
+}
+
+function splitTable(blockSource: string, row: number): SubBlockSplit | undefined {
+  const lines = blockSource.split("\n").filter((line) => line.trim() !== "");
+  const head = tableHead(lines);
+  const body = lines.slice(2);
+
+  // Editing the header: the body stays on screen under a blank header rather
+  // than under a copy of the line the reader is busy rewriting.
+  if (row === 0) {
+    const [header, delimiter] = head;
+    if (header === undefined || delimiter === undefined) return { source: header ?? blockSource };
+    return {
+      source: header,
+      ...(body.length > 0
+        ? { after: tableTail([blankHeader(delimiter), delimiter, ...body].join("\n"), 0) }
+        : {}),
+    };
+  }
+
+  const index = row - 1;
+  const source = body[index];
+  if (source === undefined) return undefined;
+
+  const leading = body.slice(0, index);
+  const trailing = body.slice(index + 1);
+  return {
+    before: [...head, ...leading].join("\n"),
+    source,
+    // The head repeats above the tail rows: they would not render as a table
+    // without it, and the repeat only exists while the editor is open.
+    ...(trailing.length > 0 ? { after: tableTail([...head, ...trailing].join("\n"), row) } : {}),
+  };
+}
+
+/** The empty markers of an item's ancestors, outermost first, so a tail slice
+ *  of a nested list nests at the depth the author wrote. */
+function ancestorMarkers(blockSource: string, spans: SubBlockSpan[], path: number[]): string[] {
+  return path.slice(0, -1).flatMap((_, depth) => {
+    const ancestorPath = path.slice(0, depth + 1);
+    const ancestor = spans.find(
+      (entry) => entry.target.kind === "list-item" && samePath(entry.target.path, ancestorPath),
+    );
+    if (!ancestor) return [];
+    const line = blockSource.slice(ancestor.range.start).split("\n")[0] ?? "";
+    const marker = listItemMarkerPrefix(line);
+    return marker === undefined ? [] : [marker];
+  });
+}
+
+/**
+ * The tail of a split list. Every item in it is a slice of the block's own
+ * source, so the two coordinate spaces are paired by where each item starts:
+ * offset in the tail, minus the reopened ancestors that have no source behind
+ * them, plus where the tail was cut from.
+ */
+function listTail(
+  spans: SubBlockSpan[],
+  source: string,
+  cutFrom: number,
+  reopenedLength: number,
+): SubBlockTail {
+  return {
+    source,
+    targets: collectSubBlocks(source, "list-item").flatMap((local) => {
+      // A reopened ancestor marker is not the author's text and stands for no
+      // item of the block.
+      if (local.range.start < reopenedLength) return [];
+      const start = cutFrom + local.range.start - reopenedLength;
+      const parent = spans.find((entry) => entry.range.start === start);
+      return parent ? [{ local: local.target, parent: parent.target }] : [];
+    }),
+  };
+}
+
+/**
+ * Splits a list or table's source into the part before the edited sub-block,
+ * the sub-block itself, and the tail after it, so the reader keeps the rest of
+ * the block on screen while one item or row is open in the editor.
+ *
+ * Slices of the original source, so ordered markers keep their own numbers and
+ * the tail list carries on counting from where the author left off.
+ */
+export function splitAroundSubBlock(
+  blockSource: string,
+  target: SubBlockTarget,
+): SubBlockSplit | undefined {
+  if (target.kind === "table-row") return splitTable(blockSource, target.row);
+
+  const spans = collectSubBlocks(blockSource, "list-item");
+  const span = spans.find(
+    (entry) => entry.target.kind === "list-item" && samePath(entry.target.path, target.path),
+  );
+  if (!span) return undefined;
+
+  // Cut at the item's own boundaries: what is left on either side is still a
+  // list, at the indentation the author wrote, so a sibling of the edited item
+  // keeps its nesting and an ordered list keeps its own numbers.
+  const before = blockSource.slice(0, span.range.start).replace(/\n+$/, "");
+  const rawAfter = blockSource.slice(span.range.end);
+  const after = rawAfter.replace(/^\n+/, "");
+  // A nested item's tail is its own document, so its ancestors have to open
+  // again above it or the sibling left behind renders at the top level. They
+  // reopen empty: their text is already on screen in `before`.
+  const reopened = ancestorMarkers(blockSource, spans, target.path);
+  const tail = after.length > 0 ? [...reopened, after].join("\n") : "";
+
+  return {
+    ...(before.length > 0 ? { before } : {}),
+    source: blockSource.slice(span.range.start, span.range.end),
+    ...(tail.length > 0
+      ? {
+          after: listTail(
+            spans,
+            tail,
+            span.range.end + rawAfter.length - after.length,
+            reopened.length > 0 ? reopened.join("\n").length + 1 : 0,
+          ),
+        }
+      : {}),
+  };
+}
