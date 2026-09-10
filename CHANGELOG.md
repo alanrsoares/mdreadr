@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0](https://github.com/alanrsoares/mdreadr/compare/v0.17.0...v0.18.0) (2026-09-10)
+
+
+### Features
+
+* **shell:** add in-app update checks and controls ([#74](https://github.com/alanrsoares/mdreadr/issues/74)) ([b630a09](https://github.com/alanrsoares/mdreadr/commit/b630a0996b24989a79d79cae8780c1b5c89422f3))
+
 ## [0.17.0](https://github.com/alanrsoares/mdreadr/compare/v0.16.1...v0.17.0) (2026-09-10)
 
 
