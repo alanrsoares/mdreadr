@@ -3,6 +3,7 @@ import {
   listItemMarkerPrefix,
   type SubBlockSpan,
   type SubBlockTarget,
+  samePath,
 } from "@mdreadr/domain";
 
 /**
@@ -68,17 +69,6 @@ export function subBlockTargetFromNode(
   // A position the DOM cannot place is a path the source cannot follow either.
   return path.some((index) => index < 0) ? undefined : { kind: "list-item", path };
 }
-
-const samePath = (a: number[], b: number[]): boolean =>
-  a.length === b.length && a.every((step, index) => step === b[index]);
-
-/** Two targets naming the same part. By value, not identity: a second gesture
- *  on the part already open is the same editor, not a competing one. */
-export const sameSubBlockTarget = (a: SubBlockTarget | null, b: SubBlockTarget | null): boolean => {
-  if (a === null || b === null) return a === b;
-  if (a.kind === "list-item" && b.kind === "list-item") return samePath(a.path, b.path);
-  return a.kind === "table-row" && b.kind === "table-row" && a.row === b.row;
-};
 
 export type SubBlockSplit = {
   /** The block's source before the edited sub-block, still valid markdown on

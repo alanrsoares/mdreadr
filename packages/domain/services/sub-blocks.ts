@@ -39,6 +39,19 @@ export type SubBlockSpan = {
   label: string;
 };
 
+/** Two paths naming the same item, step for step. */
+export const samePath = (a: number[], b: number[]): boolean =>
+  a.length === b.length && a.every((step, index) => step === b[index]);
+
+/** Two targets naming the same part. By value, not identity: a second gesture
+ *  on the part already open is the same part, not a competing one. `null` is a
+ *  whole block, which is the same as another whole block. */
+export const sameSubBlockTarget = (a: SubBlockTarget | null, b: SubBlockTarget | null): boolean => {
+  if (a === null || b === null) return a === b;
+  if (a.kind === "list-item" && b.kind === "list-item") return samePath(a.path, b.path);
+  return a.kind === "table-row" && b.kind === "table-row" && a.row === b.row;
+};
+
 /** Which sub-block a block kind can be broken into, if any. */
 export const subBlockKindForAnchor = (anchor: BlockAnchor): SubBlockTarget["kind"] | undefined =>
   match(anchor.kind)
