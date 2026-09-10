@@ -9,7 +9,7 @@
  * nothing.
  */
 
-import { type SubBlockTarget, sameSubBlockTarget } from "@mdreadr/domain";
+import { type BlockAnchor, type SubBlockTarget, sameSubBlockTarget } from "@mdreadr/domain";
 import { match } from "@onrails/pattern";
 import { err, ok, type Result } from "@onrails/result";
 
@@ -51,6 +51,25 @@ export type BlockEditError =
   | { _tag: "NoDocument" }
   /** The anchored block is no longer where its Anchor says it is. */
   | { _tag: "BlockNotFound" };
+
+/**
+ * Applies the editor's text to the Tab's Draft. The one declaration of it: the
+ * Tab that owns the Draft implements it, the open editor calls it, and nothing
+ * in between restates it.
+ *
+ * An `Err` leaves the editor open with the reader's text still in it, which at
+ * that point is the only copy.
+ */
+export type ApplyInlineEdit = (
+  anchor: BlockAnchor,
+  newMarkdown: string,
+  /**
+   * Set when one part of the block was edited (a list Item, a table Row): the
+   * splice is that part's range, so the rest of the list or table survives
+   * byte for byte.
+   */
+  target?: SubBlockTarget,
+) => Result<void, BlockEditError>;
 
 /** The empty session: nothing open, nothing to lose. */
 export const noInlineEdit: InlineEditStatus = { open: null, isDirty: false };

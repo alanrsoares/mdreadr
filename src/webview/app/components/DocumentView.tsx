@@ -1,11 +1,9 @@
 import { HStack } from "@astryxdesign/core/HStack";
 import type { EditorView } from "@codemirror/view";
-import type { BlockAnchor, DocumentKind, Note, SubBlockTarget } from "@mdreadr/domain";
+import type { BlockAnchor, DocumentKind, Note } from "@mdreadr/domain";
 import { match } from "@onrails/pattern";
-import type { Result } from "@onrails/result";
 import { type CSSProperties, type ReactNode, useRef } from "react";
 import { useReaderBlockNavigation } from "../hooks/useReaderBlockNavigation.ts";
-import type { BlockEditError } from "../session/inline-edit.ts";
 import { getReaderFontFamilyCss, useFontSettings } from "../theme/FontSettingsContext.tsx";
 import { getReaderMeasurePx } from "../theme/measure.ts";
 import {
@@ -33,12 +31,6 @@ type DocumentViewProps = {
   viewMode: DocumentViewMode;
   onViewModeChange: (mode: DocumentViewMode) => void;
   onPinBlock?: (anchor: BlockAnchor) => void;
-  /** An `Err` keeps the inline editor open, showing why it did not apply. */
-  onEditBlock?: (
-    anchor: BlockAnchor,
-    newMarkdown: string,
-    target?: SubBlockTarget,
-  ) => Result<void, BlockEditError>;
   /** Opens another Document in a Tab, for links between markdown files. */
   onOpenDocument?: (path: string) => void;
   editorValue: string;
@@ -57,7 +49,6 @@ export const DocumentView = ({
   viewMode,
   onViewModeChange,
   onPinBlock,
-  onEditBlock,
   onOpenDocument,
   editorValue,
   onEditorChange,
@@ -145,7 +136,6 @@ export const DocumentView = ({
                   documentPath={documentPath}
                   notes={notes}
                   onPinBlock={onPinBlock}
-                  onEditBlock={onEditBlock}
                   onOpenDocument={onOpenDocument}
                 />
               </ReaderColumn>

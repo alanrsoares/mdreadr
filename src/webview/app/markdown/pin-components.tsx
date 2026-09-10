@@ -6,10 +6,9 @@ import {
   resolveSubBlockRawMarkdown,
   type SubBlockTarget,
 } from "@mdreadr/domain";
-import { err, type Result } from "@onrails/result";
 import type { ReactNode } from "react";
 import { InlineBlockEditor } from "../components/InlineBlockEditor.tsx";
-import type { BlockEditError } from "../session/inline-edit.ts";
+import type { ApplyInlineEdit } from "../session/inline-edit.ts";
 import { EditableBlock } from "../ui/editable-block.tsx";
 import {
   ReaderBlockquote,
@@ -22,19 +21,14 @@ import { type ImageSrcResolver, ReaderImage, renderSpecialFence } from "./pipeli
 
 export type PinContext = {
   onPinBlock?: (anchor: BlockAnchor) => void;
-  onStartEditBlock?: (anchor: BlockAnchor) => void;
+  onStartEditBlock: (anchor: BlockAnchor) => void;
   /** Opens one part of a block with parts (a list item, a table row). */
-  onStartEditSubBlock?: (anchor: BlockAnchor, target: SubBlockTarget) => void;
+  onStartEditSubBlock: (anchor: BlockAnchor, target: SubBlockTarget) => void;
   editingBlockId?: string | null;
   /** Which part of the editing block is open, `null` for the whole block. */
   editingSubTarget?: SubBlockTarget | null;
-  /** An `Err` leaves the editor open, showing why the edit did not apply. */
-  onSaveBlockEdit?: (
-    anchor: BlockAnchor,
-    newMarkdown: string,
-    target?: SubBlockTarget,
-  ) => Result<void, BlockEditError>;
-  onCancelBlockEdit?: () => void;
+  onSaveBlockEdit: ApplyInlineEdit;
+  onCancelBlockEdit: () => void;
   onEditorDirtyChange?: (isDirty: boolean) => void;
   content?: string;
   plan: AnchorPlan;
@@ -85,10 +79,8 @@ export function BlockSourceEditor({ anchor, fallback, target, ctx }: BlockSource
       anchor={anchor}
       subKind={target?.kind}
       initialValue={raw}
-      onSave={(newMarkdown) =>
-        ctx.onSaveBlockEdit?.(anchor, newMarkdown, target) ?? err({ _tag: "BlockNotFound" })
-      }
-      onCancel={() => ctx.onCancelBlockEdit?.()}
+      onSave={(newMarkdown) => ctx.onSaveBlockEdit(anchor, newMarkdown, target)}
+      onCancel={ctx.onCancelBlockEdit}
       onDirtyChange={ctx.onEditorDirtyChange}
     />
   );

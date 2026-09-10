@@ -1,7 +1,7 @@
 import { Button } from "@astryxdesign/core/Button";
 import type { ResizableRegion } from "@astryxdesign/core/Resizable";
 import type { EditorView } from "@codemirror/view";
-import type { BlockAnchor, SubBlockTarget, Suggestion, TocEntry } from "@mdreadr/domain";
+import type { BlockAnchor, Suggestion, TocEntry } from "@mdreadr/domain";
 import {
   applyBlockEdit,
   applySubBlockEdit,
@@ -9,7 +9,7 @@ import {
   documentKindForPath,
   extractHeadings,
 } from "@mdreadr/domain";
-import { err, ok, type Result } from "@onrails/result";
+import { err, ok } from "@onrails/result";
 import { useContainer, useSelect, useStoreValues } from "@re-reduced/react";
 import {
   forwardRef,
@@ -33,7 +33,8 @@ import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
 import { beginReaderTiming, completeReaderTiming } from "../performance.ts";
 import { emptyDraft, isDirty } from "../session/document-draft.ts";
 import { scrollEditorToSettled } from "../session/editor-scroll.ts";
-import type { BlockEditError } from "../session/inline-edit.ts";
+import type { ApplyInlineEdit } from "../session/inline-edit.ts";
+import { ApplyInlineEditProvider } from "../session/inline-edit-context.tsx";
 import type { ReaderApi } from "../session/reader-api.ts";
 import { useReaderSession } from "../session/useReaderSession.ts";
 import { ReaderTabShell } from "./ReaderTabShell.tsx";
@@ -263,17 +264,8 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
     [reader],
   );
 
-  // An `Err` leaves the inline editor open with the reader's text in it, which
-  // is the only copy of it at that point.
-  const onEditBlock = useCallback(
-    (
-      anchor: BlockAnchor,
-      newMarkdown: string,
-      // Set when only one part of the block was edited (a list item, a table
-      // row): the splice is that part's range, so the rest of the list or table
-      // survives byte for byte.
-      target?: SubBlockTarget,
-    ): Result<void, BlockEditError> => {
+  const applyInlineEdit = useCallback<ApplyInlineEdit>(
+    (anchor, newMarkdown, target) => {
       if (!documentPath) return err({ _tag: "NoDocument" });
       const updated = target
         ? applySubBlockEdit(editorValue, anchor, target, newMarkdown)
@@ -352,36 +344,37 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
         />
       }
     >
-      <DocumentView
-        key={tabId}
-        content={editorValue}
-        documentPath={documentPath}
-        kind={kind}
-        notes={notes}
-        isActive={isActive}
-        viewMode={documentViewMode}
-        onViewModeChange={changeViewMode}
-        onPinBlock={onPinBlock}
-        onEditBlock={onEditBlock}
-        onOpenDocument={onOpenPath}
-        editorValue={editorValue}
-        onEditorChange={onEditorChange}
-        onEditorReady={onEditorReady}
-        chromeEnd={
-          isEditing || dirty ? (
-            <Button
-              label="Save"
-              variant="primary"
-              size="sm"
-              isDisabled={!dirty}
-              isLoading={reader.isSavingDocument}
-              onClick={() => {
-                void saveDraft();
-              }}
-            />
-          ) : undefined
-        }
-      />
+      <ApplyInlineEditProvider apply={applyInlineEdit}>
+        <DocumentView
+          key={tabId}
+          content={editorValue}
+          documentPath={documentPath}
+          kind={kind}
+          notes={notes}
+          isActive={isActive}
+          viewMode={documentViewMode}
+          onViewModeChange={changeViewMode}
+          onPinBlock={onPinBlock}
+          onOpenDocument={onOpenPath}
+          editorValue={editorValue}
+          onEditorChange={onEditorChange}
+          onEditorReady={onEditorReady}
+          chromeEnd={
+            isEditing || dirty ? (
+              <Button
+                label="Save"
+                variant="primary"
+                size="sm"
+                isDisabled={!dirty}
+                isLoading={reader.isSavingDocument}
+                onClick={() => {
+                  void saveDraft();
+                }}
+              />
+            ) : undefined
+          }
+        />
+      </ApplyInlineEditProvider>
     </ReaderTabShell>
   );
 });
