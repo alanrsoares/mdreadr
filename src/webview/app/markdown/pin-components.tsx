@@ -8,7 +8,7 @@ import {
 } from "@mdreadr/domain";
 import type { ReactNode } from "react";
 import { InlineBlockEditor } from "../components/InlineBlockEditor.tsx";
-import type { ApplyInlineEdit } from "../session/inline-edit.ts";
+import { type InlineEditHandle, isBlockOpen } from "../session/inline-edit.ts";
 import { EditableBlock } from "../ui/editable-block.tsx";
 import {
   ReaderBlockquote,
@@ -16,24 +16,17 @@ import {
   ReaderParagraph,
   readerHeadingByLevel,
 } from "../ui/reader.tsx";
-import type { AnchorPlan } from "./anchors.ts";
-import { type ImageSrcResolver, ReaderImage, renderSpecialFence } from "./pipeline.tsx";
+import { ReaderImage, renderSpecialFence } from "./pipeline.tsx";
+import type { RenderContext } from "./render-context.ts";
 
-export type PinContext = {
-  onPinBlock?: (anchor: BlockAnchor) => void;
-  onStartEditBlock: (anchor: BlockAnchor) => void;
-  /** Opens one part of a block with parts (a list item, a table row). */
-  onStartEditSubBlock: (anchor: BlockAnchor, target: SubBlockTarget) => void;
-  editingBlockId?: string | null;
-  /** Which part of the editing block is open, `null` for the whole block. */
-  editingSubTarget?: SubBlockTarget | null;
-  onSaveBlockEdit: ApplyInlineEdit;
-  onCancelBlockEdit: () => void;
-  onEditorDirtyChange?: (isDirty: boolean) => void;
-  content?: string;
-  plan: AnchorPlan;
-  notedBlockIds: ReadonlySet<string>;
-  resolveImageSrc?: ImageSrcResolver;
+/**
+ * The two things every pinnable block is handed: what to draw, and what the
+ * reader can do about editing it. Kept apart on purpose — a keystroke in the
+ * open editor changes only the second.
+ */
+type PinProps = {
+  render: RenderContext;
+  edit: InlineEditHandle;
 };
 
 function textFromChildren(children: ReactNode): string {
@@ -53,13 +46,12 @@ function textFromChildren(children: ReactNode): string {
 export const blockClasses = (notedBlockIds: ReadonlySet<string>, blockId: string): string =>
   notedBlockIds.has(blockId) ? "reader-block-has-note" : "";
 
-type BlockSourceEditorProps = {
+type BlockSourceEditorProps = PinProps & {
   anchor: BlockAnchor;
   /** Source to edit when the exact range cannot be resolved in the document. */
   fallback: string;
   /** Edits one part of the block rather than all of it. */
   target?: SubBlockTarget;
-  ctx: PinContext;
 };
 
 /**
@@ -67,109 +59,107 @@ type BlockSourceEditorProps = {
  * source range. Shared by every block kind so the seeding rule (real range,
  * else reconstructed fallback) lives in one place.
  */
-export function BlockSourceEditor({ anchor, fallback, target, ctx }: BlockSourceEditorProps) {
-  const resolve = (content: string): string | undefined =>
-    target
-      ? resolveSubBlockRawMarkdown(content, anchor, target)
-      : resolveBlockRawMarkdown(content, anchor);
-  const raw = ctx.content ? (resolve(ctx.content) ?? fallback) : fallback;
+export function BlockSourceEditor({
+  anchor,
+  fallback,
+  target,
+  render,
+  edit,
+}: BlockSourceEditorProps) {
+  const resolved = target
+    ? resolveSubBlockRawMarkdown(render.content, anchor, target)
+    : resolveBlockRawMarkdown(render.content, anchor);
 
   return (
     <InlineBlockEditor
       anchor={anchor}
       subKind={target?.kind}
-      initialValue={raw}
-      onSave={(newMarkdown) => ctx.onSaveBlockEdit(anchor, newMarkdown, target)}
-      onCancel={ctx.onCancelBlockEdit}
-      onDirtyChange={ctx.onEditorDirtyChange}
+      initialValue={resolved ?? fallback}
+      onSave={(newMarkdown) => edit.apply(anchor, newMarkdown, target)}
+      onCancel={edit.cancel}
+      onDirtyChange={edit.dirtyChanged}
     />
   );
 }
 
-type PinParagraphProps = {
+type PinParagraphProps = PinProps & {
   children: ReactNode;
-  ctx: PinContext;
 };
 
-function PinParagraph({ children, ctx }: PinParagraphProps) {
+function PinParagraph({ children, render, edit }: PinParagraphProps) {
   const text = textFromChildren(children);
-  const anchor = ctx.plan.nextParagraph(text);
+  const anchor = render.plan.nextParagraph(text);
   const blockId = anchor.blockId;
 
-  if (ctx.editingBlockId === blockId) {
-    return <BlockSourceEditor anchor={anchor} fallback={text} ctx={ctx} />;
+  if (isBlockOpen(edit.open, blockId)) {
+    return <BlockSourceEditor anchor={anchor} fallback={text} render={render} edit={edit} />;
   }
 
   return (
-    <EditableBlock
-      anchor={anchor}
-      onEdit={ctx.onStartEditBlock}
-      onPin={ctx.onPinBlock}
-      content={ctx.content}
-    >
-      <ReaderParagraph data-block-id={blockId} className={blockClasses(ctx.notedBlockIds, blockId)}>
+    <EditableBlock anchor={anchor} edit={edit} content={render.content} onPin={render.onPinBlock}>
+      <ReaderParagraph
+        data-block-id={blockId}
+        className={blockClasses(render.notedBlockIds, blockId)}
+      >
         {children}
       </ReaderParagraph>
     </EditableBlock>
   );
 }
 
-type PinCodeBlockProps = {
+type PinCodeBlockProps = PinProps & {
   code: string;
   language?: string;
-  ctx: PinContext;
 };
 
-function PinCodeBlock({ code, language, ctx }: PinCodeBlockProps) {
-  const special = renderSpecialFence(language, code, { resolveImageSrc: ctx.resolveImageSrc });
+function PinCodeBlock({ code, language, render, edit }: PinCodeBlockProps) {
+  const special = renderSpecialFence(language, code, { resolveImageSrc: render.resolveImageSrc });
   if (special !== null) return special;
 
-  const anchor = ctx.plan.nextCode(code, language);
+  const anchor = render.plan.nextCode(code, language);
   const blockId = anchor.blockId;
 
-  if (ctx.editingBlockId === blockId) {
+  if (isBlockOpen(edit.open, blockId)) {
     const fallback = `\`\`\`${language ?? ""}\n${code}\n\`\`\``;
-    return <BlockSourceEditor anchor={anchor} fallback={fallback} ctx={ctx} />;
+    return <BlockSourceEditor anchor={anchor} fallback={fallback} render={render} edit={edit} />;
   }
 
   return (
-    <EditableBlock
-      anchor={anchor}
-      onEdit={ctx.onStartEditBlock}
-      onPin={ctx.onPinBlock}
-      content={ctx.content}
-    >
-      <ReaderCodeWrap data-block-id={blockId} className={blockClasses(ctx.notedBlockIds, blockId)}>
+    <EditableBlock anchor={anchor} edit={edit} content={render.content} onPin={render.onPinBlock}>
+      <ReaderCodeWrap
+        data-block-id={blockId}
+        className={blockClasses(render.notedBlockIds, blockId)}
+      >
         <CodeBlock code={code} language={language} isCollapsible />
       </ReaderCodeWrap>
     </EditableBlock>
   );
 }
 
-export const createPinComponents = (ctx: PinContext): Partial<MarkdownComponents> => ({
+export const createPinComponents = ({ render, edit }: PinProps): Partial<MarkdownComponents> => ({
   heading({ level, children }) {
     const text = textFromChildren(children);
-    const { anchor, domId } = ctx.plan.nextHeading(level, text);
+    const { anchor, domId } = render.plan.nextHeading(level, text);
 
-    if (ctx.editingBlockId === anchor.blockId) {
+    if (isBlockOpen(edit.open, anchor.blockId)) {
       return (
-        <BlockSourceEditor anchor={anchor} fallback={`${"#".repeat(level)} ${text}`} ctx={ctx} />
+        <BlockSourceEditor
+          anchor={anchor}
+          fallback={`${"#".repeat(level)} ${text}`}
+          render={render}
+          edit={edit}
+        />
       );
     }
 
     const Heading = readerHeadingByLevel[level];
 
     return (
-      <EditableBlock
-        anchor={anchor}
-        onEdit={ctx.onStartEditBlock}
-        onPin={ctx.onPinBlock}
-        content={ctx.content}
-      >
+      <EditableBlock anchor={anchor} edit={edit} content={render.content} onPin={render.onPinBlock}>
         <Heading
           id={domId}
           data-block-id={domId}
-          className={blockClasses(ctx.notedBlockIds, domId)}
+          className={blockClasses(render.notedBlockIds, domId)}
         >
           {children}
         </Heading>
@@ -177,13 +167,17 @@ export const createPinComponents = (ctx: PinContext): Partial<MarkdownComponents
     );
   },
   paragraph({ children }) {
-    return <PinParagraph ctx={ctx}>{children}</PinParagraph>;
+    return (
+      <PinParagraph render={render} edit={edit}>
+        {children}
+      </PinParagraph>
+    );
   },
   code({ code, language }) {
-    return <PinCodeBlock code={code} language={language} ctx={ctx} />;
+    return <PinCodeBlock code={code} language={language} render={render} edit={edit} />;
   },
   image({ src, alt }) {
-    return <ReaderImage src={src} alt={alt} resolveImageSrc={ctx.resolveImageSrc} />;
+    return <ReaderImage src={src} alt={alt} resolveImageSrc={render.resolveImageSrc} />;
   },
   blockquote({ children }) {
     return <ReaderBlockquote>{children}</ReaderBlockquote>;

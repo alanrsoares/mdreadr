@@ -71,6 +71,25 @@ export type ApplyInlineEdit = (
   target?: SubBlockTarget,
 ) => Result<void, BlockEditError>;
 
+/**
+ * What a rendered block can do about the Inline Edit session: ask to open its
+ * own editor or one of its parts, and, while open, drive the editor it holds.
+ *
+ * Travels non-optional, so no block has to ask whether editing is on offer —
+ * every Document that renders at all renders over a Draft that can take an
+ * edit. The one refusal left is a dirty editor elsewhere, which `start` and
+ * `startSub` answer by nudging that editor instead.
+ */
+export type InlineEditHandle = {
+  /** The editor open anywhere in this Document, or `null`. */
+  open: InlineEditState;
+  start: (anchor: BlockAnchor) => void;
+  startSub: (anchor: BlockAnchor, target: SubBlockTarget) => void;
+  apply: ApplyInlineEdit;
+  cancel: () => void;
+  dirtyChanged: (isDirty: boolean) => void;
+};
+
 /** The empty session: nothing open, nothing to lose. */
 export const noInlineEdit: InlineEditStatus = { open: null, isDirty: false };
 
@@ -105,6 +124,10 @@ export function openInlineEdit(
   }
   return current.isDirty ? err({ _tag: "DirtyEditorOpen" }) : ok(request);
 }
+
+/** Whether `blockId` is the block whose editor is open, whole or in part. */
+export const isBlockOpen = (open: InlineEditState, blockId: string): boolean =>
+  open?.blockId === blockId;
 
 /** Which Sub-block of `blockId` is open, if that block is the open one at all. */
 export const openTargetIn = (open: InlineEditState, blockId: string): SubBlockTarget | undefined =>

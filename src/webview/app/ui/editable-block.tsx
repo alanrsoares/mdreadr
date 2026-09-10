@@ -5,6 +5,7 @@ import { type MouseEvent, type ReactNode, useRef } from "react";
 import { useCopy } from "../hooks/useCopy.ts";
 import { anchorDisplayLabel } from "../markdown/anchors.ts";
 import { subBlockNoun, subBlockTargetFromNode } from "../markdown/sub-blocks.ts";
+import type { InlineEditHandle } from "../session/inline-edit.ts";
 import { EditBlockButton, PinButton } from "./block-actions.tsx";
 import { PinnableBlock } from "./pinnable-block.tsx";
 
@@ -17,17 +18,14 @@ const isOwnGesture = (event: MouseEvent): boolean =>
 
 type EditableBlockProps = {
   anchor: BlockAnchor;
-  onEdit?: (anchor: BlockAnchor) => void;
+  /** The Inline Edit session both gestures open. */
+  edit: InlineEditHandle;
+  /** The Document's source, for the copy actions. */
+  content: string;
   onPin?: (anchor: BlockAnchor) => void;
-  /** Document source, for the copy actions. Absent for a block whose source
-   *  we do not have, which drops those two items rather than copying nothing. */
-  content?: string;
   /** Set for a block that has parts a reader can edit on their own: a list's
    *  items, a table's rows. Absent for a block that is edited whole. */
   subKind?: SubBlockTarget["kind"];
-  /** Edits one part of the block. Falls back to `onEdit` when the gesture did
-   *  not land in one. */
-  onEditSub?: (anchor: BlockAnchor, target: SubBlockTarget) => void;
   /** Maps a target from a rendered source slice to its parent block. */
   mapSubTarget?: (target: SubBlockTarget) => SubBlockTarget | undefined;
   children: ReactNode;
@@ -47,11 +45,10 @@ type EditableBlockProps = {
  */
 export function EditableBlock({
   anchor,
-  onEdit,
-  onPin,
+  edit,
   content,
+  onPin,
   subKind,
-  onEditSub,
   mapSubTarget,
   children,
 }: EditableBlockProps) {
@@ -63,55 +60,55 @@ export function EditableBlock({
 
   /** The part the pointer landed on, or `null` for the block itself. */
   const targetFrom = (event: MouseEvent): SubBlockTarget | null => {
-    if (!subKind || !onEditSub || !(event.currentTarget instanceof HTMLElement)) return null;
+    if (!subKind || !(event.currentTarget instanceof HTMLElement)) return null;
     const target = subBlockTargetFromNode(event.currentTarget, event.target as Node, subKind);
     return target ? (mapSubTarget ? (mapSubTarget(target) ?? null) : target) : null;
   };
 
   const editFrom = (event: MouseEvent): void => {
     const target = targetFrom(event);
-    if (target && onEditSub) {
-      onEditSub(anchor, target);
+    if (target) {
+      edit.startSub(anchor, target);
       return;
     }
-    onEdit?.(anchor);
+    edit.start(anchor);
   };
 
   // The gutter controls stay: a menu nobody thinks to open cannot be the only
   // route to anchoring a note (and right-click is not a keyboard gesture).
   // Annotated: a conditional spread widens the literal, so an excess property
   // (`onSelect` for `onClick`) would otherwise typecheck and silently do nothing.
-  const source = content ? resolveBlockRawMarkdown(content, anchor) : undefined;
-  const text = content ? resolveBlockText(content, anchor) : undefined;
+  const source = resolveBlockRawMarkdown(content, anchor);
+  const text = resolveBlockText(content, anchor);
   const actions: ContextMenuOption[] = [
     ...(onPin ? [{ label: "Anchor a note", onClick: () => onPin(anchor) }] : []),
-    ...(subKind && onEditSub
+    ...(subKind
       ? [
           {
             label: `Edit ${subBlockNoun(subKind)}`,
             onClick: () => {
               const target = menuTargetRef.current;
               // Right-clicked between the rows: the block is what they hit.
-              target ? onEditSub(anchor, target) : onEdit?.(anchor);
+              target ? edit.startSub(anchor, target) : edit.start(anchor);
             },
           },
         ]
       : []),
-    ...(onEdit ? [{ label: "Edit block", onClick: () => onEdit(anchor) }] : []),
+    { label: "Edit block", onClick: () => edit.start(anchor) },
   ];
   const copies: ContextMenuOption[] = [
     ...(text ? [{ label: "Copy text", onClick: () => void copy(text, "Text") }] : []),
     ...(source ? [{ label: "Copy markdown", onClick: () => void copy(source, "Markdown") }] : []),
   ];
+  // Editing is always on the menu, so the actions half is never empty and the
+  // divider only has to ask about the copies.
   const items: ContextMenuOption[] =
-    actions.length > 0 && copies.length > 0
-      ? [...actions, { type: "divider" as const }, ...copies]
-      : [...actions, ...copies];
+    copies.length > 0 ? [...actions, { type: "divider" as const }, ...copies] : actions;
 
   return (
     <PinnableBlock
       onDoubleClick={(event: MouseEvent) => {
-        if (!onEdit || isOwnGesture(event)) return;
+        if (isOwnGesture(event)) return;
         editFrom(event);
       }}
       onContextMenuCapture={(event: MouseEvent) => {
@@ -127,19 +124,13 @@ export function EditableBlock({
     >
       {/* One column in the left gutter: edit above, pin below. Positioned as a
           pair so neither control can drift over the block's own content. */}
-      {onEdit || onPin ? (
-        <span className="reader-block-actions">
-          {onEdit ? <EditBlockButton anchor={anchor} onEdit={onEdit} /> : null}
-          {onPin ? <PinButton anchor={anchor} onPin={onPin} /> : null}
-        </span>
-      ) : null}
-      {items.length === 0 ? (
-        children
-      ) : (
-        <ContextMenu items={items} size="sm" label={`Actions for ${label}`}>
-          {children}
-        </ContextMenu>
-      )}
+      <span className="reader-block-actions">
+        <EditBlockButton anchor={anchor} onEdit={edit.start} />
+        {onPin ? <PinButton anchor={anchor} onPin={onPin} /> : null}
+      </span>
+      <ContextMenu items={items} size="sm" label={`Actions for ${label}`}>
+        {children}
+      </ContextMenu>
     </PinnableBlock>
   );
 }
