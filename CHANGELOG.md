@@ -11,6 +11,7 @@
 ### Bug Fixes
 
 * **ui:** draw diagrams in the reader's own colours ([#70](https://github.com/alanrsoares/mdreadr/issues/70)) ([fbbbbcf](https://github.com/alanrsoares/mdreadr/commit/fbbbbcfe77390398e31aed042204b345f7e2bd72))
+* **ui:** finish the diagram palette off mermaid's own defaults ([#71](https://github.com/alanrsoares/mdreadr/issues/71)) ([4dcd83b](https://github.com/alanrsoares/mdreadr/commit/4dcd83b5bbee9893136af0e5b0cb9ca1e856c0a3))
 
 ## [0.16.1](https://github.com/alanrsoares/mdreadr/compare/v0.16.0...v0.16.1) (2026-09-09)
 
