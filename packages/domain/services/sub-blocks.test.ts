@@ -5,7 +5,12 @@ import {
   applySubBlockEdit,
   collectSubBlocks,
   findSubBlockRange,
+  mapTailTarget,
   resolveSubBlockRawMarkdown,
+  type SubBlockSplit,
+  type SubBlockTarget,
+  sameSubBlockTarget,
+  splitAroundSubBlock,
   subBlockKindForAnchor,
 } from "./sub-blocks.ts";
 
@@ -275,5 +280,259 @@ describe("findSubBlockRange, resolveSubBlockRawMarkdown, applySubBlockEdit", () 
         },
       ),
     ).toBeUndefined();
+  });
+});
+
+/** The split with the tail's coordinate map dropped, for the tests that are
+ *  about where the cut lands rather than what the tail means. */
+const slices = (split: SubBlockSplit | undefined) =>
+  split && { ...split, ...(split.after ? { after: split.after.source } : {}) };
+
+describe("splitAroundSubBlock: lists", () => {
+  const source = ["- alpha", "- beta", "- gamma"].join("\n");
+
+  test("keeps the items on either side of the edited one", () => {
+    expect(slices(splitAroundSubBlock(source, { kind: "list-item", path: [1] }))).toEqual({
+      before: "- alpha",
+      source: "- beta",
+      after: "- gamma",
+    });
+  });
+
+  test("the first and last items have nothing on one side", () => {
+    expect(slices(splitAroundSubBlock(source, { kind: "list-item", path: [0] }))).toEqual({
+      source: "- alpha",
+      after: "- beta\n- gamma",
+    });
+    expect(slices(splitAroundSubBlock(source, { kind: "list-item", path: [2] }))).toEqual({
+      before: "- alpha\n- beta",
+      source: "- gamma",
+    });
+  });
+
+  test("an ordered list's tail carries on counting, because the markers are the author's", () => {
+    const ordered = ["1. one", "2. two", "3. three"].join("\n");
+    expect(slices(splitAroundSubBlock(ordered, { kind: "list-item", path: [1] }))).toEqual({
+      before: "1. one",
+      source: "2. two",
+      after: "3. three",
+    });
+  });
+
+  test("a parent item takes its whole subtree with it", () => {
+    const nested = ["- alpha", "  - alpha one", "- beta"].join("\n");
+    expect(slices(splitAroundSubBlock(nested, { kind: "list-item", path: [0] }))).toEqual({
+      source: "- alpha\n  - alpha one",
+      after: "- beta",
+    });
+  });
+
+  test("a nested item is cut out on its own, and what is left is still a list", () => {
+    const nested = ["- alpha", "  - alpha one", "  - alpha two", "- beta"].join("\n");
+    expect(slices(splitAroundSubBlock(nested, { kind: "list-item", path: [0, 0] }))).toEqual({
+      before: "- alpha",
+      source: "  - alpha one",
+      // The parent reopens empty so the sibling left behind still nests.
+      after: "-\n  - alpha two\n- beta",
+    });
+  });
+
+  test("a deeper item reopens every ancestor above its tail", () => {
+    const nested = ["- alpha", "  - alpha one", "    - deep a", "    - deep b"].join("\n");
+    expect(slices(splitAroundSubBlock(nested, { kind: "list-item", path: [0, 0, 0] }))).toEqual({
+      before: "- alpha\n  - alpha one",
+      source: "    - deep a",
+      after: "-\n  -\n    - deep b",
+    });
+  });
+
+  test("a path with no item behind it splits into nothing", () => {
+    const nested = ["- alpha", "  - alpha one"].join("\n");
+    expect(splitAroundSubBlock(nested, { kind: "list-item", path: [0, 4] })).toBeUndefined();
+  });
+
+  test("an item that is no longer there splits into nothing", () => {
+    expect(splitAroundSubBlock(source, { kind: "list-item", path: [9] })).toBeUndefined();
+  });
+});
+
+describe("splitAroundSubBlock: tables", () => {
+  const source = [
+    "| Name | Size |",
+    "| :--- | ---: |",
+    "| alpha | 1 |",
+    "| beta | 2 |",
+    "| gamma | 3 |",
+  ].join("\n");
+
+  test("both halves carry the header and the alignment row, so both still render as tables", () => {
+    expect(slices(splitAroundSubBlock(source, { kind: "table-row", row: 2 }))).toEqual({
+      before: "| Name | Size |\n| :--- | ---: |\n| alpha | 1 |",
+      source: "| beta | 2 |",
+      after: "| Name | Size |\n| :--- | ---: |\n| gamma | 3 |",
+    });
+  });
+
+  test("the last row leaves no tail to render", () => {
+    expect(slices(splitAroundSubBlock(source, { kind: "table-row", row: 3 }))).toEqual({
+      before: "| Name | Size |\n| :--- | ---: |\n| alpha | 1 |\n| beta | 2 |",
+      source: "| gamma | 3 |",
+    });
+  });
+
+  test("editing the header keeps the body under a blank header of its own", () => {
+    expect(slices(splitAroundSubBlock(source, { kind: "table-row", row: 0 }))).toEqual({
+      source: "| Name | Size |",
+      after: [
+        "|   |   |",
+        "| :--- | ---: |",
+        "| alpha | 1 |",
+        "| beta | 2 |",
+        "| gamma | 3 |",
+      ].join("\n"),
+    });
+  });
+
+  test("a row that is no longer there splits into nothing", () => {
+    expect(splitAroundSubBlock(source, { kind: "table-row", row: 9 })).toBeUndefined();
+  });
+});
+
+describe("mapTailTarget", () => {
+  /** The tail of splitting `source` at `target`, or a failure loud enough to
+   *  read: a test that maps against no tail is testing nothing. */
+  const tailOf = (source: string, target: SubBlockTarget) => {
+    const after = splitAroundSubBlock(source, target)?.after;
+    if (!after) throw new Error(`no tail splitting at ${JSON.stringify(target)}`);
+    return after;
+  };
+
+  test("a tail item's own path names the item further down the list", () => {
+    const source = ["- alpha", "- beta", "- gamma"].join("\n");
+    const tail = tailOf(source, { kind: "list-item", path: [0] });
+    expect(mapTailTarget(tail, { kind: "list-item", path: [0] })).toEqual({
+      kind: "list-item",
+      path: [1],
+    });
+    expect(mapTailTarget(tail, { kind: "list-item", path: [1] })).toEqual({
+      kind: "list-item",
+      path: [2],
+    });
+  });
+
+  test("a nested tail item is named past the reopened ancestors", () => {
+    const source = ["- alpha", "  - one", "  - two", "- beta"].join("\n");
+    const tail = tailOf(source, { kind: "list-item", path: [0, 0] });
+    expect(mapTailTarget(tail, { kind: "list-item", path: [0, 0] })).toEqual({
+      kind: "list-item",
+      path: [0, 1],
+    });
+    expect(mapTailTarget(tail, { kind: "list-item", path: [1] })).toEqual({
+      kind: "list-item",
+      path: [1],
+    });
+  });
+
+  test("a reopened ancestor stands for no item, so the block is the answer", () => {
+    const source = ["- alpha", "  - one", "  - two", "- beta"].join("\n");
+    const tail = tailOf(source, { kind: "list-item", path: [0, 0] });
+    // Path [0] in the tail is the empty marker reopening `alpha`.
+    expect(mapTailTarget(tail, { kind: "list-item", path: [0] })).toBeUndefined();
+  });
+
+  test("a tail body row is named further down the table, the repeated head aside", () => {
+    const source = [
+      "| Name | Size |",
+      "| :--- | ---: |",
+      "| alpha | 1 |",
+      "| beta | 2 |",
+      "| gamma | 3 |",
+    ].join("\n");
+    const tail = tailOf(source, { kind: "table-row", row: 1 });
+    expect(mapTailTarget(tail, { kind: "table-row", row: 1 })).toEqual({
+      kind: "table-row",
+      row: 2,
+    });
+    expect(mapTailTarget(tail, { kind: "table-row", row: 0 })).toEqual({
+      kind: "table-row",
+      row: 0,
+    });
+  });
+
+  test("a part the tail does not have is not named at all", () => {
+    const source = ["- alpha", "- beta"].join("\n");
+    expect(
+      mapTailTarget(tailOf(source, { kind: "list-item", path: [0] }), {
+        kind: "list-item",
+        path: [7],
+      }),
+    ).toBeUndefined();
+  });
+});
+
+describe("splitAroundSubBlock: cut then map is the identity", () => {
+  const lists = [
+    ["- alpha", "- beta", "- gamma"],
+    ["1. one", "2. two", "3. three", "4. four"],
+    ["- alpha", "  - one", "  - two", "- beta", "  - three", "    - deep", "- gamma"],
+    ["* a", "* b", "  * b one", "  * b two", "    * b two deep", "* c"],
+    ["- alpha", "", "- beta", "", "  continued", "- gamma"],
+    ["- alpha", "  ```", "  - not an item", "  ```", "- beta"],
+  ].map((lines) => lines.join("\n"));
+
+  const tables = [
+    ["| Name | Size |", "| :--- | ---: |", "| alpha | 1 |", "| beta | 2 |", "| gamma | 3 |"],
+    ["| a | b |", "| --- | --- |", "| 1 | 2 |"],
+  ].map((lines) => lines.join("\n"));
+
+  /** The source of one sub-block, read straight out of the text it belongs to. */
+  const sliceOf = (source: string, kind: SubBlockTarget["kind"], target: SubBlockTarget) => {
+    const span = collectSubBlocks(source, kind).find((entry) =>
+      sameSubBlockTarget(entry.target, target),
+    );
+    return span && source.slice(span.range.start, span.range.end);
+  };
+
+  /**
+   * Every sub-block the tail offers has to be a sub-block of the block, and the
+   * same one: the text under the reader's pointer in the tail is the text the
+   * mapped target would put in the editor. Held for every sub-block of every
+   * source below, so the two coordinate spaces cannot drift apart silently.
+   */
+  const holdsFor = (kind: SubBlockTarget["kind"], source: string): number => {
+    let checked = 0;
+    for (const { target } of collectSubBlocks(source, kind)) {
+      const after = splitAroundSubBlock(source, target)?.after;
+      if (!after) continue;
+
+      for (const { local, parent } of after.targets) {
+        // The one pairing that is not a slice of the block: editing a table's
+        // header leaves a blanked copy of it above the body.
+        if (sameSubBlockTarget(parent, target)) continue;
+        expect(sliceOf(after.source, kind, local)).toBe(sliceOf(source, kind, parent));
+        checked += 1;
+      }
+
+      // Nothing in the tail is left unnamed except the reopened ancestors,
+      // which have no source of their own.
+      const named = collectSubBlocks(after.source, kind).filter((entry) =>
+        after.targets.some((pair) => sameSubBlockTarget(pair.local, entry.target)),
+      );
+      expect(named.length).toBe(after.targets.length);
+    }
+    return checked;
+  };
+
+  /** How many pairings the sources below are expected to produce, so a split
+   *  that quietly stopped returning tails fails here instead of passing. */
+  const total = (kind: SubBlockTarget["kind"], sources: string[]): number =>
+    sources.reduce((sum, source) => sum + holdsFor(kind, source), 0);
+
+  test("for every item of every list", () => {
+    expect(total("list-item", lists)).toBeGreaterThan(30);
+  });
+
+  test("for every row of every table", () => {
+    expect(total("table-row", tables)).toBeGreaterThan(5);
   });
 });

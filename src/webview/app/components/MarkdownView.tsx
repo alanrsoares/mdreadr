@@ -1,5 +1,11 @@
 import { Markdown } from "@astryxdesign/core/Markdown";
-import type { BlockAnchor, Note, SubBlockTarget } from "@mdreadr/domain";
+import {
+  type BlockAnchor,
+  mapTailTarget,
+  type Note,
+  type SubBlockTarget,
+  splitAroundSubBlock,
+} from "@mdreadr/domain";
 import { match } from "@onrails/pattern";
 import { isErr } from "@onrails/result";
 import { Fragment, type MouseEvent, memo, useCallback, useMemo, useRef, useState } from "react";
@@ -23,7 +29,6 @@ import {
   preprocessReaderMarkdown,
 } from "../markdown/pipeline.tsx";
 import type { RenderContext } from "../markdown/render-context.ts";
-import { remapSubBlockTargetFromAfter, splitAroundSubBlock } from "../markdown/sub-blocks.ts";
 import {
   type ApplyInlineEdit,
   type InlineEditHandle,
@@ -262,6 +267,9 @@ export const MarkdownView = memo(function MarkdownView({
           const split = editingTarget
             ? splitAroundSubBlock(segment.text, editingTarget)
             : undefined;
+          // Named apart so the tail's coordinate map and the tail's source
+          // reach the rendered slice as the one thing they are.
+          const after = split?.after;
 
           if (isBlockOpen(openEdit, anchor.blockId)) {
             return (
@@ -293,15 +301,11 @@ export const MarkdownView = memo(function MarkdownView({
                   render={render}
                   edit={edit}
                 />
-                {split?.after ? (
+                {after ? (
                   <EditableBlock
                     anchor={anchor}
                     edit={edit}
-                    mapSubTarget={(target) =>
-                      editingTarget
-                        ? remapSubBlockTargetFromAfter(segment.text, editingTarget, target)
-                        : target
-                    }
+                    mapSubTarget={(target) => mapTailTarget(after, target)}
                     subKind={subKind}
                     onPin={onPinBlock}
                     content={content}
@@ -312,7 +316,7 @@ export const MarkdownView = memo(function MarkdownView({
                       autolink="gfm"
                       inlinePlugins={inlinePlugins}
                     >
-                      {split.after}
+                      {after.source}
                     </Markdown>
                   </EditableBlock>
                 ) : null}
