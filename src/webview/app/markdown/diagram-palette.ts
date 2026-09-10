@@ -38,6 +38,12 @@ export type DiagramPalette = {
   noteFill: string;
   noteBorder: string;
   noteText: string;
+  /** Something the diagram is calling out as wrong or urgent: a gantt chart's
+   *  critical path, the line marking today. */
+  criticalFill: string;
+  criticalBorder: string;
+  /** Text that is also a link. */
+  accentText: string;
   fontFamily: string;
 };
 
@@ -56,6 +62,9 @@ const PALETTE_TOKENS = {
   noteFill: "--color-background-yellow",
   noteBorder: "--color-border-yellow",
   noteText: "--color-text-primary",
+  criticalFill: "--color-background-red",
+  criticalBorder: "--color-border-red",
+  accentText: "--color-text-accent",
 } as const satisfies Record<Exclude<keyof DiagramPalette, "fontFamily">, string>;
 
 const FONT_TOKEN = "--font-family-body";
@@ -106,10 +115,25 @@ export const readDiagramPalette = (within: HTMLElement, scheme: ColorScheme): Di
  * that derives everything from what it is given rather than from a palette of
  * its own.
  *
- * Every variable mermaid would otherwise default is named, and every one that
- * names text is given a text colour whose fill partner is named alongside it.
- * That pairing is the whole point: a variable left out here is a colour mermaid
- * picks, and a colour mermaid picks is a colour the reader's page did not.
+ * Every variable that names text is given a text colour whose fill partner is
+ * named alongside it. That pairing is the whole point: a text colour and the
+ * fill behind it have to be chosen together or they are chosen by nobody.
+ *
+ * What is named here, and what is not: `base` fills the rest in from these
+ * values, so most of what is left out still ends up the reader's colours by
+ * derivation. Two kinds do not, and only one of them is a problem.
+ *
+ * - Variables `base` falls back to a **fixed colour** — `gridColor` is
+ *   `lightgrey`, `altSectionBkgColor` is `white`, `stateBorder` is `#000`,
+ *   `critBkgColor` is `red` — ignore the reader entirely. A gantt chart in the
+ *   dark scheme draws its finished tasks `lightgrey` and then labels them in the
+ *   page's own light text. Those are named below.
+ * - Variables holding a **categorical scale** — `cScale0…`, `git0…`, the pie
+ *   slice colours — are meant to differ from one another, so one token in their
+ *   place would flatten every category into the same colour. Those keep
+ *   mermaid's palette, and with it mermaid's own contrast for their labels.
+ *   A journey or a git graph therefore still looks like mermaid's; it is the one
+ *   place that is deliberate rather than overlooked.
  */
 export const mermaidThemeVariables = (palette: DiagramPalette): Record<string, string> => ({
   background: palette.background,
@@ -153,9 +177,61 @@ export const mermaidThemeVariables = (palette: DiagramPalette): Record<string, s
   loopTextColor: palette.text,
   activationBkgColor: palette.clusterFill,
   activationBorderColor: palette.nodeBorder,
-  sequenceNumberColor: palette.nodeFill,
+  // `sequenceNumberColor` is left out on purpose. It is text on a circle filled
+  // with `lineColor`, and `base` defaults it to the inverse of that fill —
+  // better informed than any token here, which knows the page but not the
+  // circle. A surface colour there is low contrast; `lineColor` itself is
+  // invisible.
 
   noteBkgColor: palette.noteFill,
   noteBorderColor: palette.noteBorder,
   noteTextColor: palette.noteText,
+
+  // Gantt charts. `base` leaves most of this fixed: grey grid lines, white
+  // alternating bands, grey finished tasks, red for the critical path — all
+  // drawn under the page's own text colour.
+  sectionBkgColor: palette.clusterFill,
+  sectionBkgColor2: palette.background,
+  altSectionBkgColor: palette.background,
+  excludeBkgColor: palette.clusterFill,
+  gridColor: palette.nodeBorder,
+  taskBkgColor: palette.nodeFill,
+  taskBorderColor: palette.nodeBorder,
+  taskTextColor: palette.nodeText,
+  taskTextLightColor: palette.nodeText,
+  taskTextDarkColor: palette.nodeText,
+  taskTextOutsideColor: palette.text,
+  taskTextClickableColor: palette.accentText,
+  activeTaskBkgColor: palette.clusterFill,
+  activeTaskBorderColor: palette.nodeBorder,
+  doneTaskBkgColor: palette.clusterFill,
+  doneTaskBorderColor: palette.nodeBorder,
+  critBkgColor: palette.criticalFill,
+  critBorderColor: palette.criticalBorder,
+  todayLineColor: palette.criticalBorder,
+  vertLineColor: palette.line,
+
+  // State diagrams: a transition is an edge, a state is a node, and a composite
+  // state is a cluster holding more of them.
+  stateBkg: palette.nodeFill,
+  stateBorder: palette.nodeBorder,
+  stateLabelColor: palette.nodeText,
+  labelBackgroundColor: palette.nodeFill,
+  transitionColor: palette.line,
+  transitionLabelColor: palette.text,
+  altBackground: palette.clusterFill,
+  compositeBackground: palette.clusterFill,
+  compositeTitleBackground: palette.nodeFill,
+  compositeBorder: palette.nodeBorder,
+
+  // Pie charts keep mermaid's slice colours; only the strokes around them are
+  // fixed black, which on a dark page is a slice outlined in nothing.
+  pieStrokeColor: palette.nodeBorder,
+  pieOuterStrokeColor: palette.nodeBorder,
+  pieTitleTextColor: palette.text,
+  pieLegendTextColor: palette.text,
+
+  // The message a failed diagram draws in place of itself.
+  errorBkgColor: palette.criticalFill,
+  errorTextColor: palette.text,
 });
