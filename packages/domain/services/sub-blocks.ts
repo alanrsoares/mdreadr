@@ -59,6 +59,15 @@ export const sameSubBlockTarget = (a: SubBlockTarget | null, b: SubBlockTarget |
   return a.kind === "table-row" && b.kind === "table-row" && a.row === b.row;
 };
 
+/**
+ * A string key identifying a sub-block target within its parent block, or "whole"
+ * for the block itself. Useful for React element keys and continuity caches.
+ */
+export const subBlockKey = (target: SubBlockTarget | null | undefined): string => {
+  if (!target) return "whole";
+  return target.kind === "list-item" ? `item:${target.path.join(".")}` : `row:${target.row}`;
+};
+
 /** Which sub-block a block kind can be broken into, if any. */
 export const subBlockKindForAnchor = (anchor: BlockAnchor): SubBlockTarget["kind"] | undefined =>
   match(anchor.kind)

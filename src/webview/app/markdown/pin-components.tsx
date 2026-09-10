@@ -5,6 +5,7 @@ import {
   resolveBlockRawMarkdown,
   resolveSubBlockRawMarkdown,
   type SubBlockTarget,
+  subBlockKey,
 } from "@mdreadr/domain";
 import type { ReactNode } from "react";
 import { InlineBlockEditor } from "../components/InlineBlockEditor.tsx";
@@ -72,6 +73,7 @@ export function BlockSourceEditor({
 
   return (
     <InlineBlockEditor
+      key={`${anchor.blockId}:${subBlockKey(target)}`}
       anchor={anchor}
       subKind={target?.kind}
       initialValue={resolved ?? fallback}
