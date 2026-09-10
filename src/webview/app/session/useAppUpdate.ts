@@ -26,7 +26,12 @@ export function useAppUpdate(api: ReaderApi) {
 
   const downloadMutation = useMutation({
     mutationFn: () => api.downloadUpdate(),
-    onSuccess: () => {
+    onMutate: () => {
+      queryClient.setQueryData<AppUpdateState>(["app-update"], (prev) =>
+        prev ? { ...prev, status: "downloading", progressPercent: 0, error: undefined } : prev,
+      );
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["app-update"] });
     },
   });

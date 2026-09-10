@@ -553,7 +553,23 @@ describe("mdreadr api", () => {
   });
 
   describe("/updates", () => {
-    test("GET /updates/status returns current update status", async () => {
+    test("401s without the webview token", async () => {
+      const { url } = startServer(0);
+
+      const statusRes = await get(url, "/updates/status");
+      expect(statusRes?.status).toBe(401);
+
+      const checkRes = await post(url, "/updates/check", {});
+      expect(checkRes?.status).toBe(401);
+
+      const dlRes = await post(url, "/updates/download", {});
+      expect(dlRes?.status).toBe(401);
+
+      const applyRes = await post(url, "/updates/apply", {});
+      expect(applyRes?.status).toBe(401);
+    });
+
+    test("GET /updates/status returns current update status with webview token", async () => {
       const { url } = startServer(0);
       updateService.setHandler({
         getStatus: () => ({
@@ -570,14 +586,14 @@ describe("mdreadr api", () => {
         apply: async () => {},
       });
 
-      const response = await get(url, "/updates/status");
+      const response = await get(url, "/updates/status", sessionTokens.webviewToken);
       expect(response?.status).toBe(200);
       const json = await response?.json();
       expect(json.status).toBe("available");
       expect(json.latestVersion).toBe("0.18.0");
     });
 
-    test("POST /updates/check triggers check", async () => {
+    test("POST /updates/check triggers check with webview token", async () => {
       const { url } = startServer(0);
       let checked = false;
       updateService.setHandler({
@@ -590,14 +606,14 @@ describe("mdreadr api", () => {
         apply: async () => {},
       });
 
-      const response = await post(url, "/updates/check", {});
+      const response = await post(url, "/updates/check", {}, sessionTokens.webviewToken);
       expect(response?.status).toBe(200);
       const json = await response?.json();
       expect(checked).toBe(true);
       expect(json.status).toBe("up-to-date");
     });
 
-    test("POST /updates/download and POST /updates/apply invoke handlers", async () => {
+    test("POST /updates/download and POST /updates/apply invoke handlers with webview token", async () => {
       const { url } = startServer(0);
       let downloaded = false;
       let applied = false;
@@ -612,11 +628,11 @@ describe("mdreadr api", () => {
         },
       });
 
-      const dlResponse = await post(url, "/updates/download", {});
+      const dlResponse = await post(url, "/updates/download", {}, sessionTokens.webviewToken);
       expect(dlResponse?.status).toBe(200);
       expect(downloaded).toBe(true);
 
-      const applyResponse = await post(url, "/updates/apply", {});
+      const applyResponse = await post(url, "/updates/apply", {}, sessionTokens.webviewToken);
       expect(applyResponse?.status).toBe(200);
       expect(applied).toBe(true);
     });

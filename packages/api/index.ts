@@ -589,17 +589,33 @@ export const app = new Elysia()
     const clients = getConnectedClients();
     return { clients, count: clients.length };
   })
-  .get("/updates/status", () => {
+  .get("/updates/status", ({ request, set }) => {
+    if (!isWebviewRequest(request)) {
+      set.status = 401;
+      return unauthorized;
+    }
     return updateService.getStatus();
   })
-  .post("/updates/check", async () => {
+  .post("/updates/check", async ({ request, set }) => {
+    if (!isWebviewRequest(request)) {
+      set.status = 401;
+      return unauthorized;
+    }
     return await updateService.check();
   })
-  .post("/updates/download", async () => {
+  .post("/updates/download", async ({ request, set }) => {
+    if (!isWebviewRequest(request)) {
+      set.status = 401;
+      return unauthorized;
+    }
     await updateService.download();
     return { success: true };
   })
-  .post("/updates/apply", async () => {
+  .post("/updates/apply", async ({ request, set }) => {
+    if (!isWebviewRequest(request)) {
+      set.status = 401;
+      return unauthorized;
+    }
     await updateService.apply();
     return { success: true };
   })

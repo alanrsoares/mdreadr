@@ -2,7 +2,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { Icon } from "@astryxdesign/core/Icon";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useRef } from "react";
-import { ArrowDownTrayIcon, ArrowPathIcon } from "../icons.ts";
+import { ArrowDownTrayIcon, ArrowPathIcon, ExclamationTriangleIcon } from "../icons.ts";
 import { createTreatyReaderApi } from "../session/reader-api.ts";
 import { useAppUpdate } from "../session/useAppUpdate.ts";
 
@@ -59,6 +59,26 @@ export function AppUpdateIndicator() {
         />
         <Tooltip
           content="Update is downloaded and ready. Restart to apply."
+          anchorRef={containerRef}
+          placement="below"
+        />
+      </div>
+    );
+  }
+
+  if (state.status === "error") {
+    return (
+      <div ref={containerRef}>
+        <Button
+          size="sm"
+          variant="destructive"
+          isLoading={isDownloading}
+          icon={<Icon icon={ExclamationTriangleIcon} size="xsm" />}
+          label="Update Failed — Retry"
+          onClick={() => downloadUpdate()}
+        />
+        <Tooltip
+          content={state.error || "Update failed. Click to retry download."}
           anchorRef={containerRef}
           placement="below"
         />

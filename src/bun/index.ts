@@ -178,10 +178,14 @@ function buildApplicationMenu(): void {
       void checkForUpdatesCommand();
     }
     if (action === "download-update") {
-      void downloadUpdate();
+      downloadUpdate().catch((e) => {
+        console.error("Failed to download update:", e);
+      });
     }
     if (action === "apply-update") {
-      void applyUpdate();
+      applyUpdate().catch((e) => {
+        console.error("Failed to apply update:", e);
+      });
     }
     if (action === "edit-undo" || action === "edit-redo") {
       // The bridge is installed by the webview entrypoint; the optional call
