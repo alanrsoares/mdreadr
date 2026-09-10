@@ -2,10 +2,19 @@ import * as fs from "node:fs";
 import { isErr } from "@onrails/result";
 import { ApplicationMenu, app, BrowserWindow, Updater } from "electrobun/main";
 import { toDocumentHttpError } from "../../packages/api/documents.ts";
-import { documentSession, startServer } from "../../packages/api/index.ts";
+import { documentSession, startServer, updateService } from "../../packages/api/index.ts";
 import { APP_NAME } from "../../shared/constants.ts";
 import { installCliCommand } from "./installCli.ts";
-import { checkForUpdatesCommand, checkForUpdatesOnLaunch } from "./updater.ts";
+import {
+  applyUpdate,
+  check,
+  checkForUpdatesCommand,
+  checkForUpdatesOnLaunch,
+  downloadUpdate,
+  getUpdateMenuItemConfig,
+  getUpdateStatus,
+  setMenuUpdateListener,
+} from "./updater.ts";
 
 let activeApiBase: string | null = null;
 let activeMainWindow: BrowserWindow | null = null;
@@ -129,6 +138,37 @@ function buildApplicationMenu(): void {
     return;
   }
 
+  const renderMenu = () => {
+    ApplicationMenu.setApplicationMenu([
+      {
+        submenu: [
+          { label: `About ${APP_NAME}`, role: "about" },
+          { type: "separator" },
+          getUpdateMenuItemConfig(),
+          { type: "separator" },
+          { label: `Install '${APP_NAME}' Command in PATH`, action: "install-cli" },
+          { type: "separator" },
+          { label: "Quit", role: "quit", accelerator: "q" },
+        ],
+      },
+      {
+        label: "Edit",
+        submenu: [
+          // Explicit actions rather than the native undo/redo roles — see
+          // src/webview/app/editorCommands.ts for why the responder chain is the
+          // wrong route here.
+          { label: "Undo", action: "edit-undo", accelerator: "CmdOrCtrl+Z" },
+          { label: "Redo", action: "edit-redo", accelerator: "CmdOrCtrl+Shift+Z" },
+          { type: "separator" },
+          { role: "cut" },
+          { role: "copy" },
+          { role: "paste" },
+          { role: "selectAll" },
+        ],
+      },
+    ]);
+  };
+
   ApplicationMenu.on("application-menu-clicked", (event) => {
     const action = (event as { data?: { action?: string } })?.data?.action;
     if (action === "install-cli") {
@@ -136,6 +176,12 @@ function buildApplicationMenu(): void {
     }
     if (action === "check-for-updates") {
       void checkForUpdatesCommand();
+    }
+    if (action === "download-update") {
+      void downloadUpdate();
+    }
+    if (action === "apply-update") {
+      void applyUpdate();
     }
     if (action === "edit-undo" || action === "edit-redo") {
       // The bridge is installed by the webview entrypoint; the optional call
@@ -145,34 +191,11 @@ function buildApplicationMenu(): void {
     }
   });
 
-  ApplicationMenu.setApplicationMenu([
-    {
-      submenu: [
-        { label: `About ${APP_NAME}`, role: "about" },
-        { type: "separator" },
-        { label: "Check for Updates…", action: "check-for-updates" },
-        { type: "separator" },
-        { label: `Install '${APP_NAME}' Command in PATH`, action: "install-cli" },
-        { type: "separator" },
-        { label: "Quit", role: "quit", accelerator: "q" },
-      ],
-    },
-    {
-      label: "Edit",
-      submenu: [
-        // Explicit actions rather than the native undo/redo roles — see
-        // src/webview/app/editorCommands.ts for why the responder chain is the
-        // wrong route here.
-        { label: "Undo", action: "edit-undo", accelerator: "CmdOrCtrl+Z" },
-        { label: "Redo", action: "edit-redo", accelerator: "CmdOrCtrl+Shift+Z" },
-        { type: "separator" },
-        { role: "cut" },
-        { role: "copy" },
-        { role: "paste" },
-        { role: "selectAll" },
-      ],
-    },
-  ]);
+  setMenuUpdateListener(() => {
+    renderMenu();
+  });
+
+  renderMenu();
 }
 
 async function openArgvDocument(): Promise<void> {
@@ -184,6 +207,13 @@ async function openArgvDocument(): Promise<void> {
     console.error(`Failed to open document from argv: ${toDocumentHttpError(result.error).error}`);
   }
 }
+
+updateService.setHandler({
+  getStatus: getUpdateStatus,
+  check,
+  download: downloadUpdate,
+  apply: applyUpdate,
+});
 
 const { url: apiBase, webviewToken } = startServer();
 console.log(`mdreadr API listening on ${apiBase}`);

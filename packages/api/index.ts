@@ -53,6 +53,7 @@ import {
 } from "./mcp/index.ts";
 import { forgetRecent, readRecents, toRecentsHttpError } from "./recents.ts";
 import { sessionStore } from "./session.ts";
+import { updateService } from "./updates.ts";
 
 function domainError(error: NotesDomainError): { error: string; code: string } {
   switch (error._tag) {
@@ -588,6 +589,20 @@ export const app = new Elysia()
     const clients = getConnectedClients();
     return { clients, count: clients.length };
   })
+  .get("/updates/status", () => {
+    return updateService.getStatus();
+  })
+  .post("/updates/check", async () => {
+    return await updateService.check();
+  })
+  .post("/updates/download", async () => {
+    await updateService.download();
+    return { success: true };
+  })
+  .post("/updates/apply", async () => {
+    await updateService.apply();
+    return { success: true };
+  })
   .post("/mcp/connection/revoke", async ({ request, set }) => {
     if (!isWebviewRequest(request)) {
       set.status = 401;
@@ -619,6 +634,7 @@ export type App = typeof app;
 
 export { documentSession } from "./document-session.ts";
 export { sessionStore } from "./session.ts";
+export { updateService } from "./updates.ts";
 
 // Stable so MCP client configs (URL + persisted agent token, see auth.ts)
 // keep working across restarts without the user having to reconfigure them.

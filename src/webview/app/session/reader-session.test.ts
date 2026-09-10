@@ -95,6 +95,14 @@ function createInMemoryReaderApi() {
     async closeTab() {
       return { tabs: [], activeId: null };
     },
+    async getUpdateStatus() {
+      return { status: "idle", currentVersion: "0.17.0" };
+    },
+    async checkForUpdates() {
+      return { status: "idle", currentVersion: "0.17.0" };
+    },
+    async downloadUpdate() {},
+    async applyUpdate() {},
     log() {},
   };
 

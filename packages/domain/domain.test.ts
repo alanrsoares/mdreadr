@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  AppUpdateStateSchema,
   addReply,
   applyBlockEdit,
   applySuggestion,
@@ -477,5 +478,26 @@ describe("documentKindForPath", () => {
     ["/etc/hosts", "source"],
   ])("reads %s as %s", (path, kind) => {
     expect(documentKindForPath(path)).toBe(kind as ReturnType<typeof documentKindForPath>);
+  });
+});
+
+describe("AppUpdateStateSchema", () => {
+  test("validates valid update states", () => {
+    const valid = AppUpdateStateSchema.safeParse({
+      status: "available",
+      currentVersion: "0.17.0",
+      latestVersion: "0.18.0",
+      progressPercent: 50,
+      lastCheckedAt: new Date().toISOString(),
+    });
+    expect(valid.success).toBe(true);
+  });
+
+  test("rejects invalid status", () => {
+    const invalid = AppUpdateStateSchema.safeParse({
+      status: "non-existent-status",
+      currentVersion: "0.17.0",
+    });
+    expect(invalid.success).toBe(false);
   });
 });

@@ -12,6 +12,7 @@ import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppLogo } from "../components/AppLogo.tsx";
+import { AppUpdateIndicator } from "../components/AppUpdateIndicator.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
 import { McpClientsIndicator } from "../components/McpClientsIndicator.tsx";
 import { McpSettingsDialog } from "../components/McpSettingsDialog.tsx";
@@ -316,6 +317,7 @@ function ReaderPageContent() {
           }
           endContent={
             <HStack gap={2} vAlign="center">
+              <AppUpdateIndicator />
               <ColorSchemeToggle />
               <McpClientsIndicator />
               <IconButton
