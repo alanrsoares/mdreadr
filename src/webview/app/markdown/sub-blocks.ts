@@ -11,6 +11,12 @@ import type { SubBlockTarget } from "@mdreadr/domain";
  * its siblings is the position the source scan hands back at that depth. The
  * innermost item wins, so a nested item is editable on its own; the reader
  * takes the whole subtree by aiming at the parent's own line instead.
+ *
+ * "Hands back at that depth" is a guess, though — two numberings agreeing by
+ * construction, held together by nothing that checks. So the read carries the
+ * words it was pointing at, and `confirmSubBlockTarget` in the domain settles
+ * it against the source: the scan is the authority, because the scan is what
+ * the splice is resolved through.
  */
 
 /** The chain of `li` ancestors of `node` inside `root`, outermost first. */
@@ -31,19 +37,50 @@ const indexAmongSiblings = (element: HTMLElement, selector: string): number =>
     .filter((sibling): sibling is HTMLElement => sibling.matches(selector))
     .indexOf(element);
 
-function tableRowTarget(root: HTMLElement, node: Node): SubBlockTarget | undefined {
+/** A row's words: its cells, in order, the way the source lists them. */
+const rowWords = (row: HTMLElement): string =>
+  Array.from(row.children)
+    .map((cell) => cell.textContent ?? "")
+    .join(" ");
+
+/**
+ * An item's own words, with its nested items left out. `textContent` runs the
+ * whole subtree together with no gap — an item reading `alpha` above a nested
+ * `one` comes back as `alphaone` — and those children are sub-blocks of their
+ * own anyway, which the source scan also stops short of.
+ */
+const itemWords = (item: HTMLElement): string =>
+  Array.from(item.childNodes)
+    .filter((child) => !(child instanceof HTMLElement && child.matches("ul, ol")))
+    .map((child) => child.textContent ?? "")
+    .join("");
+
+function tableRowGuess(root: HTMLElement, node: Node): SubBlockGuess | undefined {
   const start = node instanceof HTMLElement ? node : node.parentElement;
   const row = start?.closest("tr");
   if (!row || !root.contains(row)) return undefined;
 
   // Row 0 is the header, then body rows in order: the same numbering
   // `collectSubBlocks` uses, which skips the alignment delimiter entirely.
-  const isHeader = row.parentElement?.tagName === "THEAD";
-  if (isHeader) return { kind: "table-row", row: 0 };
+  const words = rowWords(row);
+  if (row.parentElement?.tagName === "THEAD") {
+    return { target: { kind: "table-row", row: 0 }, words };
+  }
 
   const index = indexAmongSiblings(row, "tr");
-  return index < 0 ? undefined : { kind: "table-row", row: index + 1 };
+  return index < 0 ? undefined : { target: { kind: "table-row", row: index + 1 }, words };
 }
+
+/**
+ * Which sub-block the rendering says the gesture landed on, and the words it
+ * landed on — enough for the source scan to confirm or refuse it without
+ * touching the DOM again.
+ */
+export type SubBlockGuess = {
+  target: SubBlockTarget;
+  /** The rendered text of the item or row, nested items left out. */
+  words: string;
+};
 
 /**
  * Which sub-block of `root` the event landed on. `undefined` when the gesture
@@ -54,16 +91,21 @@ export function subBlockTargetFromNode(
   root: HTMLElement,
   node: Node | null,
   kind: SubBlockTarget["kind"],
-): SubBlockTarget | undefined {
+): SubBlockGuess | undefined {
   if (!node || !root.contains(node)) return undefined;
 
-  if (kind === "table-row") return tableRowTarget(root, node);
+  if (kind === "table-row") return tableRowGuess(root, node);
 
   const chain = listItemChain(root, node);
   if (chain.length === 0) return undefined;
   const path = chain.map((item) => indexAmongSiblings(item, "li"));
   // A position the DOM cannot place is a path the source cannot follow either.
-  return path.some((index) => index < 0) ? undefined : { kind: "list-item", path };
+  if (path.some((index) => index < 0)) return undefined;
+
+  const innermost = chain.at(-1);
+  return innermost
+    ? { target: { kind: "list-item", path }, words: itemWords(innermost) }
+    : undefined;
 }
 
 /** What the sub-block is called in a menu item, a hint or an accessible name. */

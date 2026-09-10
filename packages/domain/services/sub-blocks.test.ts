@@ -4,6 +4,7 @@ import { listDocumentBlocks } from "./anchors.ts";
 import {
   applySubBlockEdit,
   collectSubBlocks,
+  confirmSubBlockTarget,
   findSubBlockRange,
   mapTailTarget,
   resolveSubBlockRawMarkdown,
@@ -534,5 +535,146 @@ describe("splitAroundSubBlock: cut then map is the identity", () => {
 
   test("for every row of every table", () => {
     expect(total("table-row", tables)).toBeGreaterThan(5);
+  });
+});
+
+describe("confirmSubBlockTarget", () => {
+  const list = ["- alpha", "- beta *emphasised*", "  - nested one", "- gamma"].join("\n");
+  const table = ["| head | other |", "| --- | --- |", "| one | two |", "| three | four |"].join(
+    "\n",
+  );
+
+  const item = (path: number[]): SubBlockTarget => ({ kind: "list-item", path });
+  const row = (index: number): SubBlockTarget => ({ kind: "table-row", row: index });
+
+  describe("the target the reader pointed at", () => {
+    test("is confirmed when the words agree", () => {
+      expect(confirmSubBlockTarget(list, item([0]), "alpha")).toEqual(item([0]));
+      expect(confirmSubBlockTarget(list, item([2]), "gamma")).toEqual(item([2]));
+    });
+
+    test("is confirmed through inline syntax, which only the source carries", () => {
+      expect(confirmSubBlockTarget(list, item([1]), "beta emphasised")).toEqual(item([1]));
+    });
+
+    test("stops where its nested items begin, as the rendering does", () => {
+      expect(confirmSubBlockTarget(list, item([1]), "beta emphasised")).toEqual(item([1]));
+      expect(confirmSubBlockTarget(list, item([1, 0]), "nested one")).toEqual(item([1, 0]));
+    });
+
+    test("is refused when it names an item holding other words", () => {
+      // The rendering said item 0; the source says item 0 reads "alpha".
+      expect(confirmSubBlockTarget(list, item([0]), "gamma")).toBeUndefined();
+    });
+
+    test("is refused when the source scan cannot place it at all", () => {
+      expect(confirmSubBlockTarget(list, item([9]), "alpha")).toBeUndefined();
+      expect(confirmSubBlockTarget(list, item([0, 0]), "alpha")).toBeUndefined();
+    });
+  });
+
+  describe("table rows", () => {
+    test("the header is row 0, and its cells are its words", () => {
+      expect(confirmSubBlockTarget(table, row(0), "head other")).toEqual(row(0));
+    });
+
+    test("body rows carry on from there, the delimiter uncounted", () => {
+      expect(confirmSubBlockTarget(table, row(1), "one two")).toEqual(row(1));
+      expect(confirmSubBlockTarget(table, row(2), "three four")).toEqual(row(2));
+    });
+
+    test("a row whose words belong to another row is refused", () => {
+      expect(confirmSubBlockTarget(table, row(1), "three four")).toBeUndefined();
+    });
+
+    test("a row past the end of the table is refused", () => {
+      expect(confirmSubBlockTarget(table, row(7), "one two")).toBeUndefined();
+    });
+  });
+
+  describe("what counts as agreement", () => {
+    test("spacing is not a disagreement: the two roads pad differently", () => {
+      expect(confirmSubBlockTarget(list, item([0]), "  alpha\n ")).toEqual(item([0]));
+      expect(confirmSubBlockTarget(table, row(1), "one   two")).toEqual(row(1));
+    });
+
+    test("a continuation line reads as one run of words", () => {
+      const loose = ["- alpha", "  carried on", "- beta"].join("\n");
+      expect(confirmSubBlockTarget(loose, item([0]), "alpha carried on")).toEqual(item([0]));
+    });
+
+    test("one reading being the start of the other is enough, since the fallback costs the reader the item", () => {
+      expect(confirmSubBlockTarget(list, item([0]), "alpha and then some")).toEqual(item([0]));
+      expect(confirmSubBlockTarget(list, item([1]), "beta")).toEqual(item([1]));
+    });
+
+    test("a task list's checkbox is a control on one side and brackets on the other, so neither is held to it", () => {
+      const tasks = ["- [ ] wash up", "- [x] done already"].join("\n");
+      expect(confirmSubBlockTarget(tasks, item([0]), "wash up")).toEqual(item([0]));
+      expect(confirmSubBlockTarget(tasks, item([1]), "done already")).toEqual(item([1]));
+    });
+
+    test("an item with no words to compare is taken at the rendering's word", () => {
+      const images = ["- ![a picture](a.png)", "- beta"].join("\n");
+      expect(confirmSubBlockTarget(images, item([0]), "")).toEqual(item([0]));
+    });
+
+    test("a link reads as its text, which is all the rendering shows", () => {
+      const links = ["- see [the docs](https://example.com)", "- beta"].join("\n");
+      expect(confirmSubBlockTarget(links, item([0]), "see the docs")).toEqual(item([0]));
+    });
+
+    test("code spans read as their contents, backticks and all left behind", () => {
+      const code = ["- run `bun test`", "- beta"].join("\n");
+      expect(confirmSubBlockTarget(code, item([0]), "run bun test")).toEqual(item([0]));
+    });
+  });
+
+  describe("a block that is not the list or table it was taken for", () => {
+    test("has no sub-blocks to confirm against", () => {
+      expect(
+        confirmSubBlockTarget("just a paragraph", item([0]), "just a paragraph"),
+      ).toBeUndefined();
+      // A table needs its delimiter row; without one this is not a table.
+      expect(confirmSubBlockTarget("| a | b |", row(0), "a b")).toBeUndefined();
+    });
+  });
+
+  describe("every sub-block confirms itself", () => {
+    // Plain words only: the point here is the numbering agreeing item for item,
+    // and the reader below is a stand-in for the renderer, not a markdown one.
+    const plain = ["- alpha", "- beta", "  - nested one", "  - nested two", "- gamma"].join("\n");
+
+    /** The rendering's reading of a sub-block, arrived at the way the DOM half
+     *  does: the item's or row's own words, its nested items left out. */
+    const asRendered = (source: string, target: SubBlockTarget): string => {
+      const span = collectSubBlocks(source, target.kind).find((entry) =>
+        sameSubBlockTarget(entry.target, target),
+      );
+      if (!span) throw new Error(`no span for ${JSON.stringify(target)}`);
+      const own = source.slice(span.range.start, span.range.end);
+      return target.kind === "table-row"
+        ? own
+            .replace(/^\s*\|/, "")
+            .replace(/\|\s*$/, "")
+            .split("|")
+            .join(" ")
+        : (own.split("\n")[0] ?? "").replace(/^\s*(?:[-*+]|\d+[.)])\s*/, "");
+    };
+
+    test("for every item of a nested list", () => {
+      const targets = collectSubBlocks(plain, "list-item");
+      expect(targets.length).toBe(5);
+      for (const { target } of targets) {
+        expect(confirmSubBlockTarget(plain, target, asRendered(plain, target))).toEqual(target);
+      }
+    });
+
+    test("for every row of a table", () => {
+      expect(collectSubBlocks(table, "table-row").length).toBe(3);
+      for (const { target } of collectSubBlocks(table, "table-row")) {
+        expect(confirmSubBlockTarget(table, target, asRendered(table, target))).toEqual(target);
+      }
+    });
   });
 });

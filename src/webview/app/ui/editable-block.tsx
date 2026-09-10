@@ -1,6 +1,6 @@
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
 import type { BlockAnchor, SubBlockTarget } from "@mdreadr/domain";
-import { resolveBlockRawMarkdown, resolveBlockText } from "@mdreadr/domain";
+import { confirmSubBlockTarget, resolveBlockRawMarkdown, resolveBlockText } from "@mdreadr/domain";
 import { type MouseEvent, type ReactNode, useRef } from "react";
 import { useCopy } from "../hooks/useCopy.ts";
 import { anchorDisplayLabel } from "../markdown/anchors.ts";
@@ -58,11 +58,26 @@ export function EditableBlock({
   // only known when the pointer arrives, so the target rides in a ref.
   const menuTargetRef = useRef<SubBlockTarget | null>(null);
 
-  /** The part the pointer landed on, or `null` for the block itself. */
+  const source = resolveBlockRawMarkdown(content, anchor);
+
+  /**
+   * The part the pointer landed on, or `null` for the block itself.
+   *
+   * The rendering names the part; the source scan confirms it, and has the last
+   * word. Both readings number the same items, but by different means — element
+   * positions here, marker lines there — and only the scan's numbering is the
+   * one a splice is resolved through. A part the scan will not vouch for
+   * becomes the whole block, which the reader sees, rather than an edit landing
+   * in a neighbour, which they would not.
+   */
   const targetFrom = (event: MouseEvent): SubBlockTarget | null => {
     if (!subKind || !(event.currentTarget instanceof HTMLElement)) return null;
-    const target = subBlockTargetFromNode(event.currentTarget, event.target as Node, subKind);
-    return target ? (mapSubTarget ? (mapSubTarget(target) ?? null) : target) : null;
+    const guess = subBlockTargetFromNode(event.currentTarget, event.target as Node, subKind);
+    if (!guess) return null;
+
+    const target = mapSubTarget ? mapSubTarget(guess.target) : guess.target;
+    if (!target || !source) return null;
+    return confirmSubBlockTarget(source, target, guess.words) ?? null;
   };
 
   const editFrom = (event: MouseEvent): void => {
@@ -78,7 +93,6 @@ export function EditableBlock({
   // route to anchoring a note (and right-click is not a keyboard gesture).
   // Annotated: a conditional spread widens the literal, so an excess property
   // (`onSelect` for `onClick`) would otherwise typecheck and silently do nothing.
-  const source = resolveBlockRawMarkdown(content, anchor);
   const text = resolveBlockText(content, anchor);
   const actions: ContextMenuOption[] = [
     ...(onPin ? [{ label: "Anchor a note", onClick: () => onPin(anchor) }] : []),
