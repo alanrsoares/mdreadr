@@ -34,7 +34,7 @@ if (existsSync(stagingBase)) {
 mkdirSync(stagingBase, { recursive: true });
 
 for (const archive of archives) {
-  const match = archive.match(/(?:.*-)?linux-(x64|arm64)\.tar\.zst$/);
+  const match = archive.match(/(?:.*-)?linux-(x64|arm64)(?:-.*)?\.tar\.zst$/);
   if (!match) {
     console.warn(`[package-linux] skipping unrecognized archive format: ${archive}`);
     continue;
@@ -91,6 +91,7 @@ Terminal=false
 Type=Application
 Categories=Office;Utility;TextEditor;
 MimeType=text/markdown;text/x-markdown;
+StartupWMClass=${APP_NAME}
 `;
   const desktopPath = join(archDir, `${APP_IDENTIFIER}.desktop`);
   writeFileSync(desktopPath, desktopEntry);
@@ -118,19 +119,21 @@ contents:
     dst: "/usr/share/applications/${APP_IDENTIFIER}.desktop"
   - src: "${join(process.cwd(), "icon.png")}"
     dst: "/usr/share/icons/hicolor/512x512/apps/${APP_IDENTIFIER}.png"
-deb:
-  depends:
-    - libgtk-3-0 (>= 3.24) | libgtk-3-0t64
-    - libwebkit2gtk-4.1-0
-    - libayatana-appindicator3-1
-    - zenity
+overrides:
+  deb:
+    depends:
+      - libgtk-3-0 (>= 3.24) | libgtk-3-0t64
+      - libwebkit2gtk-4.1-0
+      - libayatana-appindicator3-1
+      - zenity
+  rpm:
+    depends:
+      - gtk3
+      - webkit2gtk4.1
+      - libayatana-appindicator-gtk3
+      - zenity
 rpm:
   arch: "${rpmArch}"
-  depends:
-    - gtk3
-    - webkit2gtk4.1
-    - libayatana-appindicator-gtk3
-    - zenity
 `;
 
   const configPath = join(archDir, "nfpm.yaml");
