@@ -15,9 +15,16 @@
  * AST, which is the same rule `resolveBlockRawMarkdown` follows.
  */
 
+import { parseMarkdown } from "@astryxdesign/core/Markdown/utils";
 import { match } from "@onrails/pattern";
 import type { BlockAnchor } from "../schemas/index.ts";
-import { type BlockSourceRange, findBlockRange, type ResolveBlockTextOptions } from "./anchors.ts";
+import {
+  type BlockSourceRange,
+  findBlockRange,
+  inlineToText,
+  type ListNode,
+  type ResolveBlockTextOptions,
+} from "./anchors.ts";
 import { truncateAnchorLabel } from "./markdown.ts";
 
 /** One editable region inside a block, addressed by position within it. */
@@ -477,3 +484,86 @@ export function splitAroundSubBlock(
       : {}),
   };
 }
+
+/**
+ * The sub-block's own words, as the source says they should read: the item's or
+ * the row's text with its markers, its inline syntax and its nested items left
+ * out. Nested items are sub-blocks in their own right, so an ancestor's words
+ * stop where its children begin.
+ *
+ * The renderer arrives at the same words down a different road — a parse of the
+ * whole Document, then a DOM — which is what makes the two worth comparing.
+ */
+const sourceWords = (subBlockSource: string, kind: SubBlockTarget["kind"]): string =>
+  kind === "table-row" ? rowWords(subBlockSource) : itemWords(subBlockSource);
+
+const itemWords = (source: string): string => {
+  const list = parseMarkdown(source, { autolink: "gfm" }).find(
+    (block): block is ListNode => block.type === "list",
+  );
+  const item = list?.items[0];
+  // A slice that does not parse as a list says nothing about the item's words,
+  // and saying nothing is not the same as disagreeing.
+  if (!item) return "";
+  return item.children
+    .map((child) => (child.type === "paragraph" ? inlineToText(child.children) : ""))
+    .join(" ");
+};
+
+/** A row's cells, read one at a time: a lone row is not a table, so the parser
+ *  will not take it whole. */
+const rowWords = (source: string): string =>
+  source.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(cellWords).join(" ");
+
+const cellWords = (source: string): string =>
+  parseMarkdown(source, { autolink: "gfm" })
+    .map((block) => (block.type === "paragraph" ? inlineToText(block.children) : ""))
+    .join(" ");
+
+/** A task list's checkbox is a control in the rendering and two brackets in the
+ *  source, so it is not text either side can be held to. */
+const TASK_MARKER = /^\[[ xX]\]\s*/;
+
+const comparable = (text: string): string =>
+  text.replace(TASK_MARKER, "").replace(/\s+/g, " ").trim();
+
+/**
+ * Whether two readings of the same sub-block agree. One being the start of the
+ * other counts: the fallback below is visible to the reader, so an unforeseen
+ * scrap of extra text on one side should not cost them the item they aimed at.
+ * A side with no words to offer is not a disagreement.
+ */
+const sameWords = (a: string, b: string): boolean => {
+  const [left, right] = [comparable(a), comparable(b)];
+  if (left.length === 0 || right.length === 0) return true;
+  return left.startsWith(right) || right.startsWith(left);
+};
+
+/**
+ * Confirms a sub-block target read off the rendering against the source scan,
+ * which is the authority: it is the scan's numbering that a splice is resolved
+ * through, so a target the scan cannot place, or places over different words
+ * than the reader was pointing at, is not the target they meant.
+ *
+ * `undefined` on disagreement, which every caller already reads as "the whole
+ * block" — the reader sees the block open instead of the item, rather than
+ * their text landing in a neighbour.
+ *
+ * @param blockSource the parent block's own source
+ * @param target the target read off the rendering
+ * @param pointedWords the rendered text of what the reader pointed at, with
+ *   nested items left out — `subBlockTargetFromNode` hands this over
+ */
+export const confirmSubBlockTarget = (
+  blockSource: string,
+  target: SubBlockTarget,
+  pointedWords: string,
+): SubBlockTarget | undefined => {
+  const span = collectSubBlocks(blockSource, target.kind).find((entry) =>
+    sameSubBlockTarget(entry.target, target),
+  );
+  if (!span) return undefined;
+
+  const words = sourceWords(blockSource.slice(span.range.start, span.range.end), target.kind);
+  return sameWords(words, pointedWords) ? target : undefined;
+};
