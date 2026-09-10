@@ -1,14 +1,14 @@
 import { Button } from "@astryxdesign/core/Button";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import type { ResizableRegion } from "@astryxdesign/core/Resizable";
-import type { BlockAnchor, SubBlockTarget } from "@mdreadr/domain";
 import { applyBlockEdit, applySubBlockEdit } from "@mdreadr/domain";
-import { err, ok, type Result } from "@onrails/result";
+import { err, ok } from "@onrails/result";
 import { useContainer, useStoreValues } from "@re-reduced/react";
 import { useEffect, useRef, useState } from "react";
 import { DocumentView } from "../components/DocumentView.tsx";
 import { useFileDrop } from "../hooks/useFileDrop.ts";
-import type { BlockEditError } from "../session/inline-edit.ts";
+import type { ApplyInlineEdit } from "../session/inline-edit.ts";
+import { ApplyInlineEditProvider } from "../session/inline-edit-context.tsx";
 import { ReaderTabShell } from "./ReaderTabShell.tsx";
 import { readerPageContainer } from "./reader-page-container.ts";
 
@@ -55,11 +55,7 @@ export function UnsavedReaderTab({
     onDirtyChange(UNSAVED_TAB_ID, dirty);
   }, [dirty, onDirtyChange]);
 
-  const onEditBlock = (
-    anchor: BlockAnchor,
-    newMarkdown: string,
-    target?: SubBlockTarget,
-  ): Result<void, BlockEditError> => {
+  const applyInlineEdit: ApplyInlineEdit = (anchor, newMarkdown, target) => {
     const updated = target
       ? applySubBlockEdit(text, anchor, target, newMarkdown)
       : applyBlockEdit(text, anchor, newMarkdown);
@@ -91,28 +87,29 @@ export function UnsavedReaderTab({
         />
       }
     >
-      <DocumentView
-        content={text}
-        notes={[]}
-        isActive={isActive}
-        viewMode={documentViewMode}
-        onViewModeChange={store.actions.documentViewModeChanged}
-        onEditBlock={onEditBlock}
-        onOpenDocument={onOpenPath}
-        editorValue={text}
-        onEditorChange={setText}
-        chromeEnd={
-          documentViewMode === "edit" || dirty ? (
-            <Button
-              label="Save As…"
-              variant="primary"
-              size="sm"
-              isLoading={isSaving}
-              onClick={() => onSaveAs(text)}
-            />
-          ) : undefined
-        }
-      />
+      <ApplyInlineEditProvider apply={applyInlineEdit}>
+        <DocumentView
+          content={text}
+          notes={[]}
+          isActive={isActive}
+          viewMode={documentViewMode}
+          onViewModeChange={store.actions.documentViewModeChanged}
+          onOpenDocument={onOpenPath}
+          editorValue={text}
+          onEditorChange={setText}
+          chromeEnd={
+            documentViewMode === "edit" || dirty ? (
+              <Button
+                label="Save As…"
+                variant="primary"
+                size="sm"
+                isLoading={isSaving}
+                onClick={() => onSaveAs(text)}
+              />
+            ) : undefined
+          }
+        />
+      </ApplyInlineEditProvider>
     </ReaderTabShell>
   );
 }

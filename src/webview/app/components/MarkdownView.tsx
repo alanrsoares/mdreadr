@@ -1,7 +1,7 @@
 import { Markdown } from "@astryxdesign/core/Markdown";
 import type { BlockAnchor, Note, SubBlockTarget } from "@mdreadr/domain";
 import { match } from "@onrails/pattern";
-import { err, isErr, type Result } from "@onrails/result";
+import { isErr } from "@onrails/result";
 import { Fragment, type MouseEvent, memo, useCallback, useMemo, useRef, useState } from "react";
 import {
   callAttentionToInlineEditor,
@@ -24,11 +24,12 @@ import {
 } from "../markdown/pipeline.tsx";
 import { remapSubBlockTargetFromAfter, splitAroundSubBlock } from "../markdown/sub-blocks.ts";
 import {
-  type BlockEditError,
+  type ApplyInlineEdit,
   type InlineEditState,
   openInlineEdit,
   openTargetIn,
 } from "../session/inline-edit.ts";
+import { useApplyInlineEdit } from "../session/inline-edit-context.tsx";
 import { openExternalLink } from "../session/open-external.ts";
 import { useFontSettings } from "../theme/FontSettingsContext.tsx";
 import { getReaderMeasurePx } from "../theme/measure.ts";
@@ -41,13 +42,6 @@ type MarkdownViewProps = {
   notes: Note[];
   documentPath?: string;
   onPinBlock?: (anchor: BlockAnchor) => void;
-  /** An `Err` leaves the inline editor open with the reader's text in it,
-   *  rather than dropping the only copy of it. */
-  onEditBlock?: (
-    anchor: BlockAnchor,
-    newMarkdown: string,
-    target?: SubBlockTarget,
-  ) => Result<void, BlockEditError>;
   /** Opens another Document in a Tab, for links between markdown files. */
   onOpenDocument?: (path: string) => void;
 };
@@ -57,10 +51,13 @@ export const MarkdownView = memo(function MarkdownView({
   notes,
   documentPath,
   onPinBlock,
-  onEditBlock,
   onOpenDocument,
 }: MarkdownViewProps) {
   const { readerFontSize, readerFontFamily } = useFontSettings();
+  // Reached through context rather than a prop: only the open editor uses it,
+  // and every layer between here and the Tab that owns the Draft would
+  // otherwise have to name it.
+  const applyInlineEdit = useApplyInlineEdit();
   const measurePx = getReaderMeasurePx(readerFontSize, readerFontFamily);
   /** The open Inline Edit. Every decision about it — the one-at-a-time rule,
    *  the refusal, the index focus returns to — lives in `session/inline-edit`. */
@@ -187,27 +184,23 @@ export const MarkdownView = memo(function MarkdownView({
     returnFocusToBlock(returnIndex);
   }, [openEdit, returnFocusToBlock]);
 
-  const handleSaveBlockEdit = useCallback(
-    (
-      anchor: BlockAnchor,
-      newMarkdown: string,
-      target?: SubBlockTarget,
-    ): Result<void, BlockEditError> => {
-      const applied = onEditBlock?.(anchor, newMarkdown, target) ?? err({ _tag: "BlockNotFound" });
+  const handleSaveBlockEdit = useCallback<ApplyInlineEdit>(
+    (anchor, newMarkdown, target) => {
+      const applied = applyInlineEdit(anchor, newMarkdown, target);
       if (isErr(applied)) return applied;
       const returnIndex = openEdit?.returnIndex ?? -1;
       setOpenEdit(null);
       returnFocusToBlock(returnIndex, "reader-block-edit-flash");
       return applied;
     },
-    [onEditBlock, openEdit, returnFocusToBlock],
+    [applyInlineEdit, openEdit, returnFocusToBlock],
   );
 
   const pinContext = useMemo(
     () => ({
       onPinBlock,
-      onStartEditBlock: onEditBlock ? handleStartEditBlock : undefined,
-      onStartEditSubBlock: onEditBlock ? handleStartEditSubBlock : undefined,
+      onStartEditBlock: handleStartEditBlock,
+      onStartEditSubBlock: handleStartEditSubBlock,
       editingBlockId,
       editingSubTarget: openEdit?.target ?? null,
       onSaveBlockEdit: handleSaveBlockEdit,
@@ -220,7 +213,6 @@ export const MarkdownView = memo(function MarkdownView({
     }),
     [
       onPinBlock,
-      onEditBlock,
       handleStartEditBlock,
       handleStartEditSubBlock,
       editingBlockId,
@@ -278,8 +270,8 @@ export const MarkdownView = memo(function MarkdownView({
                 {split?.before ? (
                   <EditableBlock
                     anchor={anchor}
-                    onEdit={onEditBlock ? handleStartEditBlock : undefined}
-                    onEditSub={onEditBlock ? handleStartEditSubBlock : undefined}
+                    onEdit={handleStartEditBlock}
+                    onEditSub={handleStartEditSubBlock}
                     subKind={subKind}
                     onPin={onPinBlock}
                     content={content}
@@ -305,8 +297,8 @@ export const MarkdownView = memo(function MarkdownView({
                 {split?.after ? (
                   <EditableBlock
                     anchor={anchor}
-                    onEdit={onEditBlock ? handleStartEditBlock : undefined}
-                    onEditSub={onEditBlock ? handleStartEditSubBlock : undefined}
+                    onEdit={handleStartEditBlock}
+                    onEditSub={handleStartEditSubBlock}
                     mapSubTarget={(target) =>
                       editingTarget
                         ? remapSubBlockTargetFromAfter(segment.text, editingTarget, target)
@@ -334,8 +326,8 @@ export const MarkdownView = memo(function MarkdownView({
             <EditableBlock
               key={segment.key}
               anchor={anchor}
-              onEdit={onEditBlock ? handleStartEditBlock : undefined}
-              onEditSub={onEditBlock ? handleStartEditSubBlock : undefined}
+              onEdit={handleStartEditBlock}
+              onEditSub={handleStartEditSubBlock}
               subKind={subKind}
               onPin={onPinBlock}
               content={content}
