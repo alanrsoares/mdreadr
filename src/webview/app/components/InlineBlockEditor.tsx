@@ -23,15 +23,17 @@ import {
   QueueListIcon,
 } from "../icons.ts";
 import {
-  indent,
-  insertLink,
-  outdent,
-  type Selection,
-  setHeadingLevel,
-  type TextEdit,
-  toggleLinePrefix,
-  wrapSelection,
-} from "../markdown/inline-edit-ops.ts";
+  closesTheEditor,
+  type EditorIntent,
+  type EditorTool,
+  type EditorToolId,
+  editorIntent,
+  type Keystroke,
+  nextToolIndex,
+  swallowsKeystroke,
+  toolsFor,
+} from "../markdown/inline-edit-keys.ts";
+import { indent, outdent, type Selection, type TextEdit } from "../markdown/inline-edit-ops.ts";
 import { subBlockNoun } from "../markdown/sub-blocks.ts";
 import { shortcutLabel } from "../platform.ts";
 import { type BlockEditError, blockEditErrorMessage } from "../session/inline-edit.ts";
@@ -81,76 +83,30 @@ const headingLevelOf = (source: string): string | undefined => {
 /** How long the "press Escape again" arming lasts before it forgets. */
 const DISCARD_ARM_MS = 4_000;
 
-type Tool = {
-  id: string;
-  /** Accessible name, without the shortcut: the shortcut rides on the title. */
-  label: string;
-  shortcut?: string;
-  glyph: ReactNode;
-  apply: (value: string, selection: Selection) => TextEdit;
+/** The Cancel button is the Escape key with a mouse behind it. */
+const ESCAPE: Keystroke = {
+  key: "Escape",
+  hasMod: false,
+  hasAlt: false,
+  hasShift: false,
+  isInSource: false,
 };
 
-const FORMAT_TOOLS: Tool[] = [
-  {
-    id: "bold",
-    label: "Bold",
-    shortcut: "B",
-    glyph: <span className="font-bold text-xs leading-none">B</span>,
-    apply: (value, selection) => wrapSelection(value, selection, "**", "**", "bold text"),
-  },
-  {
-    id: "italic",
-    label: "Italic",
-    shortcut: "I",
-    glyph: <span className="font-serif text-xs italic leading-none">I</span>,
-    apply: (value, selection) => wrapSelection(value, selection, "*", "*", "italic text"),
-  },
-  {
-    id: "code",
-    label: "Inline code",
-    shortcut: "E",
-    glyph: <Icon icon={CodeBracketIcon} size="sm" />,
-    apply: (value, selection) => wrapSelection(value, selection, "`", "`", "code"),
-  },
-  {
-    id: "strike",
-    label: "Strikethrough",
-    glyph: <span className="text-xs leading-none line-through">S</span>,
-    apply: (value, selection) => wrapSelection(value, selection, "~~", "~~", "strikethrough"),
-  },
-  {
-    id: "link",
-    label: "Link",
-    shortcut: "K",
-    glyph: <Icon icon={LinkIcon} size="sm" />,
-    apply: insertLink,
-  },
-  {
-    id: "quote",
-    label: "Quote",
-    glyph: <Icon icon={ChatBubbleBottomCenterTextIcon} size="sm" />,
-    apply: (value, selection) => toggleLinePrefix(value, selection, "> "),
-  },
-  {
-    id: "bullet",
-    label: "Bullet list",
-    glyph: <Icon icon={ListBulletIcon} size="sm" />,
-    apply: (value, selection) => toggleLinePrefix(value, selection, "- "),
-  },
-  {
-    id: "ordered",
-    label: "Numbered list",
-    glyph: <Icon icon={QueueListIcon} size="sm" />,
-    apply: (value, selection) => toggleLinePrefix(value, selection, "1. "),
-  },
-];
-
-const HEADING_TOOLS: Tool[] = [1, 2, 3].map((level) => ({
-  id: `heading-${level}`,
-  label: `Heading ${level}`,
-  glyph: <span className="font-bold text-[11px] leading-none">{`H${level}`}</span>,
-  apply: (value, selection) => setHeadingLevel(value, selection, level),
-}));
+/** What each tool is drawn as. Kept here rather than beside the transform it
+ *  runs: the keyboard contract in `inline-edit-keys.ts` has no use for a node. */
+const TOOL_GLYPHS: Record<EditorToolId, ReactNode> = {
+  bold: <span className="font-bold text-xs leading-none">B</span>,
+  italic: <span className="font-serif text-xs italic leading-none">I</span>,
+  code: <Icon icon={CodeBracketIcon} size="sm" />,
+  strike: <span className="text-xs leading-none line-through">S</span>,
+  link: <Icon icon={LinkIcon} size="sm" />,
+  quote: <Icon icon={ChatBubbleBottomCenterTextIcon} size="sm" />,
+  bullet: <Icon icon={ListBulletIcon} size="sm" />,
+  ordered: <Icon icon={QueueListIcon} size="sm" />,
+  "heading-1": <span className="font-bold text-[11px] leading-none">H1</span>,
+  "heading-2": <span className="font-bold text-[11px] leading-none">H2</span>,
+  "heading-3": <span className="font-bold text-[11px] leading-none">H3</span>,
+};
 
 export function InlineBlockEditor({
   anchor,
@@ -174,13 +130,7 @@ export function InlineBlockEditor({
   const isMono = isMonospaceKind(anchor.kind);
   /** What the editor is holding: the block, or one part of it. */
   const subject = subKind ? subBlockNoun(subKind) : (anchor.label ?? anchor.kind);
-  const tools = useMemo(
-    () =>
-      anchor.kind === "heading" || anchor.kind === "paragraph"
-        ? [...FORMAT_TOOLS, ...HEADING_TOOLS]
-        : FORMAT_TOOLS,
-    [anchor.kind],
-  );
+  const tools = useMemo(() => toolsFor(anchor.kind), [anchor.kind]);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -216,7 +166,7 @@ export function InlineBlockEditor({
   }, []);
 
   const runTool = useCallback(
-    (tool: Tool) => {
+    (tool: EditorTool) => {
       const editor = editorRef.current;
       if (!editor) return;
       applyEdit(tool.apply(editor.getValue(), editor.getSelection()));
@@ -231,80 +181,79 @@ export function InlineBlockEditor({
     editorRef.current?.focus();
   }, [onSave, text]);
 
-  const handleCancel = useCallback(() => {
-    if (!isDirty || isDiscardArmed) {
-      onCancel();
-      return;
-    }
-    setIsDiscardArmed(true);
-  }, [isDirty, isDiscardArmed, onCancel]);
+  const reindent = useCallback(
+    (op: (value: string, selection: Selection) => TextEdit) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      applyEdit(op(editor.getValue(), editor.getSelection()));
+    },
+    [applyEdit],
+  );
 
-  // On the section, not the textarea: Escape and the apply shortcut have to
-  // work while focus sits on a toolbar button too.
+  /** The one place an intent becomes an effect. A new keystroke is a branch in
+   *  `editorIntent` and a branch here, and nothing anywhere else. */
+  const dispatch = useCallback(
+    (intent: EditorIntent): void =>
+      match(intent)
+        .returnType<void>()
+        .with({ kind: "apply" }, handleApply)
+        .with({ kind: "cancel" }, onCancel)
+        .with({ kind: "armDiscard" }, () => setIsDiscardArmed(true))
+        .with({ kind: "tool" }, ({ tool }) => runTool(tool))
+        .with({ kind: "indent" }, () => reindent(indent))
+        .with({ kind: "outdent" }, () => reindent(outdent))
+        .with({ kind: "none" }, () => undefined)
+        .exhaustive(),
+    [handleApply, onCancel, reindent, runTool],
+  );
+
+  /** The Cancel button asks the same question a keystroke does, so it goes
+   *  through the same contract rather than repeating its two-press rule. */
+  const handleCancel = useCallback(() => {
+    dispatch(editorIntent(ESCAPE, { kind: anchor.kind, isDirty, isDiscardArmed }));
+  }, [anchor.kind, dispatch, isDirty, isDiscardArmed]);
+
+  // Bound to the section rather than the source: Escape and the apply shortcut
+  // have to work while focus sits on a toolbar button too.
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLElement>) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        handleCancel();
-        return;
-      }
-
-      const isMod = event.metaKey || event.ctrlKey;
-
-      if (isMod && event.key === "Enter") {
-        event.preventDefault();
-        handleApply();
-        return;
-      }
-
-      if (isMod && !event.altKey) {
-        const key = event.key === "`" ? "E" : event.key.toUpperCase();
-        const tool = tools.find((candidate) => candidate.shortcut === key);
-        if (tool) {
-          event.preventDefault();
-          runTool(tool);
-        }
-        return;
-      }
-
-      // Indentation is the textarea's business; in the toolbar, Tab still moves
-      // focus out of the editor, which is the only reason it is not a trap.
       // `event.target` is CodeMirror's contenteditable, not the section, so
-      // the test is containment rather than identity.
-      const isInEditor =
+      // where the keystroke came from is a containment test, not identity.
+      const isInSource =
         event.target instanceof Node && editorDomRef.current?.contains(event.target) === true;
-      if (event.key === "Tab" && isInEditor) {
-        const editor = editorRef.current;
-        if (!editor) return;
-        event.preventDefault();
-        const value = editor.getValue();
-        const selection = editor.getSelection();
-        applyEdit(event.shiftKey ? outdent(value, selection) : indent(value, selection));
-      }
+
+      const intent = editorIntent(
+        {
+          key: event.key,
+          hasMod: event.metaKey || event.ctrlKey,
+          hasAlt: event.altKey,
+          hasShift: event.shiftKey,
+          isInSource,
+        },
+        { kind: anchor.kind, isDirty, isDiscardArmed },
+      );
+
+      if (swallowsKeystroke(intent)) event.preventDefault();
+      if (closesTheEditor(intent)) event.stopPropagation();
+      dispatch(intent);
     },
-    [applyEdit, handleApply, handleCancel, runTool, tools],
+    [anchor.kind, dispatch, isDirty, isDiscardArmed],
   );
 
   /** Roving focus, so the whole toolbar is one Tab stop rather than eleven. */
   const handleToolbarKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
-    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (step === 0 && event.key !== "Home" && event.key !== "End") return;
-
     const buttons = Array.from(
       toolbarRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? [],
     );
-    if (buttons.length === 0) return;
+    const next = nextToolIndex(
+      event.key,
+      buttons.indexOf(document.activeElement as HTMLButtonElement),
+      buttons.length,
+    );
+    if (next === undefined) return;
 
     event.preventDefault();
-    const from = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    const target =
-      event.key === "Home"
-        ? buttons[0]
-        : event.key === "End"
-          ? buttons[buttons.length - 1]
-          : buttons[(from + step + buttons.length) % buttons.length];
-    target?.focus();
+    buttons[next]?.focus();
   }, []);
 
   const sourceStyle = useMemo(
@@ -378,7 +327,7 @@ export function InlineBlockEditor({
               onMouseDown={(event: MouseEvent) => event.preventDefault()}
               onClick={() => runTool(tool)}
             >
-              {tool.glyph}
+              {TOOL_GLYPHS[tool.id]}
             </button>
           ))}
         </div>
