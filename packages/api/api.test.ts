@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sessionTokens } from "../../packages/api/auth.ts";
-import { app, sessionStore, startServer } from "../../packages/api/index.ts";
+import { app, sessionStore, startServer, updateService } from "../../packages/api/index.ts";
 
 const authHeaders = (token?: string): Record<string, string> =>
   token ? { Authorization: `Bearer ${token}` } : {};
@@ -549,6 +549,92 @@ describe("mdreadr api", () => {
       const json = await response?.json();
       expect(Array.isArray(json.clients)).toBe(true);
       expect(json.count).toBe(json.clients.length);
+    });
+  });
+
+  describe("/updates", () => {
+    test("401s without the webview token", async () => {
+      const { url } = startServer(0);
+
+      const statusRes = await get(url, "/updates/status");
+      expect(statusRes?.status).toBe(401);
+
+      const checkRes = await post(url, "/updates/check", {});
+      expect(checkRes?.status).toBe(401);
+
+      const dlRes = await post(url, "/updates/download", {});
+      expect(dlRes?.status).toBe(401);
+
+      const applyRes = await post(url, "/updates/apply", {});
+      expect(applyRes?.status).toBe(401);
+    });
+
+    test("GET /updates/status returns current update status with webview token", async () => {
+      const { url } = startServer(0);
+      updateService.setHandler({
+        getStatus: () => ({
+          status: "available",
+          currentVersion: "0.17.0",
+          latestVersion: "0.18.0",
+        }),
+        check: async () => ({
+          status: "available",
+          currentVersion: "0.17.0",
+          latestVersion: "0.18.0",
+        }),
+        download: async () => {},
+        apply: async () => {},
+      });
+
+      const response = await get(url, "/updates/status", sessionTokens.webviewToken);
+      expect(response?.status).toBe(200);
+      const json = await response?.json();
+      expect(json.status).toBe("available");
+      expect(json.latestVersion).toBe("0.18.0");
+    });
+
+    test("POST /updates/check triggers check with webview token", async () => {
+      const { url } = startServer(0);
+      let checked = false;
+      updateService.setHandler({
+        getStatus: () => ({ status: "idle", currentVersion: "0.17.0" }),
+        check: async () => {
+          checked = true;
+          return { status: "up-to-date", currentVersion: "0.17.0" };
+        },
+        download: async () => {},
+        apply: async () => {},
+      });
+
+      const response = await post(url, "/updates/check", {}, sessionTokens.webviewToken);
+      expect(response?.status).toBe(200);
+      const json = await response?.json();
+      expect(checked).toBe(true);
+      expect(json.status).toBe("up-to-date");
+    });
+
+    test("POST /updates/download and POST /updates/apply invoke handlers with webview token", async () => {
+      const { url } = startServer(0);
+      let downloaded = false;
+      let applied = false;
+      updateService.setHandler({
+        getStatus: () => ({ status: "idle", currentVersion: "0.17.0" }),
+        check: async () => ({ status: "idle", currentVersion: "0.17.0" }),
+        download: async () => {
+          downloaded = true;
+        },
+        apply: async () => {
+          applied = true;
+        },
+      });
+
+      const dlResponse = await post(url, "/updates/download", {}, sessionTokens.webviewToken);
+      expect(dlResponse?.status).toBe(200);
+      expect(downloaded).toBe(true);
+
+      const applyResponse = await post(url, "/updates/apply", {}, sessionTokens.webviewToken);
+      expect(applyResponse?.status).toBe(200);
+      expect(applied).toBe(true);
     });
   });
 });

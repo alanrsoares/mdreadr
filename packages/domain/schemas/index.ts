@@ -135,6 +135,27 @@ export const UpdateSuggestionStatusBodySchema = z.object({
   status: z.enum(["accepted", "rejected"]),
 });
 
+export const AppUpdateStatusSchema = z.enum([
+  "idle",
+  "checking",
+  "available",
+  "up-to-date",
+  "downloading",
+  "ready",
+  "error",
+]);
+
+export const AppUpdateStateSchema = z.object({
+  status: AppUpdateStatusSchema,
+  currentVersion: z.string(),
+  latestVersion: z.string().optional(),
+  progressPercent: z.number().min(0).max(100).optional(),
+  bytesDownloaded: z.number().optional(),
+  totalBytes: z.number().optional(),
+  error: z.string().optional(),
+  lastCheckedAt: z.iso.datetime().optional(),
+});
+
 export type DocumentRef = z.infer<typeof DocumentRefSchema>;
 export type Author = z.infer<typeof AuthorSchema>;
 export type Reply = z.infer<typeof ReplySchema>;
@@ -145,6 +166,8 @@ export type Note = z.infer<typeof NoteSchema>;
 export type NotesFile = z.infer<typeof NotesFileSchema>;
 export type SuggestionStatus = z.infer<typeof SuggestionStatusSchema>;
 export type Suggestion = z.infer<typeof SuggestionSchema>;
+export type AppUpdateStatus = z.infer<typeof AppUpdateStatusSchema>;
+export type AppUpdateState = z.infer<typeof AppUpdateStateSchema>;
 
 export type CreateNoteInput = z.input<typeof CreateNoteBodySchema>;
 export type AddReplyInput = z.infer<typeof AddReplyBodySchema>;

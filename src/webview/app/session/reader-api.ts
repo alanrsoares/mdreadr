@@ -1,4 +1,5 @@
 import type {
+  AppUpdateState,
   CreateNoteRequest,
   DocumentRef,
   Note,
@@ -59,6 +60,10 @@ export type ReaderApi = {
   getTabs(): Promise<TabsResult>;
   activateTab(id: string): Promise<SessionSnapshot>;
   closeTab(id: string): Promise<TabsResult>;
+  getUpdateStatus(): Promise<AppUpdateState>;
+  checkForUpdates(): Promise<AppUpdateState>;
+  downloadUpdate(): Promise<void>;
+  applyUpdate(): Promise<void>;
   log(message: string): void; // fire-and-forget diagnostics
 };
 
@@ -220,6 +225,20 @@ export const createTreatyReaderApi = (): ReaderApi => ({
   async closeTab(id) {
     const data = unwrap(await api.documents.tabs({ id: encodeURIComponent(id) }).close.post());
     return data;
+  },
+  async getUpdateStatus() {
+    const data = unwrap(await api.updates.status.get());
+    return data as AppUpdateState;
+  },
+  async checkForUpdates() {
+    const data = unwrap(await api.updates.check.post());
+    return data as AppUpdateState;
+  },
+  async downloadUpdate() {
+    unwrap(await api.updates.download.post());
+  },
+  async applyUpdate() {
+    unwrap(await api.updates.apply.post());
   },
   log(message) {
     void api.log.post({ message }).catch(() => {});

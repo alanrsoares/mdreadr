@@ -9,6 +9,7 @@ export {
   Cog6ToothIcon,
   CommandLineIcon,
   DocumentTextIcon,
+  ExclamationTriangleIcon,
   EyeIcon,
   FolderIcon,
   HashtagIcon,
