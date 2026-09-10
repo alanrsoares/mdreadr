@@ -32,6 +32,10 @@ _Avoid_: Allocator, id map
 One editable part inside a pinnable block: a list Item at any depth, or a table Row. Addressed by position within its block (an item by its path of nested positions) for as long as an inline editor is open, never persisted — a Note still anchors to the block around it.
 _Avoid_: sub-anchor, cell, fragment
 
+**Inline Edit**:
+The one open inline editor on a Document in Preview: the Anchor it holds, the Sub-block within it if any, and the position focus returns to when it closes. At most one at a time — its text is the only copy until it is applied to the Draft.
+_Avoid_: block editor, edit state, editing session
+
 **Session Notes**:
 The in-memory Note collection for the current app session before the user explicitly saves them.
 _Avoid_: Draft notes, cache

@@ -8,7 +8,7 @@ import { useContainer, useStoreValues } from "@re-reduced/react";
 import { useEffect, useRef, useState } from "react";
 import { DocumentView } from "../components/DocumentView.tsx";
 import { useFileDrop } from "../hooks/useFileDrop.ts";
-import type { BlockEditError } from "../session/block-edit.ts";
+import type { BlockEditError } from "../session/inline-edit.ts";
 import { ReaderTabShell } from "./ReaderTabShell.tsx";
 import { readerPageContainer } from "./reader-page-container.ts";
 

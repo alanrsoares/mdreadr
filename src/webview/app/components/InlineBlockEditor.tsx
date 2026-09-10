@@ -34,7 +34,7 @@ import {
 } from "../markdown/inline-edit-ops.ts";
 import { subBlockNoun } from "../markdown/sub-blocks.ts";
 import { shortcutLabel } from "../platform.ts";
-import { type BlockEditError, blockEditErrorMessage } from "../session/block-edit.ts";
+import { type BlockEditError, blockEditErrorMessage } from "../session/inline-edit.ts";
 import { useFontSettings } from "../theme/FontSettingsContext.tsx";
 import { SourceEditor, type SourceEditorHandle } from "./SourceEditor.tsx";
 
