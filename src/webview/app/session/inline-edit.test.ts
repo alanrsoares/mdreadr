@@ -5,6 +5,7 @@ import {
   blockEditErrorMessage,
   type InlineEdit,
   type InlineEditStatus,
+  isBlockOpen,
   isSameInlineEdit,
   noInlineEdit,
   openInlineEdit,
@@ -94,6 +95,21 @@ describe("isSameInlineEdit", () => {
 
   test("the same part of a different block is a different editor", () => {
     expect(isSameInlineEdit(item("b1", [0]), item("b2", [0]))).toBe(false);
+  });
+});
+
+describe("isBlockOpen", () => {
+  test("a block holding the open editor is open, whole or in part", () => {
+    expect(isBlockOpen(wholeBlock("b1"), "b1")).toBe(true);
+    expect(isBlockOpen(item("b1", [2, 0]), "b1")).toBe(true);
+  });
+
+  test("its neighbours are not", () => {
+    expect(isBlockOpen(wholeBlock("b1"), "b2")).toBe(false);
+  });
+
+  test("nothing open leaves every block closed", () => {
+    expect(isBlockOpen(null, "b1")).toBe(false);
   });
 });
 

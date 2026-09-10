@@ -22,10 +22,13 @@ import {
   createReaderInlinePlugins,
   preprocessReaderMarkdown,
 } from "../markdown/pipeline.tsx";
+import type { RenderContext } from "../markdown/render-context.ts";
 import { remapSubBlockTargetFromAfter, splitAroundSubBlock } from "../markdown/sub-blocks.ts";
 import {
   type ApplyInlineEdit,
+  type InlineEditHandle,
   type InlineEditState,
+  isBlockOpen,
   openInlineEdit,
   openTargetIn,
 } from "../session/inline-edit.ts";
@@ -62,7 +65,6 @@ export const MarkdownView = memo(function MarkdownView({
   /** The open Inline Edit. Every decision about it — the one-at-a-time rule,
    *  the refusal, the index focus returns to — lives in `session/inline-edit`. */
   const [openEdit, setOpenEdit] = useState<InlineEditState>(null);
-  const editingBlockId = openEdit?.blockId ?? null;
   // Dirtiness rides in a ref rather than in the state beside it: it changes on
   // every keystroke, and rendering on that would rebuild the whole Document.
   const isEditorDirtyRef = useRef(false);
@@ -196,38 +198,35 @@ export const MarkdownView = memo(function MarkdownView({
     [applyInlineEdit, openEdit, returnFocusToBlock],
   );
 
-  const pinContext = useMemo(
+  /** What every block needs to draw itself. Nothing about editing in here, so
+   *  a keystroke in the open editor cannot invalidate it. */
+  const render = useMemo<RenderContext>(
+    () => ({ plan, notedBlockIds, content, resolveImageSrc, onPinBlock }),
+    [plan, notedBlockIds, content, resolveImageSrc, onPinBlock],
+  );
+
+  /** The session beside it: which editor is open, and the four ways a block
+   *  asks for or drives one. */
+  const edit = useMemo<InlineEditHandle>(
     () => ({
-      onPinBlock,
-      onStartEditBlock: handleStartEditBlock,
-      onStartEditSubBlock: handleStartEditSubBlock,
-      editingBlockId,
-      editingSubTarget: openEdit?.target ?? null,
-      onSaveBlockEdit: handleSaveBlockEdit,
-      onCancelBlockEdit: handleCancelBlockEdit,
-      onEditorDirtyChange: handleEditorDirtyChange,
-      content,
-      plan,
-      notedBlockIds,
-      resolveImageSrc,
+      open: openEdit,
+      start: handleStartEditBlock,
+      startSub: handleStartEditSubBlock,
+      apply: handleSaveBlockEdit,
+      cancel: handleCancelBlockEdit,
+      dirtyChanged: handleEditorDirtyChange,
     }),
     [
-      onPinBlock,
+      openEdit,
       handleStartEditBlock,
       handleStartEditSubBlock,
-      editingBlockId,
-      openEdit,
       handleSaveBlockEdit,
       handleCancelBlockEdit,
       handleEditorDirtyChange,
-      content,
-      plan,
-      notedBlockIds,
-      resolveImageSrc,
     ],
   );
 
-  const components = useMemo(() => createPinComponents(pinContext), [pinContext]);
+  const components = useMemo(() => createPinComponents({ render, edit }), [render, edit]);
 
   // MUST run at the start of every render pass so cursors restart in sync
   // with the actual Markdown render, regardless of whether `components`
@@ -264,14 +263,13 @@ export const MarkdownView = memo(function MarkdownView({
             ? splitAroundSubBlock(segment.text, editingTarget)
             : undefined;
 
-          if (editingBlockId === anchor.blockId) {
+          if (isBlockOpen(openEdit, anchor.blockId)) {
             return (
               <Fragment key={segment.key}>
                 {split?.before ? (
                   <EditableBlock
                     anchor={anchor}
-                    onEdit={handleStartEditBlock}
-                    onEditSub={handleStartEditSubBlock}
+                    edit={edit}
                     subKind={subKind}
                     onPin={onPinBlock}
                     content={content}
@@ -292,13 +290,13 @@ export const MarkdownView = memo(function MarkdownView({
                   // named is gone, and the block's source is the honest seed.
                   {...(split && editingTarget ? { target: editingTarget } : {})}
                   fallback={split?.source ?? segment.text}
-                  ctx={pinContext}
+                  render={render}
+                  edit={edit}
                 />
                 {split?.after ? (
                   <EditableBlock
                     anchor={anchor}
-                    onEdit={handleStartEditBlock}
-                    onEditSub={handleStartEditSubBlock}
+                    edit={edit}
                     mapSubTarget={(target) =>
                       editingTarget
                         ? remapSubBlockTargetFromAfter(segment.text, editingTarget, target)
@@ -326,8 +324,7 @@ export const MarkdownView = memo(function MarkdownView({
             <EditableBlock
               key={segment.key}
               anchor={anchor}
-              onEdit={handleStartEditBlock}
-              onEditSub={handleStartEditSubBlock}
+              edit={edit}
               subKind={subKind}
               onPin={onPinBlock}
               content={content}
