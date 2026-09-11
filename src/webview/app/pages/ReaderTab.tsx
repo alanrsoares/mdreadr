@@ -20,6 +20,7 @@ import {
   useMemo,
   useRef,
 } from "react";
+import { registerAppCommand } from "../appCommands.ts";
 import { DocumentView } from "../components/DocumentView.tsx";
 import { ReviewPanel } from "../components/ReviewPanel.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
@@ -155,6 +156,23 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
     if (!documentPath || draft.path !== documentPath || draft.text === null) return;
     await reader.saveDocument(documentPath, draft.text);
   }, [documentPath, draft, reader]);
+
+  // Only the Tab in front answers the menu: a parked Tab is mounted and would
+  // otherwise save or toggle a Document the reader is not looking at.
+  useEffect(() => {
+    if (!isActive) return;
+    const cleanups = [
+      registerAppCommand("save-document", () => {
+        if (dirty) void saveDraft();
+      }),
+      registerAppCommand("toggle-view-mode", () => {
+        store.actions.documentViewModeChanged(documentViewMode === "edit" ? "preview" : "edit");
+      }),
+    ];
+    return () => {
+      for (const cleanup of cleanups) cleanup();
+    };
+  }, [isActive, dirty, saveDraft, documentViewMode, store]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

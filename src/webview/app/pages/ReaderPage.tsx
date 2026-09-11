@@ -11,6 +11,7 @@ import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { registerAppCommand } from "../appCommands.ts";
 import { AppLogo } from "../components/AppLogo.tsx";
 import { AppUpdateIndicator } from "../components/AppUpdateIndicator.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
@@ -19,7 +20,7 @@ import { McpSettingsDialog } from "../components/McpSettingsDialog.tsx";
 import { formatDisplayPath, pathFileName, truncatePathMiddle } from "../components/path-display.ts";
 import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
 import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
-import { RecentsSidebarProvider } from "../components/RecentsSidebarContext.tsx";
+import { RecentsSidebarProvider, useRecentsSidebar } from "../components/RecentsSidebarContext.tsx";
 import { TabStrip } from "../components/TabStrip.tsx";
 import { Cog6ToothIcon, ViewColumnsIcon } from "../icons.ts";
 import { beginReaderTiming } from "../performance.ts";
@@ -82,6 +83,7 @@ function ReaderDocumentTopNavHeading({
 }
 
 function ReaderPageContent() {
+  const recentsSidebar = useRecentsSidebar();
   const notesSidebar = useResizable({
     defaultSize: 280,
     minSizePx: 220,
@@ -239,6 +241,33 @@ function ReaderPageContent() {
     [handleDirtyChange],
   );
 
+  const toggleNotesSidebar = useCallback(() => {
+    hasUserCollapsedNotesRef.current = !notesSidebar.isCollapsed;
+    if (notesSidebar.isCollapsed) notesSidebar.expand();
+    else notesSidebar.collapse();
+  }, [notesSidebar.isCollapsed, notesSidebar.collapse, notesSidebar.expand]);
+
+  // The application menu's File and View items land here. Cmd+O and Cmd+W are
+  // already bound below; the menu gives them a name the reader can find.
+  useEffect(() => {
+    const cleanups = [
+      registerAppCommand("open-document", () => tabsRef.current.pick()),
+      registerAppCommand("close-tab", () => {
+        if (effectiveActiveId) handleRequestCloseTab(effectiveActiveId);
+      }),
+      registerAppCommand("toggle-notes-sidebar", toggleNotesSidebar),
+      registerAppCommand("toggle-navigation-sidebar", () => recentsSidebar.toggleCollapsed()),
+    ];
+    return () => {
+      for (const cleanup of cleanups) cleanup();
+    };
+  }, [
+    effectiveActiveId,
+    handleRequestCloseTab,
+    toggleNotesSidebar,
+    recentsSidebar.toggleCollapsed,
+  ]);
+
   const handleLoadNotes = useCallback(() => tabsRef.current.load(), []);
 
   const handleSaveAs = useCallback(
@@ -333,11 +362,7 @@ function ReaderPageContent() {
                 variant={notesSidebar.isCollapsed ? "ghost" : "secondary"}
                 isDisabled={isEmpty}
                 icon={<Icon icon={ViewColumnsIcon} size="sm" />}
-                onClick={() => {
-                  hasUserCollapsedNotesRef.current = !notesSidebar.isCollapsed;
-                  if (notesSidebar.isCollapsed) notesSidebar.expand();
-                  else notesSidebar.collapse();
-                }}
+                onClick={toggleNotesSidebar}
               />
               {isEmpty ? null : (
                 <Button

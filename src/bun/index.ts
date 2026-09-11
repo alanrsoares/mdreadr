@@ -163,6 +163,16 @@ function buildApplicationMenu(): void {
         ],
       },
       {
+        label: "File",
+        submenu: [
+          { label: "Open…", action: "app:open-document", accelerator: "CmdOrCtrl+O" },
+          { type: "separator" },
+          { label: "Save", action: "app:save-document", accelerator: "CmdOrCtrl+S" },
+          { type: "separator" },
+          { label: "Close Tab", action: "app:close-tab", accelerator: "CmdOrCtrl+W" },
+        ],
+      },
+      {
         label: "Edit",
         submenu: [
           // Explicit actions rather than the native undo/redo roles — see
@@ -175,6 +185,27 @@ function buildApplicationMenu(): void {
           { role: "copy" },
           { role: "paste" },
           { role: "selectAll" },
+        ],
+      },
+      {
+        label: "View",
+        submenu: [
+          {
+            label: "Toggle Preview / Edit",
+            action: "app:toggle-view-mode",
+            accelerator: "CmdOrCtrl+E",
+          },
+          { type: "separator" },
+          {
+            label: "Toggle Navigation",
+            action: "app:toggle-navigation-sidebar",
+            accelerator: "CmdOrCtrl+1",
+          },
+          {
+            label: "Toggle Notes",
+            action: "app:toggle-notes-sidebar",
+            accelerator: "CmdOrCtrl+2",
+          },
         ],
       },
     ]);
@@ -197,6 +228,15 @@ function buildApplicationMenu(): void {
       applyUpdate().catch((e) => {
         console.error("Failed to apply update:", e);
       });
+    }
+    // Everything the reader owns rather than the shell: which Tab is in front,
+    // whether a sidebar is collapsed, whether the Draft is dirty. The bun
+    // process holds none of it, so the menu just names the command.
+    if (action?.startsWith("app:")) {
+      const command = action.slice("app:".length);
+      activeMainWindow?.webview.executeJavascript(
+        `window.__MDREADR_APP__?.run(${JSON.stringify(command)})`,
+      );
     }
     if (action === "edit-undo" || action === "edit-redo") {
       // The bridge is installed by the webview entrypoint; the optional call

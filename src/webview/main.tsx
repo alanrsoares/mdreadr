@@ -8,6 +8,7 @@ import "./app/index.css";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { installAppCommandBridge } from "./app/appCommands.ts";
 import { installEditBridge } from "./app/editorCommands.ts";
 import { installReaderPerformanceObserver } from "./app/performance.ts";
 import { AppProviders } from "./app/providers.tsx";
@@ -23,6 +24,7 @@ if (!root) {
 // Must exist before the native Edit menu can call into it, so install it here
 // rather than from a component effect.
 installEditBridge();
+installAppCommandBridge();
 installReaderPerformanceObserver();
 
 createRoot(root).render(
