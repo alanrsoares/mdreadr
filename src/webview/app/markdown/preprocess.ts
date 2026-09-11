@@ -1,3 +1,5 @@
+import { stripFrontmatter } from "@mdreadr/domain";
+
 const LINKED_IMAGE_RE = /\[!\[([^\]\n]*)\]\(([^)\n]+)\)\]\(([^)\n]+)\)/g;
 const BADGE_LINE_RE = /^\[\[\[BADGE:\{.*?\}\]\]\]$/;
 /** Single source of truth for the linked-badge token shape (preprocess replace + inline plugin match). */
@@ -9,7 +11,7 @@ export const encodeLinkedBadge = (alt: string, src: string, href: string): strin
 
 /** Normalise markdown before Astryx parsing. */
 export const preprocessReaderMarkdown = (content: string): string =>
-  mapOutsideCodeFences(content, (chunk) =>
+  mapOutsideCodeFences(stripFrontmatter(content), (chunk) =>
     convertAlignWrappers(
       convertBadgeRowsToBlocks(
         collapseBadgeRows(

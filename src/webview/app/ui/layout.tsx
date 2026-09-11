@@ -9,7 +9,9 @@ export const ReaderSheet = tw.article(
   // header with a 100%-tall containing block, so the chrome scrolled away with
   // the first screenful. `min-h-full` keeps a short document filling the pane
   // while a long one grows the sheet, which is what keeps the header up.
-  "flex min-h-full flex-col rounded-none border-0 bg-(--reader-paper-bg) overscroll-none",
+  // `relative` is the find bar's containing block; nothing else in the sheet
+  // is positioned, so it costs the layout nothing.
+  "relative flex min-h-full flex-col rounded-none border-0 bg-(--reader-paper-bg) overscroll-none",
 );
 
 export const ReaderDocumentChrome = tw.header(
@@ -18,11 +20,29 @@ export const ReaderDocumentChrome = tw.header(
 
 export const ReaderChromeControls = tw.div`mx-auto flex w-fit items-center justify-center gap-2`;
 
+// Mirrors ReaderChromeEnd on the other side, so the centred mode switch stays
+// centred on the sheet rather than being pushed by whatever sits beside it.
+export const ReaderChromeStart = tw.div(
+  "absolute top-1/2 left-4 -translate-y-1/2 tabular-nums sm:left-2 md:left-3.5",
+);
+
 export const ReaderChromeEnd = tw.div(
   "absolute right-4 top-1/2 -translate-y-1/2 sm:right-2 md:right-3.5",
 );
 
 export const ReaderDocumentBody = tw.div`min-h-0 flex-1`;
+
+// Floats over the sheet: find must not move the prose it is searching. Sits
+// below the sticky chrome's z-index so scrolling never runs the text over it.
+// Find takes the chrome row over rather than adding one: an extra row would
+// push the prose down the moment the reader opens it, and the chrome's own
+// controls are not what they are reaching for while searching.
+export const FindBarShell = tw.div(
+  "absolute inset-0 z-20 flex items-center justify-end gap-2 bg-(--reader-chrome-bg-solid) px-4 sm:px-6 md:px-8",
+);
+
+/** Fixed width so the step buttons hold still as the count changes. */
+export const FindCount = tw.span("min-w-12 text-center");
 
 // The one column both modes live in. Preview and Edit share it so that toggling
 // leaves the text where it was: same centring, same padding, same width. Sheet

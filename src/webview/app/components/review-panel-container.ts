@@ -6,6 +6,7 @@ export type ReviewPanelState = {
   draft: string;
   draftKind: NoteKind;
   filter: ReviewFilter;
+  search: string;
   replyDrafts: Record<string, string>;
   expandedReplies: Record<string, boolean>;
 };
@@ -17,6 +18,7 @@ export const reviewPanelContainer = defineContainer("review-panel", {
     // Open by default: settled threads are history, and a column that keeps
     // showing them buries the two items still asking something of the reader.
     filter: "open",
+    search: "",
     replyDrafts: {},
     expandedReplies: {},
   } as ReviewPanelState,
@@ -25,6 +27,7 @@ export const reviewPanelContainer = defineContainer("review-panel", {
     draftKindChanged: on<NoteKind>((_s, draftKind) => ({ draftKind })),
     noteSubmitted: on<void>(() => ({ draft: "", draftKind: "comment" as NoteKind })),
     filterChanged: on<ReviewFilter>((_s, filter) => ({ filter })),
+    searchChanged: on<string>((_s, search) => ({ search })),
     replyDraftChanged: on<{ noteId: string; value: string }>((s, { noteId, value }) => ({
       replyDrafts: { ...s.replyDrafts, [noteId]: value },
     })),

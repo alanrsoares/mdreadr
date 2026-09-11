@@ -1,3 +1,4 @@
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
@@ -5,6 +6,7 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
 import { Timestamp } from "@astryxdesign/core/Timestamp";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import type {
@@ -20,12 +22,14 @@ import type {
 import { formatAuthorLabel } from "@mdreadr/domain";
 import { match } from "@onrails/pattern";
 import { useContainer, useStoreValues } from "@re-reduced/react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChatBubbleBottomCenterTextIcon,
   CheckIcon,
   Cog6ToothIcon,
   CommandLineIcon,
+  MagnifyingGlassIcon,
+  TrashIcon,
   XMarkIcon,
 } from "../icons.ts";
 import { anchorDisplayLabel } from "../markdown/anchors.ts";
@@ -37,6 +41,7 @@ import {
   type ReviewCounts,
   type ReviewFilter,
   type ReviewItem,
+  searchReviewStream,
   type ThreadItem,
 } from "../review/stream.ts";
 import {
@@ -75,6 +80,7 @@ type ReviewPanelProps = {
   onCreateNote: (input: CreateNoteRequest) => Promise<void>;
   onAddReply: (noteId: string, body: string) => Promise<void>;
   onUpdateStatus: (noteId: string, status: NoteStatus) => Promise<void>;
+  onDeleteNote: (noteId: string) => Promise<void>;
   onAcceptSuggestion: (suggestion: Suggestion) => Promise<void>;
   onRejectSuggestion: (suggestion: Suggestion) => Promise<void>;
   onSaveNotes: () => Promise<void>;
@@ -98,6 +104,7 @@ export function ReviewPanel({
   onCreateNote,
   onAddReply,
   onUpdateStatus,
+  onDeleteNote,
   onAcceptSuggestion,
   onRejectSuggestion,
   onSaveNotes,
@@ -105,13 +112,18 @@ export function ReviewPanel({
   onScrollToAnchor,
 }: ReviewPanelProps) {
   const store = useContainer(reviewPanelContainer);
-  const { draft, draftKind, filter, replyDrafts, expandedReplies, canSubmitNote } =
+  const { draft, draftKind, filter, search, replyDrafts, expandedReplies, canSubmitNote } =
     useStoreValues(store);
   const composerRef = useRef<HTMLDivElement>(null);
 
   const stream = useMemo(() => buildReviewStream(notes, suggestions), [notes, suggestions]);
   const counts = useMemo(() => countReviewStream(stream), [stream]);
-  const visible = useMemo(() => filterReviewStream(stream, filter), [stream, filter]);
+  // Search narrows what the filter already chose, so a reader searching inside
+  // Open does not silently get settled threads back.
+  const visible = useMemo(
+    () => searchReviewStream(filterReviewStream(stream, filter), search),
+    [stream, filter, search],
+  );
 
   useEffect(() => {
     if (!pendingAnchor) return;
@@ -138,6 +150,16 @@ export function ReviewPanel({
           <SegmentedControlItem value="resolved" label="Done" />
           <SegmentedControlItem value="all" label="All" />
         </SegmentedControl>
+        <TextInput
+          label="Search review"
+          isLabelHidden
+          size="sm"
+          hasClear
+          placeholder="Search threads"
+          startIcon={<Icon icon={MagnifyingGlassIcon} size="sm" />}
+          value={search}
+          onChange={store.actions.searchChanged}
+        />
       </ReviewHeader>
 
       <ReviewBody>
@@ -166,7 +188,7 @@ export function ReviewPanel({
           ) : null}
 
           {visible.length === 0 ? (
-            <ReviewEmptyState filter={filter} counts={counts} />
+            <ReviewEmptyState filter={filter} counts={counts} search={search} />
           ) : (
             visible.map((item, index) => (
               <ReviewItemCard
@@ -182,6 +204,7 @@ export function ReviewPanel({
                 onReplySubmitted={() => store.actions.replySubmitted(item.id)}
                 onAddReply={(body) => onAddReply(item.id, body)}
                 onUpdateStatus={(status) => onUpdateStatus(item.id, status)}
+                onDeleteNote={() => onDeleteNote(item.id)}
                 onAcceptSuggestion={onAcceptSuggestion}
                 onRejectSuggestion={onRejectSuggestion}
                 onScrollToAnchor={onScrollToAnchor}
@@ -233,10 +256,18 @@ const emptyCopy = (filter: ReviewFilter, hasAny: boolean): { title: string; desc
 const START_HINT =
   "Use the anchor control beside a heading, paragraph, or code block. It appears when you hover or focus the block.";
 
-type ReviewEmptyStateProps = { filter: ReviewFilter; counts: ReviewCounts };
+type ReviewEmptyStateProps = { filter: ReviewFilter; counts: ReviewCounts; search: string };
 
-function ReviewEmptyState({ filter, counts }: ReviewEmptyStateProps) {
-  const { title, description } = emptyCopy(filter, counts.total > 0);
+function ReviewEmptyState({ filter, counts, search }: ReviewEmptyStateProps) {
+  // A search that matched nothing is the reader's own doing, so it says so
+  // rather than claiming the document has no review on it.
+  const { title, description } =
+    search.trim() === ""
+      ? emptyCopy(filter, counts.total > 0)
+      : {
+          title: "No match",
+          description: `Nothing in this column contains "${search.trim()}". Clear the search, or widen the filter to All.`,
+        };
 
   return (
     <EmptyState
@@ -320,6 +351,7 @@ type ReviewItemCardProps = {
   onReplySubmitted: () => void;
   onAddReply: (body: string) => Promise<void>;
   onUpdateStatus: (status: NoteStatus) => Promise<void>;
+  onDeleteNote: () => Promise<void>;
   onAcceptSuggestion: (suggestion: Suggestion) => Promise<void>;
   onRejectSuggestion: (suggestion: Suggestion) => Promise<void>;
   onScrollToAnchor: (blockId: string) => void;
@@ -355,9 +387,11 @@ function ThreadItemCard({
   onAcceptSuggestion,
   onRejectSuggestion,
   onScrollToAnchor,
+  onDeleteNote,
 }: ThreadItemCardProps) {
   const { note } = item;
   const pending = pendingSuggestions(item);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   return (
     <ThreadCard
@@ -382,7 +416,11 @@ function ThreadItemCard({
           <ThreadMeta>
             Updated <Timestamp value={note.updatedAt} format="auto" isLive />
           </ThreadMeta>
-          <StatusActions status={note.status} onUpdateStatus={onUpdateStatus} />
+          <StatusActions
+            status={note.status}
+            onUpdateStatus={onUpdateStatus}
+            onDelete={() => setIsConfirmingDelete(true)}
+          />
         </ThreadMetaRow>
       </ThreadHeader>
 
@@ -399,6 +437,25 @@ function ThreadItemCard({
           />
         ))}
       </MessageList>
+
+      {/* Session Notes live in memory until they are saved to a file, so a
+          deleted thread is gone with no undo to offer. That is the one thing in
+          this column worth a dialog. */}
+      <AlertDialog
+        isOpen={isConfirmingDelete}
+        onOpenChange={setIsConfirmingDelete}
+        title="Delete this note?"
+        description={`${anchorDisplayLabel(note.anchor)}: ${note.replies.length} ${
+          note.replies.length === 1 ? "message" : "messages"
+        }. Deleting cannot be undone.`}
+        cancelLabel="Keep"
+        actionLabel="Delete"
+        actionVariant="destructive"
+        onAction={() => {
+          setIsConfirmingDelete(false);
+          void onDeleteNote();
+        }}
+      />
 
       {isReplyOpen ? (
         <ReplyStack className="reader-reveal">
@@ -434,13 +491,14 @@ function ThreadItemCard({
 type StatusActionsProps = {
   status: NoteStatus;
   onUpdateStatus: (status: NoteStatus) => Promise<void>;
+  onDelete: () => void;
 };
 
 /**
  * Replaces the per-card status dropdown. Quiet at rest, revealed on hover or
  * focus, and every status is one click rather than two.
  */
-function StatusActions({ status, onUpdateStatus }: StatusActionsProps) {
+function StatusActions({ status, onUpdateStatus, onDelete }: StatusActionsProps) {
   return (
     <ThreadActions>
       {status === "open" ? (
@@ -472,6 +530,15 @@ function StatusActions({ status, onUpdateStatus }: StatusActionsProps) {
           onClick={() => void onUpdateStatus("open")}
         />
       )}
+      <Button
+        label="Delete note"
+        variant="ghost"
+        size="sm"
+        isIconOnly
+        icon={<Icon icon={TrashIcon} size="sm" />}
+        tooltip="Delete note"
+        onClick={onDelete}
+      />
     </ThreadActions>
   );
 }

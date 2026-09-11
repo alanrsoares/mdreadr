@@ -243,6 +243,7 @@ export const app = new Elysia()
       return { error: `Tab not found: ${params.id}`, code: "TabNotFound" };
     }
     sessionStore.activateTab(params.id);
+    documentSession.persistTabs();
     return sessionStore.snapshot();
   })
   .post("/documents/tabs/:id/close", ({ params }) => {
@@ -381,6 +382,28 @@ export const app = new Elysia()
     },
     { body: UpdateNoteStatusBodySchema },
   )
+  .delete("/notes/:id", ({ params, request, set }) => {
+    // Deleting is the reader's alone. Creating and replying are things an
+    // agent legitimately does, so those routes stay open on the loopback API;
+    // removing a human's thread is not, and there is no MCP tool for it
+    // either. Without this check the tool an agent cannot call is still one
+    // HTTP request away.
+    if (!isWebviewRequest(request)) {
+      set.status = 401;
+      return unauthorized;
+    }
+
+    // 404 rather than a silent ok: the webview only offers delete on a thread
+    // it is rendering, so a miss means its list and the session disagree.
+    const found = findNote(sessionStore.getNotes(), params.id);
+    if (isErr(found)) {
+      set.status = 404;
+      return domainError(found.error);
+    }
+
+    sessionStore.noteDeleted(params.id);
+    return { id: params.id };
+  })
   .post(
     "/notes/save",
     async ({ body, set }) => {
@@ -651,6 +674,7 @@ export type App = typeof app;
 export { documentSession } from "./document-session.ts";
 export { sessionStore } from "./session.ts";
 export { updateService } from "./updates.ts";
+export { loadWindowFrame, saveWindowFrame, type WindowFrame } from "./window-state.ts";
 
 // Stable so MCP client configs (URL + persisted agent token, see auth.ts)
 // keep working across restarts without the user having to reconfigure them.

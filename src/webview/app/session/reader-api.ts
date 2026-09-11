@@ -52,6 +52,7 @@ export type ReaderApi = {
   createNote(input: CreateNoteRequest): Promise<void>;
   addReply(noteId: string, body: string): Promise<Note>;
   setNoteStatus(noteId: string, status: NoteStatus): Promise<Note>;
+  deleteNote(noteId: string): Promise<void>;
   getSuggestions(): Promise<Suggestion[]>;
   setSuggestionStatus(suggestionId: string, status: "accepted" | "rejected"): Promise<Suggestion>;
   saveNotes(input: SaveNotesInput): Promise<void>;
@@ -178,6 +179,10 @@ export const createTreatyReaderApi = (): ReaderApi => ({
     const data = unwrap(await api.notes({ id: noteId }).status.patch({ status }));
     if (!data || "error" in data) throw new Error("Failed to update note status");
     return data.note;
+  },
+  async deleteNote(noteId) {
+    const data = unwrap(await api.notes({ id: noteId }).delete());
+    if (!data || "error" in data) throw new Error("Failed to delete note");
   },
   async getSuggestions() {
     const data = unwrap(await api.suggestions.get());

@@ -92,6 +92,38 @@ export const filterReviewStream = (items: ReviewItem[], filter: ReviewFilter): R
     .with("resolved", () => items.filter((item) => !isOpenItem(item)))
     .exhaustive();
 
+/** Everything in one item a reader could plausibly remember it by. */
+const searchableText = (item: ReviewItem): string =>
+  match(item)
+    .with({ kind: "thread" }, ({ note, suggestions }) =>
+      [
+        note.anchor.label ?? "",
+        ...(note.anchor.headingPath ?? []),
+        ...note.replies.map((reply) => reply.body),
+        ...suggestions.map((suggestion) => suggestion.replacementText),
+      ].join("\n"),
+    )
+    .with({ kind: "suggestion" }, ({ suggestion }) =>
+      [
+        suggestion.replacementText,
+        suggestion.anchor.label ?? "",
+        ...(suggestion.anchor.headingPath ?? []),
+      ].join("\n"),
+    )
+    .exhaustive();
+
+/**
+ * Narrows the column to the threads whose text contains `query`. Substring and
+ * case-insensitive, over the whole thread rather than its first line: a reader
+ * looking for a thread remembers a phrase from somewhere in it, not where in
+ * the thread it fell. A blank query is not a filter.
+ */
+export const searchReviewStream = (items: ReviewItem[], query: string): ReviewItem[] => {
+  const needle = query.trim().toLowerCase();
+  if (needle === "") return items;
+  return items.filter((item) => searchableText(item).toLowerCase().includes(needle));
+};
+
 export const countReviewStream = (items: ReviewItem[]): ReviewCounts => {
   const open = items.filter(isOpenItem).length;
   return { open, resolved: items.length - open, total: items.length };

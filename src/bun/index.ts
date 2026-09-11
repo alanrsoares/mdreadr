@@ -3,6 +3,14 @@ import { isErr } from "@onrails/result";
 import { ApplicationMenu, app, BrowserWindow, Updater } from "electrobun/main";
 import { toDocumentHttpError } from "../../packages/api/documents.ts";
 import { documentSession, startServer, updateService } from "../../packages/api/index.ts";
+import { loadOpenTabs } from "../../packages/api/open-tabs.ts";
+import {
+  DEFAULT_WINDOW_FRAME,
+  loadWindowFrame,
+  saveWindowFrame,
+  saveWindowFrameSync,
+  type WindowFrame,
+} from "../../packages/api/window-state.ts";
 import { APP_NAME } from "../../shared/constants.ts";
 import { installCliCommand } from "./installCli.ts";
 import {
@@ -19,6 +27,9 @@ import {
 let activeApiBase: string | null = null;
 let activeMainWindow: BrowserWindow | null = null;
 let pendingOpenUrl: string | null = null;
+
+/** One write per settle: a corner drag emits a resize per frame. */
+const WINDOW_FRAME_WRITE_DEBOUNCE_MS = 400;
 
 // Register file change notification to update the webview dynamically
 documentSession.onChange((documentId) => {
@@ -152,6 +163,16 @@ function buildApplicationMenu(): void {
         ],
       },
       {
+        label: "File",
+        submenu: [
+          { label: "Open…", action: "app:open-document", accelerator: "CmdOrCtrl+O" },
+          { type: "separator" },
+          { label: "Save", action: "app:save-document", accelerator: "CmdOrCtrl+S" },
+          { type: "separator" },
+          { label: "Close Tab", action: "app:close-tab", accelerator: "CmdOrCtrl+W" },
+        ],
+      },
+      {
         label: "Edit",
         submenu: [
           // Explicit actions rather than the native undo/redo roles — see
@@ -164,6 +185,29 @@ function buildApplicationMenu(): void {
           { role: "copy" },
           { role: "paste" },
           { role: "selectAll" },
+          { type: "separator" },
+          { label: "Find…", action: "app:find-in-document", accelerator: "CmdOrCtrl+F" },
+        ],
+      },
+      {
+        label: "View",
+        submenu: [
+          {
+            label: "Toggle Preview / Edit",
+            action: "app:toggle-view-mode",
+            accelerator: "CmdOrCtrl+E",
+          },
+          { type: "separator" },
+          {
+            label: "Toggle Navigation",
+            action: "app:toggle-navigation-sidebar",
+            accelerator: "CmdOrCtrl+1",
+          },
+          {
+            label: "Toggle Notes",
+            action: "app:toggle-notes-sidebar",
+            accelerator: "CmdOrCtrl+2",
+          },
         ],
       },
     ]);
@@ -187,6 +231,15 @@ function buildApplicationMenu(): void {
         console.error("Failed to apply update:", e);
       });
     }
+    // Everything the reader owns rather than the shell: which Tab is in front,
+    // whether a sidebar is collapsed, whether the Draft is dirty. The bun
+    // process holds none of it, so the menu just names the command.
+    if (action?.startsWith("app:")) {
+      const command = action.slice("app:".length);
+      activeMainWindow?.webview.executeJavascript(
+        `window.__MDREADR_APP__?.run(${JSON.stringify(command)})`,
+      );
+    }
     if (action === "edit-undo" || action === "edit-redo") {
       // The bridge is installed by the webview entrypoint; the optional call
       // keeps a menu click harmless if the menu is somehow up before it.
@@ -202,6 +255,46 @@ function buildApplicationMenu(): void {
   renderMenu();
 }
 
+/**
+ * Persists the window's frame so the next launch opens where this one closed.
+ * Resize fires per frame while a corner is dragged, so the write waits for the
+ * drag to settle; `close` flushes whatever the last event carried, since the
+ * process exits before a pending timer could run.
+ */
+function rememberWindowFrame(window: BrowserWindow): void {
+  let pending: WindowFrame | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const flush = (sync = false) => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    if (!pending) return;
+    const frame = pending;
+    pending = null;
+    if (sync) saveWindowFrameSync(frame);
+    else void saveWindowFrame(frame);
+  };
+
+  const remember = (event: unknown) => {
+    const data = (event as { data?: Partial<WindowFrame> })?.data;
+    // `move` carries no size, so the width and height stay whatever the last
+    // resize (or the frame the window opened at) reported.
+    const current = { ...(pending ?? window.getFrame()), ...data };
+    pending = {
+      x: current.x,
+      y: current.y,
+      width: current.width,
+      height: current.height,
+    };
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(flush, WINDOW_FRAME_WRITE_DEBOUNCE_MS);
+  };
+
+  window.on("resize", remember);
+  window.on("move", remember);
+  window.on("close", () => flush(true));
+}
+
 async function openArgvDocument(): Promise<void> {
   const markdownArg = process.argv.find((arg) => arg.endsWith(".md") && !arg.startsWith("-"));
   if (!markdownArg) return;
@@ -210,6 +303,27 @@ async function openArgvDocument(): Promise<void> {
   if (isErr(result)) {
     console.error(`Failed to open document from argv: ${toDocumentHttpError(result.error).error}`);
   }
+}
+
+/**
+ * Reopens last session's Tabs before anything the launch itself asks for, so a
+ * Document opened from the command line or a double-clicked file still ends up
+ * in front. Each one is a normal open: it gets its watcher and its place in
+ * recents, and a file that has since gone is already filtered out.
+ */
+async function restoreOpenTabs(): Promise<void> {
+  const tabs = await loadOpenTabs();
+  if (isErr(tabs)) return;
+
+  for (const path of tabs.value.paths) {
+    const result = await documentSession.open(path);
+    if (isErr(result)) {
+      console.error(`Failed to restore tab ${path}: ${toDocumentHttpError(result.error).error}`);
+    }
+  }
+  // Reopening in order leaves the last one active; put the reader back on the
+  // one they were actually reading.
+  if (tabs.value.activePath) await documentSession.open(tabs.value.activePath);
 }
 
 updateService.setHandler({
@@ -221,6 +335,8 @@ updateService.setHandler({
 
 const { url: apiBase, webviewToken } = startServer();
 console.log(`mdreadr API listening on ${apiBase}`);
+
+await restoreOpenTabs();
 
 // If we have a pending open-url from startup, handle it before creating the window
 if (pendingOpenUrl) {
@@ -247,17 +363,17 @@ buildApplicationMenu();
 
 const viewUrl = await getMainViewUrl();
 
+const frameResult = await loadWindowFrame();
+const savedFrame = isErr(frameResult) ? { ...DEFAULT_WINDOW_FRAME } : frameResult.value;
+
 const mainWindow = new BrowserWindow({
   title: APP_NAME,
   url: viewUrl,
   preload: `window.__MDREADR_API__ = ${JSON.stringify(apiBase)}; window.__MDREADR_WEBVIEW_TOKEN__ = ${JSON.stringify(webviewToken)};`,
-  frame: {
-    width: 1280,
-    height: 840,
-    x: 100,
-    y: 100,
-  },
+  frame: savedFrame,
 });
+
+rememberWindowFrame(mainWindow);
 
 activeApiBase = apiBase;
 activeMainWindow = mainWindow;

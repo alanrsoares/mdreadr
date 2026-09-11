@@ -1,7 +1,6 @@
-import { mkdir } from "node:fs/promises";
-import { homedir } from "node:os";
 import { okAsync, ResultAsync } from "@onrails/result";
 import { z } from "zod";
+import { configFilePath, ensureConfigDir } from "./config-paths.ts";
 
 const RECENTS_FILENAME = "recents.json";
 const MAX_RECENTS = 20;
@@ -12,13 +11,7 @@ const RecentsSchema = z.object({
 
 export type RecentsError = { _tag: "RecentsIo"; message: string };
 
-const configDir = (): string => `${process.env.HOME ?? homedir()}/.config/mdreadr`;
-
-const recentsPath = (): string => `${configDir()}/${RECENTS_FILENAME}`;
-
-async function ensureConfigDir(): Promise<void> {
-  await mkdir(configDir(), { recursive: true });
-}
+const recentsPath = (): string => configFilePath(RECENTS_FILENAME);
 
 export const loadRecents = (): ResultAsync<string[], RecentsError> =>
   ResultAsync.fromPromise(

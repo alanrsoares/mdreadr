@@ -13,12 +13,15 @@ import {
   createNote,
   createSuggestion,
   documentKindForPath,
+  documentStats,
   extractHeadings,
   findBlockRange,
   findNote,
   findSuggestion,
   listDocumentBlocks,
+  type Note,
   parseNotesFileJson,
+  removeNote,
   resolveBlockRawMarkdown,
   resolveBlockText,
   SaveDocumentBodySchema,
@@ -500,4 +503,42 @@ describe("AppUpdateStateSchema", () => {
     });
     expect(invalid.success).toBe(false);
   });
+});
+
+test("documentStats counts prose words and rounds a reading time", () => {
+  const markdown = `${"word ".repeat(400).trim()}\n`;
+  expect(documentStats(markdown)).toEqual({ words: 400, minutes: 2 });
+});
+
+test("documentStats ignores frontmatter and fenced code", () => {
+  const markdown = "---\ntitle: mdreadr\n---\n\nOne two three\n\n```ts\nconst x = 1;\n```\n";
+  expect(documentStats(markdown).words).toBe(3);
+});
+
+test("documentStats ignores a tilde-fenced block too", () => {
+  const markdown = "One two three\n\n~~~ts\nconst neverRead = counted;\n~~~\n";
+  expect(documentStats(markdown).words).toBe(3);
+});
+
+test("documentStats never reports a zero-minute read", () => {
+  expect(documentStats("Hi").minutes).toBe(1);
+});
+
+test("removeNote drops the note and leaves the rest in order", () => {
+  const make = (id: string): Note => ({
+    id,
+    anchor: { kind: "document", blockId: "document-root" },
+    kind: "comment",
+    status: "open",
+    replies: [],
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+  const notes = [make("a"), make("b"), make("c")];
+
+  expect(removeNote(notes, "b").map((note) => note.id)).toEqual(["a", "c"]);
+});
+
+test("removeNote treats an unknown id as already gone", () => {
+  expect(removeNote([], "missing")).toEqual([]);
 });

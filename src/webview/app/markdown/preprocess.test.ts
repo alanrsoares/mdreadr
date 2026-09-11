@@ -110,3 +110,24 @@ test("preprocessReaderMarkdown decodes non-breaking spaces outside code", () => 
   expect(preprocessReaderMarkdown("a&nbsp;b")).toBe("a b");
   expect(preprocessReaderMarkdown("`a&nbsp;b`")).toBe("`a&nbsp;b`");
 });
+
+test("preprocessReaderMarkdown strips YAML frontmatter", () => {
+  const input = "---\ntitle: mdreadr\ntags: [a, b]\n---\n\n# Heading\n\nBody";
+  expect(preprocessReaderMarkdown(input)).toBe("# Heading\n\nBody");
+});
+test("preprocessReaderMarkdown accepts a `...` frontmatter terminator", () => {
+  const input = "---\ntitle: mdreadr\n...\nBody";
+  expect(preprocessReaderMarkdown(input)).toBe("Body");
+});
+test("preprocessReaderMarkdown leaves an unterminated frontmatter block alone", () => {
+  const input = "---\ntitle: mdreadr\n\nBody";
+  expect(preprocessReaderMarkdown(input)).toBe(input);
+});
+test("preprocessReaderMarkdown only treats a first-line `---` as frontmatter", () => {
+  const input = "Intro\n\n---\n\nOutro";
+  expect(preprocessReaderMarkdown(input)).toBe(input);
+});
+test("preprocessReaderMarkdown keeps a `---` divider inside the document", () => {
+  const input = "---\ntitle: mdreadr\n---\n\nIntro\n\n---\n\nOutro";
+  expect(preprocessReaderMarkdown(input)).toBe("Intro\n\n---\n\nOutro");
+});

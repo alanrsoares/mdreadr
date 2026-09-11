@@ -75,6 +75,7 @@ function createInMemoryReaderApi() {
     async setSuggestionStatus(): Promise<Suggestion> {
       throw new Error("not exercised by these tests");
     },
+    async deleteNote() {},
     async saveNotes(input) {
       saveNotesCallCount += 1;
       savedInput = input;

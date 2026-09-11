@@ -730,6 +730,18 @@ body,
   animation: reader-block-flash 1.8s var(--ease-standard);
 }
 
+/* Find matches are painted with the CSS Custom Highlight API rather than by
+   wrapping text in elements: the prose is React's output, and inserting nodes
+   mid-paragraph would both be dropped on the next render and reflow the line
+   the reader is looking at. */
+::highlight(mdreadr-find) {
+  background-color: color-mix(in srgb, var(--color-accent) 26%, transparent);
+}
+
+::highlight(mdreadr-find-current) {
+  background-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
 /* Distinct from the accent jump/pin flash: this one says "this block just changed
    on disk", so it reads as an arrival rather than a selection. */
 .reader-block-updated {

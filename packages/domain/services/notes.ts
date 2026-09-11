@@ -74,6 +74,14 @@ export function parseNotesFileJson(raw: unknown): Result<NotesFile, NotesDomainE
     : ok(parsed.data);
 }
 
+/**
+ * Drops a Note from a collection. Deleting one that is already gone is not an
+ * error: the caller wanted it gone, and it is (`forgetRecent` reads the same
+ * way). Returns a new array so the store's copy-on-write holds.
+ */
+export const removeNote = (notes: Note[], id: string): Note[] =>
+  notes.filter((note) => note.id !== id);
+
 export function findNote(notes: Note[], id: string): Result<Note, NotesDomainError> {
   const note = notes.find((item) => item.id === id);
   return !note ? err({ _tag: "NoteNotFound", id }) : ok(note);

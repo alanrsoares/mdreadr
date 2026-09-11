@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import type { Author, DocumentRef, Note, Suggestion } from "../domain/index.ts";
-import { nowIso } from "../domain/index.ts";
+import { nowIso, removeNote } from "../domain/index.ts";
 
 export type SessionSnapshot = {
   document: DocumentRef | null;
@@ -15,6 +15,7 @@ export type JournalEventType =
   | "note_added"
   | "note_replied"
   | "note_status_changed"
+  | "note_deleted"
   | "suggestion_added"
   | "suggestion_status_changed";
 
@@ -216,6 +217,16 @@ export class SessionStore {
   noteStatusChanged(note: Note): void {
     this.replaceNote(note);
     this.appendEvent("note_status_changed", note.id);
+  }
+
+  /**
+   * Removes a Note. Suggestions an agent hung on it are kept: the edit it
+   * proposes still stands on its own, and the review column already renders a
+   * Suggestion whose Note is gone as a card of its own.
+   */
+  noteDeleted(id: string): void {
+    this.notes = removeNote(this.notes, id);
+    this.appendEvent("note_deleted", id);
   }
 
   getSuggestions(): Suggestion[] {

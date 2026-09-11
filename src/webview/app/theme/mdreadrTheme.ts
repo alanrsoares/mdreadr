@@ -12,6 +12,10 @@ const readerTokens = {
   "--reader-well-bg": ["#faf8f5", "#1c1a18"],
   "--reader-paper-bg": ["#faf8f5", "#1c1a18"],
   "--reader-chrome-bg": ["rgb(250 248 245 / 0.92)", "rgb(28 26 24 / 0.92)"],
+  // The chrome is translucent so the prose blurs under it; anything that
+  // *covers* the chrome (the find bar) needs the same colour at full opacity,
+  // or the controls it stands in for read through it.
+  "--reader-chrome-bg-solid": ["rgb(250 248 245)", "rgb(28 26 24)"],
   "--reader-prose-family":
     '"Source Serif 4", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
 } satisfies Record<string, TokenValue>;
