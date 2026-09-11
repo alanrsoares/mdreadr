@@ -17,6 +17,7 @@ import packageJson from "../../../../package.json";
 import { useCopy } from "../hooks/useCopy.ts";
 import { DocumentTextIcon } from "../icons.ts";
 import { RecentItemActions, RecentItemRow } from "../ui/layout.tsx";
+import { fileIcon } from "./file-icons.ts";
 import { formatDisplayPath, formatRecentMenuLabels, pathFileName } from "./path-display.ts";
 import { useRecentsSidebar } from "./RecentsSidebarContext.tsx";
 
@@ -78,13 +79,14 @@ function RecentSideNavItem({
   const copy = useCopy();
   const anchorRef = useRef<HTMLDivElement>(null);
   const itemLabel = isCollapsed ? displayPath : menuLabel;
+  const icon = fileIcon(path);
 
   return (
     <RecentItemRow ref={anchorRef}>
       <SideNavItem
         label={itemLabel}
-        icon={DocumentTextIcon}
-        selectedIcon={DocumentTextIcon}
+        icon={icon}
+        selectedIcon={icon}
         // Reading a file off disk is the one part of opening we can't make
         // instant, so the clicked row claims selection immediately rather than
         // leaving the click looking dropped until the document lands.
@@ -113,7 +115,9 @@ function RecentSideNavItem({
           )
         }
       />
-      {!isCollapsed && displayPath !== menuLabel ? (
+      {/* Collapsed, the row is icon-width and its label is gone from the
+          screen, so the tooltip is the only thing naming the file. */}
+      {isCollapsed || displayPath !== menuLabel ? (
         <Tooltip content={displayPath} placement="end" alignment="start" anchorRef={anchorRef} />
       ) : null}
     </RecentItemRow>
