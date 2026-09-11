@@ -3,6 +3,13 @@ import { isErr } from "@onrails/result";
 import { ApplicationMenu, app, BrowserWindow, Updater } from "electrobun/main";
 import { toDocumentHttpError } from "../../packages/api/documents.ts";
 import { documentSession, startServer, updateService } from "../../packages/api/index.ts";
+import {
+  DEFAULT_WINDOW_FRAME,
+  loadWindowFrame,
+  saveWindowFrame,
+  saveWindowFrameSync,
+  type WindowFrame,
+} from "../../packages/api/window-state.ts";
 import { APP_NAME } from "../../shared/constants.ts";
 import { installCliCommand } from "./installCli.ts";
 import {
@@ -19,6 +26,9 @@ import {
 let activeApiBase: string | null = null;
 let activeMainWindow: BrowserWindow | null = null;
 let pendingOpenUrl: string | null = null;
+
+/** One write per settle: a corner drag emits a resize per frame. */
+const WINDOW_FRAME_WRITE_DEBOUNCE_MS = 400;
 
 // Register file change notification to update the webview dynamically
 documentSession.onChange((documentId) => {
@@ -202,6 +212,46 @@ function buildApplicationMenu(): void {
   renderMenu();
 }
 
+/**
+ * Persists the window's frame so the next launch opens where this one closed.
+ * Resize fires per frame while a corner is dragged, so the write waits for the
+ * drag to settle; `close` flushes whatever the last event carried, since the
+ * process exits before a pending timer could run.
+ */
+function rememberWindowFrame(window: BrowserWindow): void {
+  let pending: WindowFrame | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const flush = (sync = false) => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    if (!pending) return;
+    const frame = pending;
+    pending = null;
+    if (sync) saveWindowFrameSync(frame);
+    else void saveWindowFrame(frame);
+  };
+
+  const remember = (event: unknown) => {
+    const data = (event as { data?: Partial<WindowFrame> })?.data;
+    // `move` carries no size, so the width and height stay whatever the last
+    // resize (or the frame the window opened at) reported.
+    const current = { ...(pending ?? window.getFrame()), ...data };
+    pending = {
+      x: current.x,
+      y: current.y,
+      width: current.width,
+      height: current.height,
+    };
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(flush, WINDOW_FRAME_WRITE_DEBOUNCE_MS);
+  };
+
+  window.on("resize", remember);
+  window.on("move", remember);
+  window.on("close", () => flush(true));
+}
+
 async function openArgvDocument(): Promise<void> {
   const markdownArg = process.argv.find((arg) => arg.endsWith(".md") && !arg.startsWith("-"));
   if (!markdownArg) return;
@@ -247,17 +297,17 @@ buildApplicationMenu();
 
 const viewUrl = await getMainViewUrl();
 
+const frameResult = await loadWindowFrame();
+const savedFrame = isErr(frameResult) ? { ...DEFAULT_WINDOW_FRAME } : frameResult.value;
+
 const mainWindow = new BrowserWindow({
   title: APP_NAME,
   url: viewUrl,
   preload: `window.__MDREADR_API__ = ${JSON.stringify(apiBase)}; window.__MDREADR_WEBVIEW_TOKEN__ = ${JSON.stringify(webviewToken)};`,
-  frame: {
-    width: 1280,
-    height: 840,
-    x: 100,
-    y: 100,
-  },
+  frame: savedFrame,
 });
+
+rememberWindowFrame(mainWindow);
 
 activeApiBase = apiBase;
 activeMainWindow = mainWindow;

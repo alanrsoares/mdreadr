@@ -651,6 +651,7 @@ export type App = typeof app;
 export { documentSession } from "./document-session.ts";
 export { sessionStore } from "./session.ts";
 export { updateService } from "./updates.ts";
+export { loadWindowFrame, saveWindowFrame, type WindowFrame } from "./window-state.ts";
 
 // Stable so MCP client configs (URL + persisted agent token, see auth.ts)
 // keep working across restarts without the user having to reconfigure them.
