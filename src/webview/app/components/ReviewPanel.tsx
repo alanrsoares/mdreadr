@@ -5,6 +5,7 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
 import { Timestamp } from "@astryxdesign/core/Timestamp";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import type {
@@ -26,6 +27,7 @@ import {
   CheckIcon,
   Cog6ToothIcon,
   CommandLineIcon,
+  MagnifyingGlassIcon,
   XMarkIcon,
 } from "../icons.ts";
 import { anchorDisplayLabel } from "../markdown/anchors.ts";
@@ -37,6 +39,7 @@ import {
   type ReviewCounts,
   type ReviewFilter,
   type ReviewItem,
+  searchReviewStream,
   type ThreadItem,
 } from "../review/stream.ts";
 import {
@@ -105,13 +108,18 @@ export function ReviewPanel({
   onScrollToAnchor,
 }: ReviewPanelProps) {
   const store = useContainer(reviewPanelContainer);
-  const { draft, draftKind, filter, replyDrafts, expandedReplies, canSubmitNote } =
+  const { draft, draftKind, filter, search, replyDrafts, expandedReplies, canSubmitNote } =
     useStoreValues(store);
   const composerRef = useRef<HTMLDivElement>(null);
 
   const stream = useMemo(() => buildReviewStream(notes, suggestions), [notes, suggestions]);
   const counts = useMemo(() => countReviewStream(stream), [stream]);
-  const visible = useMemo(() => filterReviewStream(stream, filter), [stream, filter]);
+  // Search narrows what the filter already chose, so a reader searching inside
+  // Open does not silently get settled threads back.
+  const visible = useMemo(
+    () => searchReviewStream(filterReviewStream(stream, filter), search),
+    [stream, filter, search],
+  );
 
   useEffect(() => {
     if (!pendingAnchor) return;
@@ -138,6 +146,16 @@ export function ReviewPanel({
           <SegmentedControlItem value="resolved" label="Done" />
           <SegmentedControlItem value="all" label="All" />
         </SegmentedControl>
+        <TextInput
+          label="Search review"
+          isLabelHidden
+          size="sm"
+          hasClear
+          placeholder="Search threads"
+          startIcon={<Icon icon={MagnifyingGlassIcon} size="sm" />}
+          value={search}
+          onChange={store.actions.searchChanged}
+        />
       </ReviewHeader>
 
       <ReviewBody>
@@ -166,7 +184,7 @@ export function ReviewPanel({
           ) : null}
 
           {visible.length === 0 ? (
-            <ReviewEmptyState filter={filter} counts={counts} />
+            <ReviewEmptyState filter={filter} counts={counts} search={search} />
           ) : (
             visible.map((item, index) => (
               <ReviewItemCard
@@ -233,10 +251,18 @@ const emptyCopy = (filter: ReviewFilter, hasAny: boolean): { title: string; desc
 const START_HINT =
   "Use the anchor control beside a heading, paragraph, or code block. It appears when you hover or focus the block.";
 
-type ReviewEmptyStateProps = { filter: ReviewFilter; counts: ReviewCounts };
+type ReviewEmptyStateProps = { filter: ReviewFilter; counts: ReviewCounts; search: string };
 
-function ReviewEmptyState({ filter, counts }: ReviewEmptyStateProps) {
-  const { title, description } = emptyCopy(filter, counts.total > 0);
+function ReviewEmptyState({ filter, counts, search }: ReviewEmptyStateProps) {
+  // A search that matched nothing is the reader's own doing, so it says so
+  // rather than claiming the document has no review on it.
+  const { title, description } =
+    search.trim() === ""
+      ? emptyCopy(filter, counts.total > 0)
+      : {
+          title: "No match",
+          description: `Nothing in this column contains "${search.trim()}". Clear the search, or widen the filter to All.`,
+        };
 
   return (
     <EmptyState

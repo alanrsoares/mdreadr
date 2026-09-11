@@ -16,6 +16,7 @@ export {
   KeyIcon,
   LinkIcon,
   ListBulletIcon,
+  MagnifyingGlassIcon,
   MapPinIcon,
   MoonIcon,
   PencilSquareIcon,

@@ -6,6 +6,7 @@ import {
   filterReviewStream,
   isOpenItem,
   pendingSuggestions,
+  searchReviewStream,
   type ThreadItem,
 } from "./stream.ts";
 
@@ -159,5 +160,50 @@ describe("pendingSuggestions", () => {
     );
 
     expect(item?.kind === "thread" && pendingSuggestions(item).map((s) => s.id)).toEqual(["s1"]);
+  });
+});
+
+describe("searchReviewStream", () => {
+  it("returns every item for a blank query", () => {
+    const stream = buildReviewStream([note({ id: "n1" })], []);
+    expect(searchReviewStream(stream, "   ")).toHaveLength(1);
+  });
+
+  it("matches a reply anywhere in the thread, case-insensitively", () => {
+    const target = note({
+      id: "n1",
+      replies: [
+        { id: "n1-r0", author: human, body: "First", createdAt: "2026-01-01T00:00:00.000Z" },
+        {
+          id: "n1-r1",
+          author: agent,
+          body: "The measure is off",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const stream = buildReviewStream([target, note({ id: "n2" })], []);
+    expect(searchReviewStream(stream, "MEASURE").map((item) => item.id)).toEqual(["n1"]);
+  });
+
+  it("matches the anchor label", () => {
+    const stream = buildReviewStream([note({ id: "n1" })], []);
+    expect(searchReviewStream(stream, "intro")).toHaveLength(1);
+  });
+
+  it("matches a suggestion's replacement text, attached or loose", () => {
+    const stream = buildReviewStream(
+      [note({ id: "n1" })],
+      [suggestion({ id: "s1", noteId: "n1", replacementText: "Tighten this sentence." })],
+    );
+    expect(searchReviewStream(stream, "tighten").map((item) => item.id)).toEqual(["n1"]);
+
+    const loose = buildReviewStream([], [suggestion({ id: "s2", replacementText: "Rewrite." })]);
+    expect(searchReviewStream(loose, "rewrite").map((item) => item.id)).toEqual(["s2"]);
+  });
+
+  it("drops everything when nothing matches", () => {
+    const stream = buildReviewStream([note({ id: "n1" })], []);
+    expect(searchReviewStream(stream, "nowhere in this thread")).toEqual([]);
   });
 });
