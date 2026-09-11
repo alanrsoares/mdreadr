@@ -37,6 +37,10 @@ export function FindBar({ find }: FindBarProps) {
       return;
     }
     if (event.key !== "Enter") return;
+    // Only the field's own Enter steps. The step and close buttons are native
+    // buttons that activate on Enter, and `preventDefault` here would cancel
+    // that activation, so Enter on Close would step instead of closing.
+    if (event.target !== inputRef.current) return;
     event.preventDefault();
     find.step(event.shiftKey ? -1 : 1);
   };

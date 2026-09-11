@@ -9,28 +9,27 @@
 
 export type FindMatch = { start: number; end: number };
 
+/** Every character a regex would read as syntax, so the term stays literal. */
+const escapeLiteral = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /**
  * Every occurrence of `query` in `haystack`, in order, non-overlapping.
  *
  * Plain substring, case-insensitive: a reviewer typing `useMemo(` into a search
  * box means those characters, and a regex would turn every bracket in a code
- * fence into a syntax error they have to debug. Lower-casing can change a
- * string's length in some locales, so the scan compares in lower case but
- * measures in the original.
+ * fence into a syntax error they have to debug. The term is escaped to a
+ * literal and matched with the engine's own case folding rather than by
+ * lower-casing the Document first: `"İ".toLowerCase()` is two characters, so
+ * that route shifts every offset after it and paints half a match.
  */
 export function findMatches(haystack: string, query: string): FindMatch[] {
   if (query === "" || haystack === "") return [];
 
-  const hay = haystack.toLowerCase();
-  const needle = query.toLowerCase();
+  const pattern = new RegExp(escapeLiteral(query), "giu");
   const matches: FindMatch[] = [];
 
-  let from = 0;
-  while (from <= hay.length - needle.length) {
-    const start = hay.indexOf(needle, from);
-    if (start === -1) break;
-    matches.push({ start, end: start + query.length });
-    from = start + needle.length;
+  for (const match of haystack.matchAll(pattern)) {
+    matches.push({ start: match.index, end: match.index + match[0].length });
   }
 
   return matches;

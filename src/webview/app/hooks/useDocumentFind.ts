@@ -82,8 +82,12 @@ export function useDocumentFind({
 
   // Read by `step`, which must not be re-created on every keystroke: the find
   // bar binds it to Enter, and a new identity per render would reset that.
+  // Written after commit, not during render: a render React abandons must not
+  // leave `step` counting matches nobody is looking at.
   const matchesRef = useRef<FindMatch[]>([]);
-  matchesRef.current = matches;
+  useEffect(() => {
+    matchesRef.current = matches;
+  }, [matches]);
 
   // Collect the text and match against it. In Preview that means reading the
   // rendered DOM, so it runs after paint rather than during render.
@@ -105,7 +109,10 @@ export function useDocumentFind({
   // Show the match the reader is on: painted over the prose, selected in the
   // source. Separate from finding them, so stepping does not re-scan the text.
   useEffect(() => {
-    if (!isOpen) return;
+    // A parked Tab paints nothing: the highlight registry is the window's, so
+    // painting from the background would draw this Document's matches over the
+    // one in front. Reactivating repaints, which is why `isActive` is a dep.
+    if (!isOpen || !isActive) return;
     const match = matches[index];
     if (match) anchorRef.current = match.start;
 
@@ -123,7 +130,7 @@ export function useDocumentFind({
     if (!root) return;
     const { currentRange } = paintMatches(collectTextNodes(root), matches, index);
     if (currentRange) revealRange(currentRange, root);
-  }, [isOpen, matches, index, mode, previewRef, rootRef, editorViewRef]);
+  }, [isOpen, isActive, matches, index, mode, previewRef, rootRef, editorViewRef]);
 
   // Painted ranges belong to this tab's DOM: leaving the tab, or the Document,
   // must not leave them on the next one.

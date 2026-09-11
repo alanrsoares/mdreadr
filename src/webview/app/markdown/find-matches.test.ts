@@ -25,6 +25,16 @@ describe("findMatches", () => {
     ]);
   });
 
+  it("keeps offsets in the original text when lower-casing would grow it", () => {
+    // "\u0130".toLowerCase() is two characters, so a lower-cased scan reports
+    // this match one position late and paints "oo".
+    expect(findMatches("\u0130xfoo", "foo")).toEqual([{ start: 2, end: 5 }]);
+  });
+
+  it("matches a term whose own case differs from the text, across scripts", () => {
+    expect(findMatches("Straße und STRASSE", "stra\u00dfe")).toEqual([{ start: 0, end: 6 }]);
+  });
+
   it("finds nothing for an empty term or an empty document", () => {
     expect(findMatches("anything", "")).toEqual([]);
     expect(findMatches("", "anything")).toEqual([]);
