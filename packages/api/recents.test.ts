@@ -7,16 +7,19 @@ import { forgetRecent, loadRecents, touchRecent } from "./recents.ts";
 
 describe("recents", () => {
   let tempHome: string;
-  let originalHome: string | undefined;
+  let originalConfigDir: string | undefined;
 
   beforeEach(async () => {
-    originalHome = process.env.HOME;
+    originalConfigDir = process.env.MDREADR_CONFIG_DIR;
     tempHome = await mkdtemp(join(tmpdir(), "mdreadr-recents-test-"));
-    process.env.HOME = tempHome;
+    // The config location, not HOME: `configDir` keeps every suite off the
+    // developer's own recents, so HOME is no longer what points at it.
+    process.env.MDREADR_CONFIG_DIR = join(tempHome, ".config", "mdreadr");
   });
 
   afterEach(async () => {
-    process.env.HOME = originalHome;
+    if (originalConfigDir === undefined) delete process.env.MDREADR_CONFIG_DIR;
+    else process.env.MDREADR_CONFIG_DIR = originalConfigDir;
     if (tempHome) {
       await rm(tempHome, { recursive: true, force: true });
     }

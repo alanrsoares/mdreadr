@@ -3,6 +3,7 @@ import { isErr } from "@onrails/result";
 import { ApplicationMenu, app, BrowserWindow, Updater } from "electrobun/main";
 import { toDocumentHttpError } from "../../packages/api/documents.ts";
 import { documentSession, startServer, updateService } from "../../packages/api/index.ts";
+import { loadOpenTabs } from "../../packages/api/open-tabs.ts";
 import {
   DEFAULT_WINDOW_FRAME,
   loadWindowFrame,
@@ -262,6 +263,27 @@ async function openArgvDocument(): Promise<void> {
   }
 }
 
+/**
+ * Reopens last session's Tabs before anything the launch itself asks for, so a
+ * Document opened from the command line or a double-clicked file still ends up
+ * in front. Each one is a normal open: it gets its watcher and its place in
+ * recents, and a file that has since gone is already filtered out.
+ */
+async function restoreOpenTabs(): Promise<void> {
+  const tabs = await loadOpenTabs();
+  if (isErr(tabs)) return;
+
+  for (const path of tabs.value.paths) {
+    const result = await documentSession.open(path);
+    if (isErr(result)) {
+      console.error(`Failed to restore tab ${path}: ${toDocumentHttpError(result.error).error}`);
+    }
+  }
+  // Reopening in order leaves the last one active; put the reader back on the
+  // one they were actually reading.
+  if (tabs.value.activePath) await documentSession.open(tabs.value.activePath);
+}
+
 updateService.setHandler({
   getStatus: getUpdateStatus,
   check,
@@ -271,6 +293,8 @@ updateService.setHandler({
 
 const { url: apiBase, webviewToken } = startServer();
 console.log(`mdreadr API listening on ${apiBase}`);
+
+await restoreOpenTabs();
 
 // If we have a pending open-url from startup, handle it before creating the window
 if (pendingOpenUrl) {

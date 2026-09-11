@@ -243,6 +243,7 @@ export const app = new Elysia()
       return { error: `Tab not found: ${params.id}`, code: "TabNotFound" };
     }
     sessionStore.activateTab(params.id);
+    documentSession.persistTabs();
     return sessionStore.snapshot();
   })
   .post("/documents/tabs/:id/close", ({ params }) => {

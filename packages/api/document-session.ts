@@ -7,6 +7,7 @@ import {
   openDocument,
   writeTextFile,
 } from "./documents.ts";
+import { saveOpenTabs } from "./open-tabs.ts";
 import { SessionStore, sessionStore } from "./session.ts";
 
 export type WatchFn = (path: string, listener: (eventType: string) => void) => FSWatcher;
@@ -30,6 +31,12 @@ export type DocumentSession = {
   triggerChange(): void;
   /** Stop watching and close a single tab (idempotent). */
   closeTab(id: string): void;
+  /**
+   * Writes the open Tabs and the active one to disk, so the next launch opens
+   * on the same set. Called for every change this module makes; the activate
+   * route calls it for the one it makes itself.
+   */
+  persistTabs(): void;
   /** Stop every watcher (idempotent). */
   close(): void;
 };
@@ -90,9 +97,16 @@ export function createDocumentSession(deps: CreateDocumentSessionDeps): Document
     }
   }
 
+  function persistTabs(): void {
+    const tabs = store.listTabs();
+    const activePath = store.snapshot().document?.path ?? null;
+    void saveOpenTabs({ paths: tabs.map((tab) => tab.document.path), activePath });
+  }
+
   function applyOpenedDocument(id: string, result: OpenDocumentResult): OpenDocumentResult {
     store.openTab(id, { path: result.path }, result.content);
     startWatching(id, result.path);
+    persistTabs();
     return result;
   }
 
@@ -102,6 +116,7 @@ export function createDocumentSession(deps: CreateDocumentSessionDeps): Document
       const alreadyOpen = store.listTabs().some((tab) => tab.id === id);
       if (alreadyOpen) {
         store.activateTab(id);
+        persistTabs();
         return okAsync({ path, content: store.getTabContent(id) ?? "" });
       }
       return openDocument(path).map((result) => applyOpenedDocument(id, result));
@@ -145,7 +160,9 @@ export function createDocumentSession(deps: CreateDocumentSessionDeps): Document
     closeTab(id) {
       stopWatching(id);
       store.closeTab(id);
+      persistTabs();
     },
+    persistTabs,
     close() {
       for (const id of watchers.keys()) stopWatching(id);
     },
