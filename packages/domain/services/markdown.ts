@@ -67,6 +67,9 @@ export type DocumentStats = { words: number; minutes: number };
 /** Technical prose, read attentively rather than skimmed. */
 const WORDS_PER_MINUTE = 200;
 
+/** Both fence spellings CommonMark allows; a `~~~` block is as unread as a ``` one. */
+const FENCED_BLOCK = /^(```|~~~)[\s\S]*?^\1/gm;
+
 /**
  * Counts what the reader actually reads: frontmatter and fenced code are the
  * two things a Document carries in bulk that nobody reads word by word, and
@@ -75,7 +78,7 @@ const WORDS_PER_MINUTE = 200;
  * count that rounds away.
  */
 export function documentStats(markdown: string): DocumentStats {
-  const prose = stripFrontmatter(markdown).replace(/```[\s\S]*?```/g, " ");
+  const prose = stripFrontmatter(markdown).replace(FENCED_BLOCK, " ");
   const words = prose.split(/\s+/).filter((token) => /[\p{L}\p{N}]/u.test(token)).length;
   return { words, minutes: Math.max(1, Math.round(words / WORDS_PER_MINUTE)) };
 }

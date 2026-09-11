@@ -202,6 +202,20 @@ describe("searchReviewStream", () => {
     expect(searchReviewStream(loose, "rewrite").map((item) => item.id)).toEqual(["s2"]);
   });
 
+  it("finds a loose suggestion by the heading it sits under", () => {
+    const stream = buildReviewStream(
+      [],
+      [
+        suggestion({
+          id: "s1",
+          anchor: { kind: "paragraph", blockId: "b9", headingPath: ["Design", "Hard bans"] },
+        }),
+      ],
+    );
+
+    expect(searchReviewStream(stream, "hard bans").map((item) => item.id)).toEqual(["s1"]);
+  });
+
   it("drops everything when nothing matches", () => {
     const stream = buildReviewStream([note({ id: "n1" })], []);
     expect(searchReviewStream(stream, "nowhere in this thread")).toEqual([]);

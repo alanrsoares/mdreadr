@@ -515,6 +515,11 @@ test("documentStats ignores frontmatter and fenced code", () => {
   expect(documentStats(markdown).words).toBe(3);
 });
 
+test("documentStats ignores a tilde-fenced block too", () => {
+  const markdown = "One two three\n\n~~~ts\nconst neverRead = counted;\n~~~\n";
+  expect(documentStats(markdown).words).toBe(3);
+});
+
 test("documentStats never reports a zero-minute read", () => {
   expect(documentStats("Hi").minutes).toBe(1);
 });

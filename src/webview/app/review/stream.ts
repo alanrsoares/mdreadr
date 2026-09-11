@@ -104,7 +104,11 @@ const searchableText = (item: ReviewItem): string =>
       ].join("\n"),
     )
     .with({ kind: "suggestion" }, ({ suggestion }) =>
-      [suggestion.replacementText, suggestion.anchor.label ?? ""].join("\n"),
+      [
+        suggestion.replacementText,
+        suggestion.anchor.label ?? "",
+        ...(suggestion.anchor.headingPath ?? []),
+      ].join("\n"),
     )
     .exhaustive();
 

@@ -220,7 +220,9 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
   // this Tab; the heading only exists once the Document has rendered, which is
   // why the scroll waits here rather than happening at the click.
   useEffect(() => {
-    if (!isActive || !documentPath || !content) return;
+    // Preview only: Edit mode renders no headings to scroll to, and consuming
+    // the fragment there would lose it for good. It waits for the toggle.
+    if (!isActive || !documentPath || !content || documentViewMode !== "preview") return;
     const fragment = takeFragment(documentPath);
     if (!fragment) return;
 
@@ -234,7 +236,7 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
       frame = requestAnimationFrame(tryScroll);
     });
     return () => cancelAnimationFrame(frame);
-  }, [isActive, documentPath, content]);
+  }, [isActive, documentPath, content, documentViewMode]);
 
   const prevContentRef = useRef(content);
   useEffect(() => {
