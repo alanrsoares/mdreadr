@@ -75,7 +75,7 @@ describe("mdreadr api", () => {
       const { note } = await (created as Response).json();
       const since = sessionStore.latestSeq() - 1;
 
-      const response = await del(url, `/notes/${note.id}`);
+      const response = await del(url, `/notes/${note.id}`, sessionTokens.webviewToken);
       expect(response?.status).toBe(200);
       expect(sessionStore.getNotes()).toHaveLength(0);
       expect(sessionStore.getEvents(since).some((entry) => entry.type === "note_deleted")).toBe(
@@ -87,8 +87,25 @@ describe("mdreadr api", () => {
       const { url } = startServer(0);
       sessionStore.setNotes([]);
 
-      const response = await del(url, "/notes/nope");
+      const response = await del(url, "/notes/nope", sessionTokens.webviewToken);
       expect(response?.status).toBe(404);
+    });
+
+    test("refuses an unauthorized caller, so an agent cannot delete a reviewer's note", async () => {
+      const { url } = startServer(0);
+      sessionStore.setNotes([]);
+
+      const created = await post(url, "/notes", {
+        anchor: { kind: "document", blockId: "document-root" },
+        body: "Keep me",
+        author: { kind: "human" },
+      });
+      const { note } = await (created as Response).json();
+
+      const response = await del(url, `/notes/${note.id}`);
+
+      expect(response?.status).toBe(401);
+      expect(sessionStore.getNotes()).toHaveLength(1);
     });
   });
 

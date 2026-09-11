@@ -382,7 +382,17 @@ export const app = new Elysia()
     },
     { body: UpdateNoteStatusBodySchema },
   )
-  .delete("/notes/:id", ({ params, set }) => {
+  .delete("/notes/:id", ({ params, request, set }) => {
+    // Deleting is the reader's alone. Creating and replying are things an
+    // agent legitimately does, so those routes stay open on the loopback API;
+    // removing a human's thread is not, and there is no MCP tool for it
+    // either. Without this check the tool an agent cannot call is still one
+    // HTTP request away.
+    if (!isWebviewRequest(request)) {
+      set.status = 401;
+      return unauthorized;
+    }
+
     // 404 rather than a silent ok: the webview only offers delete on a thread
     // it is rendering, so a miss means its list and the session disagree.
     const found = findNote(sessionStore.getNotes(), params.id);

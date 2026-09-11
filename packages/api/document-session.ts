@@ -7,6 +7,7 @@ import {
   openDocument,
   writeTextFile,
 } from "./documents.ts";
+import type { OpenTabs } from "./open-tabs.ts";
 import { saveOpenTabs } from "./open-tabs.ts";
 import { SessionStore, sessionStore } from "./session.ts";
 
@@ -97,10 +98,28 @@ export function createDocumentSession(deps: CreateDocumentSessionDeps): Document
     }
   }
 
+  /**
+   * Writes run one at a time, newest last. Opening two Documents in quick
+   * succession fires two writes; unserialised, the older snapshot can land
+   * after the newer one and the next launch restores a Tab that was closed.
+   * Only the latest pending snapshot is kept, since the ones before it are
+   * already stale by the time the current write finishes.
+   */
+  let writing: Promise<unknown> = Promise.resolve();
+  let queued: OpenTabs | null = null;
+
   function persistTabs(): void {
     const tabs = store.listTabs();
-    const activePath = store.snapshot().document?.path ?? null;
-    void saveOpenTabs({ paths: tabs.map((tab) => tab.document.path), activePath });
+    queued = {
+      paths: tabs.map((tab) => tab.document.path),
+      activePath: store.snapshot().document?.path ?? null,
+    };
+
+    writing = writing.then(() => {
+      const next = queued;
+      queued = null;
+      return next ? saveOpenTabs(next) : undefined;
+    });
   }
 
   function applyOpenedDocument(id: string, result: OpenDocumentResult): OpenDocumentResult {
