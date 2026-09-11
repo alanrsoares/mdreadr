@@ -1,3 +1,4 @@
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
@@ -21,13 +22,14 @@ import type {
 import { formatAuthorLabel } from "@mdreadr/domain";
 import { match } from "@onrails/pattern";
 import { useContainer, useStoreValues } from "@re-reduced/react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChatBubbleBottomCenterTextIcon,
   CheckIcon,
   Cog6ToothIcon,
   CommandLineIcon,
   MagnifyingGlassIcon,
+  TrashIcon,
   XMarkIcon,
 } from "../icons.ts";
 import { anchorDisplayLabel } from "../markdown/anchors.ts";
@@ -78,6 +80,7 @@ type ReviewPanelProps = {
   onCreateNote: (input: CreateNoteRequest) => Promise<void>;
   onAddReply: (noteId: string, body: string) => Promise<void>;
   onUpdateStatus: (noteId: string, status: NoteStatus) => Promise<void>;
+  onDeleteNote: (noteId: string) => Promise<void>;
   onAcceptSuggestion: (suggestion: Suggestion) => Promise<void>;
   onRejectSuggestion: (suggestion: Suggestion) => Promise<void>;
   onSaveNotes: () => Promise<void>;
@@ -101,6 +104,7 @@ export function ReviewPanel({
   onCreateNote,
   onAddReply,
   onUpdateStatus,
+  onDeleteNote,
   onAcceptSuggestion,
   onRejectSuggestion,
   onSaveNotes,
@@ -200,6 +204,7 @@ export function ReviewPanel({
                 onReplySubmitted={() => store.actions.replySubmitted(item.id)}
                 onAddReply={(body) => onAddReply(item.id, body)}
                 onUpdateStatus={(status) => onUpdateStatus(item.id, status)}
+                onDeleteNote={() => onDeleteNote(item.id)}
                 onAcceptSuggestion={onAcceptSuggestion}
                 onRejectSuggestion={onRejectSuggestion}
                 onScrollToAnchor={onScrollToAnchor}
@@ -346,6 +351,7 @@ type ReviewItemCardProps = {
   onReplySubmitted: () => void;
   onAddReply: (body: string) => Promise<void>;
   onUpdateStatus: (status: NoteStatus) => Promise<void>;
+  onDeleteNote: () => Promise<void>;
   onAcceptSuggestion: (suggestion: Suggestion) => Promise<void>;
   onRejectSuggestion: (suggestion: Suggestion) => Promise<void>;
   onScrollToAnchor: (blockId: string) => void;
@@ -381,9 +387,11 @@ function ThreadItemCard({
   onAcceptSuggestion,
   onRejectSuggestion,
   onScrollToAnchor,
+  onDeleteNote,
 }: ThreadItemCardProps) {
   const { note } = item;
   const pending = pendingSuggestions(item);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   return (
     <ThreadCard
@@ -408,7 +416,11 @@ function ThreadItemCard({
           <ThreadMeta>
             Updated <Timestamp value={note.updatedAt} format="auto" isLive />
           </ThreadMeta>
-          <StatusActions status={note.status} onUpdateStatus={onUpdateStatus} />
+          <StatusActions
+            status={note.status}
+            onUpdateStatus={onUpdateStatus}
+            onDelete={() => setIsConfirmingDelete(true)}
+          />
         </ThreadMetaRow>
       </ThreadHeader>
 
@@ -425,6 +437,25 @@ function ThreadItemCard({
           />
         ))}
       </MessageList>
+
+      {/* Session Notes live in memory until they are saved to a file, so a
+          deleted thread is gone with no undo to offer. That is the one thing in
+          this column worth a dialog. */}
+      <AlertDialog
+        isOpen={isConfirmingDelete}
+        onOpenChange={setIsConfirmingDelete}
+        title="Delete this note?"
+        description={`${anchorDisplayLabel(note.anchor)}: ${note.replies.length} ${
+          note.replies.length === 1 ? "message" : "messages"
+        }. Deleting cannot be undone.`}
+        cancelLabel="Keep"
+        actionLabel="Delete"
+        actionVariant="destructive"
+        onAction={() => {
+          setIsConfirmingDelete(false);
+          void onDeleteNote();
+        }}
+      />
 
       {isReplyOpen ? (
         <ReplyStack className="reader-reveal">
@@ -460,13 +491,14 @@ function ThreadItemCard({
 type StatusActionsProps = {
   status: NoteStatus;
   onUpdateStatus: (status: NoteStatus) => Promise<void>;
+  onDelete: () => void;
 };
 
 /**
  * Replaces the per-card status dropdown. Quiet at rest, revealed on hover or
  * focus, and every status is one click rather than two.
  */
-function StatusActions({ status, onUpdateStatus }: StatusActionsProps) {
+function StatusActions({ status, onUpdateStatus, onDelete }: StatusActionsProps) {
   return (
     <ThreadActions>
       {status === "open" ? (
@@ -498,6 +530,15 @@ function StatusActions({ status, onUpdateStatus }: StatusActionsProps) {
           onClick={() => void onUpdateStatus("open")}
         />
       )}
+      <Button
+        label="Delete note"
+        variant="ghost"
+        size="sm"
+        isIconOnly
+        icon={<Icon icon={TrashIcon} size="sm" />}
+        tooltip="Delete note"
+        onClick={onDelete}
+      />
     </ThreadActions>
   );
 }

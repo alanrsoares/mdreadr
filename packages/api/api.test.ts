@@ -26,6 +26,9 @@ const patch = (url: string, path: string, body: unknown, token?: string) =>
     }),
   );
 
+const del = (url: string, path: string, token?: string) =>
+  app.handle(new Request(`${url}${path}`, { method: "DELETE", headers: authHeaders(token) }));
+
 const get = (url: string, path: string, token?: string) =>
   app.handle(new Request(`${url}${path}`, { headers: authHeaders(token) }));
 
@@ -53,6 +56,40 @@ describe("mdreadr api", () => {
     const notes = await app.handle(new Request(`${url}/notes`));
     const json = await notes?.json();
     expect(json.notes).toHaveLength(1);
+  });
+
+  describe("DELETE /notes/:id", () => {
+    afterEach(() => {
+      sessionStore.setNotes([]);
+    });
+
+    test("removes the note and journals the deletion", async () => {
+      const { url } = startServer(0);
+      sessionStore.setNotes([]);
+
+      const created = await post(url, "/notes", {
+        anchor: { kind: "document", blockId: "document-root" },
+        body: "Typo, ignore me",
+        author: { kind: "human" },
+      });
+      const { note } = await (created as Response).json();
+      const since = sessionStore.latestSeq() - 1;
+
+      const response = await del(url, `/notes/${note.id}`);
+      expect(response?.status).toBe(200);
+      expect(sessionStore.getNotes()).toHaveLength(0);
+      expect(sessionStore.getEvents(since).some((entry) => entry.type === "note_deleted")).toBe(
+        true,
+      );
+    });
+
+    test("404s for a note the session does not have", async () => {
+      const { url } = startServer(0);
+      sessionStore.setNotes([]);
+
+      const response = await del(url, "/notes/nope");
+      expect(response?.status).toBe(404);
+    });
   });
 
   describe("/events + /events/wait", () => {

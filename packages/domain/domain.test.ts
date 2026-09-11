@@ -19,7 +19,9 @@ import {
   findNote,
   findSuggestion,
   listDocumentBlocks,
+  type Note,
   parseNotesFileJson,
+  removeNote,
   resolveBlockRawMarkdown,
   resolveBlockText,
   SaveDocumentBodySchema,
@@ -515,4 +517,23 @@ test("documentStats ignores frontmatter and fenced code", () => {
 
 test("documentStats never reports a zero-minute read", () => {
   expect(documentStats("Hi").minutes).toBe(1);
+});
+
+test("removeNote drops the note and leaves the rest in order", () => {
+  const make = (id: string): Note => ({
+    id,
+    anchor: { kind: "document", blockId: "document-root" },
+    kind: "comment",
+    status: "open",
+    replies: [],
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+  const notes = [make("a"), make("b"), make("c")];
+
+  expect(removeNote(notes, "b").map((note) => note.id)).toEqual(["a", "c"]);
+});
+
+test("removeNote treats an unknown id as already gone", () => {
+  expect(removeNote([], "missing")).toEqual([]);
 });

@@ -23,6 +23,7 @@ export {
   QueueListIcon,
   ShieldCheckIcon,
   SunIcon,
+  TrashIcon,
   ViewColumnsIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";

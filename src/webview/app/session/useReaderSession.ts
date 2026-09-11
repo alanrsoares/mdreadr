@@ -21,6 +21,7 @@ export type ReaderSessionCallbacks = {
   onNoteCreated?: () => void;
   onReplyAdded?: () => void;
   onStatusChanged?: (status: NoteStatus | undefined) => void;
+  onNoteDeleted?: () => void;
   onNotesSaved?: () => void;
   onDocumentSaved?: () => void;
   onSuggestionStatusChanged?: (suggestion: Suggestion) => void;
@@ -33,6 +34,7 @@ export type ReaderSession = {
   createNote: (input: CreateNoteRequest) => Promise<void>;
   addReply: (noteId: string, body: string) => Promise<void>;
   setStatus: (noteId: string, status: NoteStatus) => Promise<void>;
+  deleteNote: (noteId: string) => Promise<void>;
   setSuggestionStatus: (suggestionId: string, status: "accepted" | "rejected") => Promise<void>;
   save: () => Promise<void>;
   saveDocument: (path: string, content: string) => Promise<void>;
@@ -130,6 +132,17 @@ export function useReaderSession(
     },
   });
 
+  const deleteNoteMutation = useMutation({
+    mutationFn: (noteId: string) => readerApi.deleteNote(noteId),
+    onSuccess: () => {
+      invalidateNotes();
+      callbacks.onNoteDeleted?.();
+    },
+    onError: (error) => {
+      showError("Delete note", error);
+    },
+  });
+
   const setSuggestionStatusMutation = useMutation({
     mutationFn: (input: SetSuggestionStatusMutationInput) =>
       readerApi.setSuggestionStatus(input.suggestionId, input.status),
@@ -182,6 +195,9 @@ export function useReaderSession(
     },
     setStatus: async (noteId, status) => {
       await updateStatusMutation.mutateAsync({ noteId, status });
+    },
+    deleteNote: async (noteId) => {
+      await deleteNoteMutation.mutateAsync(noteId);
     },
     setSuggestionStatus: async (suggestionId, status) => {
       await setSuggestionStatusMutation.mutateAsync({ suggestionId, status });

@@ -99,6 +99,9 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
     onStatusChanged: (status) => {
       onAnnounce(`Note marked ${status ?? "updated"}`);
     },
+    onNoteDeleted: () => {
+      onAnnounce("Note deleted");
+    },
     onNotesSaved: () => {
       onAnnounce("Notes saved");
     },
@@ -357,6 +360,9 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
           }}
           onUpdateStatus={async (noteId, status) => {
             await reader.setStatus(noteId, status);
+          }}
+          onDeleteNote={async (noteId) => {
+            await reader.deleteNote(noteId);
           }}
           onAcceptSuggestion={onAcceptSuggestion}
           onRejectSuggestion={onRejectSuggestion}

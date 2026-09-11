@@ -381,6 +381,18 @@ export const app = new Elysia()
     },
     { body: UpdateNoteStatusBodySchema },
   )
+  .delete("/notes/:id", ({ params, set }) => {
+    // 404 rather than a silent ok: the webview only offers delete on a thread
+    // it is rendering, so a miss means its list and the session disagree.
+    const found = findNote(sessionStore.getNotes(), params.id);
+    if (isErr(found)) {
+      set.status = 404;
+      return domainError(found.error);
+    }
+
+    sessionStore.noteDeleted(params.id);
+    return { id: params.id };
+  })
   .post(
     "/notes/save",
     async ({ body, set }) => {
