@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.18.1](https://github.com/alanrsoares/mdreadr/compare/v0.18.0...v0.18.1) (2026-09-11)
+
+
+### Bug Fixes
+
+* **repo:** resolve linux packaging script errors ([#76](https://github.com/alanrsoares/mdreadr/issues/76)) ([9859e35](https://github.com/alanrsoares/mdreadr/commit/9859e355f7f0238d7a14745a39d9f1038772b663))
+* **ui:** key inline editor on sub-block target ([#78](https://github.com/alanrsoares/mdreadr/issues/78)) ([528bf7f](https://github.com/alanrsoares/mdreadr/commit/528bf7f6753d0dde78279468049e0e0e8a16e94a))
+
 ## [0.18.0](https://github.com/alanrsoares/mdreadr/compare/v0.17.0...v0.18.0) (2026-09-10)
 
 
