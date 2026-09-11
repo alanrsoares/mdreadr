@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/alanrsoares/mdreadr/compare/v0.18.1...v0.19.0) (2026-09-11)
+
+
+### Features
+
+* **reader:** ship the quick wins from the missing-feature scope ([#79](https://github.com/alanrsoares/mdreadr/issues/79)) ([e6093da](https://github.com/alanrsoares/mdreadr/commit/e6093da0285b31b30c604674087fe925e08f9ca0))
+
 ## [0.18.1](https://github.com/alanrsoares/mdreadr/compare/v0.18.0...v0.18.1) (2026-09-11)
 
 
