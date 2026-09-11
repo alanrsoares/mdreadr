@@ -185,6 +185,8 @@ function buildApplicationMenu(): void {
           { role: "copy" },
           { role: "paste" },
           { role: "selectAll" },
+          { type: "separator" },
+          { label: "Find…", action: "app:find-in-document", accelerator: "CmdOrCtrl+F" },
         ],
       },
       {

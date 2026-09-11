@@ -16,6 +16,7 @@ export type AppCommand =
   | "open-document"
   | "save-document"
   | "close-tab"
+  | "find-in-document"
   | "toggle-notes-sidebar"
   | "toggle-navigation-sidebar"
   | "toggle-view-mode";

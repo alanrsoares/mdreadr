@@ -22,9 +22,11 @@ import {
 } from "react";
 import { registerAppCommand } from "../appCommands.ts";
 import { DocumentView } from "../components/DocumentView.tsx";
+import { FindBar } from "../components/FindBar.tsx";
 import { ReviewPanel } from "../components/ReviewPanel.tsx";
 import { TocSidebar } from "../components/TocSidebar.tsx";
 import { registerEditorView } from "../editorCommands.ts";
+import { useDocumentFind } from "../hooks/useDocumentFind.ts";
 import { useEditorOutlineSpy } from "../hooks/useEditorOutlineSpy.ts";
 import { useFileDrop } from "../hooks/useFileDrop.ts";
 import { useLiveDocumentUpdates } from "../hooks/useLiveDocumentUpdates.ts";
@@ -81,6 +83,7 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
   const store = useContainer(readerPageContainer);
   const { pendingAnchor, documentViewMode, isDragOver } = useStoreValues(store);
   const readerMainRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
 
   const drop = useFileDrop({
@@ -157,6 +160,28 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
     await reader.saveDocument(documentPath, draft.text);
   }, [documentPath, draft, reader]);
 
+  const find = useDocumentFind({
+    isActive,
+    mode: documentViewMode,
+    previewRef,
+    rootRef: readerMainRef,
+    editorViewRef,
+    editorValue,
+  });
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isActive) return;
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      if (event.key.toLowerCase() !== "f") return;
+      event.preventDefault();
+      find.open();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isActive, find.open]);
+
   // Only the Tab in front answers the menu: a parked Tab is mounted and would
   // otherwise save or toggle a Document the reader is not looking at.
   useEffect(() => {
@@ -165,6 +190,7 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
       registerAppCommand("save-document", () => {
         if (dirty) void saveDraft();
       }),
+      registerAppCommand("find-in-document", find.open),
       registerAppCommand("toggle-view-mode", () => {
         store.actions.documentViewModeChanged(documentViewMode === "edit" ? "preview" : "edit");
       }),
@@ -172,7 +198,7 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
     return () => {
       for (const cleanup of cleanups) cleanup();
     };
-  }, [isActive, dirty, saveDraft, documentViewMode, store]);
+  }, [isActive, dirty, saveDraft, documentViewMode, store, find.open]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -407,6 +433,8 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
           editorValue={editorValue}
           onEditorChange={onEditorChange}
           onEditorReady={onEditorReady}
+          previewRef={previewRef}
+          findBar={find.isOpen ? <FindBar find={find} /> : undefined}
           chromeEnd={
             isEditing || dirty ? (
               <Button

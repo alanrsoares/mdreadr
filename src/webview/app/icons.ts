@@ -5,6 +5,8 @@ export {
   Bars3Icon,
   ChatBubbleBottomCenterTextIcon,
   CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   CodeBracketIcon,
   Cog6ToothIcon,
   CommandLineIcon,

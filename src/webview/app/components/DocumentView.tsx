@@ -1,8 +1,9 @@
 import { HStack } from "@astryxdesign/core/HStack";
+import { Text } from "@astryxdesign/core/Text";
 import type { EditorView } from "@codemirror/view";
 import { type BlockAnchor, type DocumentKind, documentStats, type Note } from "@mdreadr/domain";
 import { match } from "@onrails/pattern";
-import { type CSSProperties, type ReactNode, useMemo, useRef } from "react";
+import { type CSSProperties, type ReactNode, type RefObject, useMemo, useRef } from "react";
 import { useReaderBlockNavigation } from "../hooks/useReaderBlockNavigation.ts";
 import { getReaderFontFamilyCss, useFontSettings } from "../theme/FontSettingsContext.tsx";
 import { getReaderMeasurePx } from "../theme/measure.ts";
@@ -38,6 +39,10 @@ type DocumentViewProps = {
   onEditorChange: (text: string) => void;
   onEditorReady?: (view: EditorView) => void;
   chromeEnd?: ReactNode;
+  /** Floats over the sheet, above the prose it searches. */
+  findBar?: ReactNode;
+  /** The rendered Document, when a caller needs to read it (find, navigation). */
+  previewRef?: RefObject<HTMLDivElement | null>;
   /** False for a mounted-but-hidden tab; gates the window-level Cmd+± shortcut. */
   isActive?: boolean;
 };
@@ -55,12 +60,15 @@ export const DocumentView = ({
   onEditorChange,
   onEditorReady,
   chromeEnd,
+  findBar,
+  previewRef: previewRefFromProps,
   isActive = true,
 }: DocumentViewProps) => {
   const { readerFontSize, readerFontFamily, readerLineHeight, editorFontSize, editorFontFamily } =
     useFontSettings();
   const readerFontFamilyCss = getReaderFontFamilyCss(readerFontFamily);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const ownPreviewRef = useRef<HTMLDivElement>(null);
+  const previewRef = previewRefFromProps ?? ownPreviewRef;
   // Only markdown owns both modes; the others are pinned to the one they have.
   const mode = match(kind)
     .with("markdown", () => viewMode)
@@ -97,7 +105,9 @@ export const DocumentView = ({
       <ReaderDocumentChrome>
         {kind === "markdown" ? (
           <ReaderChromeStart>
-            {stats.words.toLocaleString()} words, {stats.minutes} min
+            <Text type="supporting" size="xsm">
+              {stats.words.toLocaleString()} words, {stats.minutes} min
+            </Text>
           </ReaderChromeStart>
         ) : null}
         <ReaderChromeControls>
@@ -111,6 +121,7 @@ export const DocumentView = ({
             {chromeEnd}
           </HStack>
         </ReaderChromeEnd>
+        {findBar}
       </ReaderDocumentChrome>
 
       {/* No `key={viewMode}`: keying here remounts the whole body on every
