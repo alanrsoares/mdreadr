@@ -13,6 +13,7 @@ import {
   createNote,
   createSuggestion,
   documentKindForPath,
+  documentStats,
   extractHeadings,
   findBlockRange,
   findNote,
@@ -500,4 +501,18 @@ describe("AppUpdateStateSchema", () => {
     });
     expect(invalid.success).toBe(false);
   });
+});
+
+test("documentStats counts prose words and rounds a reading time", () => {
+  const markdown = `${"word ".repeat(400).trim()}\n`;
+  expect(documentStats(markdown)).toEqual({ words: 400, minutes: 2 });
+});
+
+test("documentStats ignores frontmatter and fenced code", () => {
+  const markdown = "---\ntitle: mdreadr\n---\n\nOne two three\n\n```ts\nconst x = 1;\n```\n";
+  expect(documentStats(markdown).words).toBe(3);
+});
+
+test("documentStats never reports a zero-minute read", () => {
+  expect(documentStats("Hi").minutes).toBe(1);
 });

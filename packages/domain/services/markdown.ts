@@ -35,6 +35,51 @@ export function extractHeadings(markdown: string): TocEntry[] {
   return entries;
 }
 
+/**
+ * YAML frontmatter is metadata, not prose: GitHub and every markdown reader hide
+ * it, and left in it does worse than show itself — `title: mdreadr` followed by
+ * the closing `---` is a setext h2, so the first thing a Document shows is a
+ * fake heading that also lands in the outline.
+ *
+ * Runs before every other transform and before the fence split: the opening
+ * delimiter is only frontmatter on line 1, where no code fence can have opened
+ * yet. An unterminated block is left alone — it is a thematic break and a
+ * paragraph the author meant to write.
+ */
+export function stripFrontmatter(content: string): string {
+  if (!/^---[ \t]*\r?\n/.test(content)) return content;
+
+  const lines = content.split("\n");
+  const closing = lines.findIndex(
+    (line, index) => index > 0 && /^(---|\.\.\.)[ \t\r]*$/.test(line),
+  );
+  if (closing === -1) return content;
+
+  return lines
+    .slice(closing + 1)
+    .join("\n")
+    .replace(/^\s*\n/, "");
+}
+
+/** Prose-only word count and the reading time it implies. */
+export type DocumentStats = { words: number; minutes: number };
+
+/** Technical prose, read attentively rather than skimmed. */
+const WORDS_PER_MINUTE = 200;
+
+/**
+ * Counts what the reader actually reads: frontmatter and fenced code are the
+ * two things a Document carries in bulk that nobody reads word by word, and
+ * counting them turns a short page with one long listing into a "20 min read".
+ * Inline markers are left in — stripping them costs a second parse to move a
+ * count that rounds away.
+ */
+export function documentStats(markdown: string): DocumentStats {
+  const prose = stripFrontmatter(markdown).replace(/```[\s\S]*?```/g, " ");
+  const words = prose.split(/\s+/).filter((token) => /[\p{L}\p{N}]/u.test(token)).length;
+  return { words, minutes: Math.max(1, Math.round(words / WORDS_PER_MINUTE)) };
+}
+
 export const blockIdForHeading = (entry: TocEntry): string => `heading-${entry.id}`;
 
 /** FNV-1a 32-bit — stable across reloads, sync, no crypto dependency */

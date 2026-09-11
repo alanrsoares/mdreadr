@@ -1,14 +1,15 @@
 import { HStack } from "@astryxdesign/core/HStack";
 import type { EditorView } from "@codemirror/view";
-import type { BlockAnchor, DocumentKind, Note } from "@mdreadr/domain";
+import { type BlockAnchor, type DocumentKind, documentStats, type Note } from "@mdreadr/domain";
 import { match } from "@onrails/pattern";
-import { type CSSProperties, type ReactNode, useRef } from "react";
+import { type CSSProperties, type ReactNode, useMemo, useRef } from "react";
 import { useReaderBlockNavigation } from "../hooks/useReaderBlockNavigation.ts";
 import { getReaderFontFamilyCss, useFontSettings } from "../theme/FontSettingsContext.tsx";
 import { getReaderMeasurePx } from "../theme/measure.ts";
 import {
   ReaderChromeControls,
   ReaderChromeEnd,
+  ReaderChromeStart,
   ReaderColumn,
   ReaderDocumentBody,
   ReaderDocumentChrome,
@@ -69,6 +70,10 @@ export const DocumentView = ({
 
   useReaderBlockNavigation(previewRef, isActive && kind === "markdown" && mode === "preview");
 
+  // Off the saved content, not the Draft: a stat that ticked over per keystroke
+  // would be motion in the chrome while the reader types.
+  const stats = useMemo(() => documentStats(content), [content]);
+
   const readerStyles = {
     "--text-body-size": `${readerFontSize}px`,
     "--reader-line-height": readerLineHeight,
@@ -90,6 +95,11 @@ export const DocumentView = ({
   return (
     <ReaderSheet className={kind === "image" ? "reader-sheet-enter h-full" : "reader-sheet-enter"}>
       <ReaderDocumentChrome>
+        {kind === "markdown" ? (
+          <ReaderChromeStart>
+            {stats.words.toLocaleString()} words, {stats.minutes} min
+          </ReaderChromeStart>
+        ) : null}
         <ReaderChromeControls>
           <DocumentViewModeSwitch value={mode} onChange={onViewModeChange} kind={kind} />
         </ReaderChromeControls>

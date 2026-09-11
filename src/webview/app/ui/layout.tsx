@@ -18,6 +18,12 @@ export const ReaderDocumentChrome = tw.header(
 
 export const ReaderChromeControls = tw.div`mx-auto flex w-fit items-center justify-center gap-2`;
 
+// Mirrors ReaderChromeEnd on the other side, so the centred mode switch stays
+// centred on the sheet rather than being pushed by whatever sits beside it.
+export const ReaderChromeStart = tw.div(
+  "absolute top-1/2 left-4 -translate-y-1/2 text-(--color-text-secondary) text-xs tabular-nums sm:left-2 md:left-3.5",
+);
+
 export const ReaderChromeEnd = tw.div(
   "absolute right-4 top-1/2 -translate-y-1/2 sm:right-2 md:right-3.5",
 );

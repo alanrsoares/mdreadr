@@ -1,3 +1,5 @@
+import { stripFrontmatter } from "@mdreadr/domain";
+
 const LINKED_IMAGE_RE = /\[!\[([^\]\n]*)\]\(([^)\n]+)\)\]\(([^)\n]+)\)/g;
 const BADGE_LINE_RE = /^\[\[\[BADGE:\{.*?\}\]\]\]$/;
 /** Single source of truth for the linked-badge token shape (preprocess replace + inline plugin match). */
@@ -41,32 +43,6 @@ export function convertAlignWrappers(content: string): string {
     });
     return `\n\`\`\`align\n${payload}\n\`\`\`\n`;
   });
-}
-
-/**
- * YAML frontmatter is metadata, not prose: GitHub and every markdown reader hide
- * it, and left in it does worse than show itself — `title: mdreadr` followed by
- * the closing `---` is a setext h2, so the first thing a Document shows is a
- * fake heading that also lands in the outline.
- *
- * Runs before every other transform and before the fence split: the opening
- * delimiter is only frontmatter on line 1, where no code fence can have opened
- * yet. An unterminated block is left alone — it is a thematic break and a
- * paragraph the author meant to write.
- */
-export function stripFrontmatter(content: string): string {
-  if (!/^---[ \t]*\r?\n/.test(content)) return content;
-
-  const lines = content.split("\n");
-  const closing = lines.findIndex(
-    (line, index) => index > 0 && /^(---|\.\.\.)[ \t\r]*$/.test(line),
-  );
-  if (closing === -1) return content;
-
-  return lines
-    .slice(closing + 1)
-    .join("\n")
-    .replace(/^\s*\n/, "");
 }
 
 /** GitHub hides HTML comments; Astryx would render them as literal text. */
