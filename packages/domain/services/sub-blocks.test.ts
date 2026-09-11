@@ -12,6 +12,7 @@ import {
   type SubBlockTarget,
   sameSubBlockTarget,
   splitAroundSubBlock,
+  subBlockKey,
   subBlockKindForAnchor,
 } from "./sub-blocks.ts";
 
@@ -21,6 +22,23 @@ const anchorFor = (content: string, kind: "list" | "table"): BlockAnchor => {
   if (!block) throw new Error(`no ${kind} block in fixture`);
   return { kind, blockId: block.blockId };
 };
+
+describe("subBlockKey", () => {
+  test("returns whole for null or undefined", () => {
+    expect(subBlockKey(null)).toBe("whole");
+    expect(subBlockKey(undefined)).toBe("whole");
+  });
+
+  test("formats list items by path", () => {
+    expect(subBlockKey({ kind: "list-item", path: [0] })).toBe("item:0");
+    expect(subBlockKey({ kind: "list-item", path: [1, 2, 0] })).toBe("item:1.2.0");
+  });
+
+  test("formats table rows by index", () => {
+    expect(subBlockKey({ kind: "table-row", row: 0 })).toBe("row:0");
+    expect(subBlockKey({ kind: "table-row", row: 3 })).toBe("row:3");
+  });
+});
 
 describe("subBlockKindForAnchor", () => {
   test("only lists and tables have sub-blocks", () => {

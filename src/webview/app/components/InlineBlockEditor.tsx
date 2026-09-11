@@ -117,6 +117,13 @@ export function InlineBlockEditor({
   onDirtyChange,
 }: InlineBlockEditorProps) {
   const [text, setText] = useState(initialValue);
+  const [prevInitialValue, setPrevInitialValue] = useState(initialValue);
+  if (initialValue !== prevInitialValue) {
+    setPrevInitialValue(initialValue);
+    if (text === prevInitialValue) {
+      setText(initialValue);
+    }
+  }
   const [isDiscardArmed, setIsDiscardArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const editorRef = useRef<SourceEditorHandle>(null);

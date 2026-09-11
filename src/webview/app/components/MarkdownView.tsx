@@ -5,6 +5,7 @@ import {
   type Note,
   type SubBlockTarget,
   splitAroundSubBlock,
+  subBlockKey,
 } from "@mdreadr/domain";
 import { match } from "@onrails/pattern";
 import { isErr } from "@onrails/result";
@@ -272,10 +273,12 @@ export const MarkdownView = memo(function MarkdownView({
           const after = split?.after;
 
           if (isBlockOpen(openEdit, anchor.blockId)) {
+            const keySuffix = subBlockKey(editingTarget);
             return (
               <Fragment key={segment.key}>
                 {split?.before ? (
                   <EditableBlock
+                    key={`${anchor.blockId}:before:${keySuffix}`}
                     anchor={anchor}
                     edit={edit}
                     subKind={subKind}
@@ -293,6 +296,7 @@ export const MarkdownView = memo(function MarkdownView({
                   </EditableBlock>
                 ) : null}
                 <BlockSourceEditor
+                  key={`${anchor.blockId}:${keySuffix}`}
                   anchor={anchor}
                   // No split: the whole block is being edited, or the part it
                   // named is gone, and the block's source is the honest seed.
@@ -303,6 +307,7 @@ export const MarkdownView = memo(function MarkdownView({
                 />
                 {after ? (
                   <EditableBlock
+                    key={`${anchor.blockId}:after:${keySuffix}`}
                     anchor={anchor}
                     edit={edit}
                     mapSubTarget={(target) => mapTailTarget(after, target)}
