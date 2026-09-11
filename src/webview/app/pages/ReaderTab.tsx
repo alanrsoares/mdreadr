@@ -29,16 +29,20 @@ import { useFileDrop } from "../hooks/useFileDrop.ts";
 import { useLiveDocumentUpdates } from "../hooks/useLiveDocumentUpdates.ts";
 import { useMutationToast } from "../hooks/useMutationToast.ts";
 import { useViewModeHandoff } from "../hooks/useViewModeHandoff.ts";
-import { flashAnchor, scrollToAnchor } from "../markdown/anchors.ts";
+import { flashAnchor, scrollToAnchor, scrollToHeadingSlug } from "../markdown/anchors.ts";
 import { beginReaderTiming, completeReaderTiming } from "../performance.ts";
 import { emptyDraft, isDirty } from "../session/document-draft.ts";
 import { scrollEditorToSettled } from "../session/editor-scroll.ts";
 import type { ApplyInlineEdit } from "../session/inline-edit.ts";
 import { ApplyInlineEditProvider } from "../session/inline-edit-context.tsx";
+import { takeFragment } from "../session/pending-fragment.ts";
 import type { ReaderApi } from "../session/reader-api.ts";
 import { useReaderSession } from "../session/useReaderSession.ts";
 import { ReaderTabShell } from "./ReaderTabShell.tsx";
 import { readerPageContainer } from "./reader-page-container.ts";
+
+/** Frames to keep looking for the linked heading while a long Document paints. */
+const FRAGMENT_SCROLL_ATTEMPTS = 30;
 
 type NotesSidebar = ResizableRegion;
 
@@ -164,6 +168,26 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isActive, dirty, documentViewMode, saveDraft]);
+
+  // A link that carried a `#fragment` (`[spec](docs/SPEC.md#anchors)`) opened
+  // this Tab; the heading only exists once the Document has rendered, which is
+  // why the scroll waits here rather than happening at the click.
+  useEffect(() => {
+    if (!isActive || !documentPath || !content) return;
+    const fragment = takeFragment(documentPath);
+    if (!fragment) return;
+
+    let attempt = 0;
+    let frame = requestAnimationFrame(function tryScroll() {
+      attempt += 1;
+      // A long Document paints its blocks over several frames; give up rather
+      // than spin, and leave the reader at the top of a Document that simply
+      // has no such heading.
+      if (scrollToHeadingSlug(fragment) || attempt >= FRAGMENT_SCROLL_ATTEMPTS) return;
+      frame = requestAnimationFrame(tryScroll);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isActive, documentPath, content]);
 
   const prevContentRef = useRef(content);
   useEffect(() => {

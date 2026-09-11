@@ -40,6 +40,7 @@ import {
 } from "../session/inline-edit.ts";
 import { useApplyInlineEdit } from "../session/inline-edit-context.tsx";
 import { openExternalLink } from "../session/open-external.ts";
+import { requestFragment } from "../session/pending-fragment.ts";
 import { useFontSettings } from "../theme/FontSettingsContext.tsx";
 import { getReaderMeasurePx } from "../theme/measure.ts";
 import { getApiBase } from "../treaty.ts";
@@ -111,10 +112,13 @@ export const MarkdownView = memo(function MarkdownView({
           event.preventDefault();
           scrollToHeadingSlug(id);
         })
-        .with({ kind: "document" }, ({ path }) => {
+        .with({ kind: "document" }, ({ path, fragment }) => {
           // Prevented even with no handler wired: following the link would
           // navigate the app off its own bundle and lose the session.
           event.preventDefault();
+          // Handed over before the open, not after: the Tab that applies it
+          // renders on its own schedule, once the Document has loaded.
+          if (fragment) requestFragment(path, fragment);
           onOpenDocument?.(path);
         })
         .with({ kind: "external" }, ({ url }) => {
