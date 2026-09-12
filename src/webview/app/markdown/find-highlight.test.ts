@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { locateSpan } from "./find-highlight.ts";
+import { clearHighlights, locateSpan, paintMatches } from "./find-highlight.ts";
 
 const chunks = [{ length: 10 }, { length: 5 }, { length: 8 }];
 
@@ -35,5 +35,32 @@ describe("locateSpan", () => {
 
   it("gives up when there is no text at all", () => {
     expect(locateSpan([], { start: 0, end: 1 })).toBeNull();
+  });
+});
+
+describe("clearHighlights and paintMatches cleanup", () => {
+  it("paintMatches returns null currentRange and clears highlights when matches are empty", () => {
+    const deleted: string[] = [];
+    const mockCss = {
+      highlights: {
+        delete: (name: string) => deleted.push(name),
+        set: () => {},
+      },
+    };
+    (globalThis as { CSS?: unknown }).CSS = mockCss;
+    (globalThis as { Highlight?: unknown }).Highlight = class {};
+
+    try {
+      const result = paintMatches([], [], 0);
+      expect(result).toEqual({ currentRange: null });
+      expect(deleted).toEqual(["mdreadr-find", "mdreadr-find-current"]);
+    } finally {
+      delete (globalThis as { CSS?: unknown }).CSS;
+      delete (globalThis as { Highlight?: unknown }).Highlight;
+    }
+  });
+
+  it("clearHighlights is safe when Highlight API is unavailable", () => {
+    expect(() => clearHighlights()).not.toThrow();
   });
 });

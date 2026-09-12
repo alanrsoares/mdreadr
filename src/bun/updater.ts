@@ -3,6 +3,8 @@ import { type ApplicationMenuItemConfig, PATHS, Updater, Utils } from "electrobu
 import pkg from "../../package.json";
 import type { AppUpdateState } from "../../packages/domain/index.ts";
 import { APP_NAME } from "../../shared/constants.ts";
+import { appendUpdateLog } from "./update-log.ts";
+import { downloadFailure } from "./update-outcome.ts";
 
 let currentState: AppUpdateState = {
   status: "idle",
@@ -74,6 +76,16 @@ function resignBundleIfNeeded(): void {
 
 // Hook into Electrobun's real-time state machine
 Updater.onStatusChange((entry) => {
+  // A shipped launch has no console to print to, and a failed update leaves
+  // nothing else behind, so every transition but the progress ticks is logged.
+  if (entry.status !== "download-progress") {
+    void appendUpdateLog({
+      status: entry.status,
+      message: entry.message,
+      error: entry.details?.errorMessage,
+    });
+  }
+
   switch (entry.status) {
     case "checking":
       updateState({ status: "checking", error: undefined });
@@ -163,14 +175,18 @@ export async function downloadUpdate(): Promise<void> {
   updateState({ status: "downloading", progressPercent: 0, error: undefined });
   try {
     await Updater.downloadUpdate();
+    const info = Updater.updateInfo();
+    const failure = downloadFailure(info);
+    if (failure) throw new Error(failure);
     resignBundleIfNeeded();
     updateState({
       status: "ready",
       progressPercent: 100,
-      latestVersion: Updater.updateInfo().version,
+      latestVersion: info.version,
     });
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : String(e);
+    void appendUpdateLog({ status: "download-refused", error: errorMsg });
     updateState({ status: "error", error: errorMsg });
     throw e;
   }
@@ -182,6 +198,7 @@ export async function applyUpdate(): Promise<void> {
     await Updater.applyUpdate();
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : String(e);
+    void appendUpdateLog({ status: "apply-failed", error: errorMsg });
     updateState({ status: "error", error: errorMsg });
     await Utils.showMessageBox({
       type: "error",

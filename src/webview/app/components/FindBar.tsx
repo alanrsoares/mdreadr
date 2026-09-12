@@ -1,10 +1,11 @@
 import { HStack } from "@astryxdesign/core/HStack";
+import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { type KeyboardEvent, useEffect, useRef } from "react";
 import type { DocumentFind } from "../hooks/useDocumentFind.ts";
-import { ChevronDownIcon, ChevronUpIcon, XMarkIcon } from "../icons.ts";
+import { ChevronDownIcon, ChevronUpIcon, MagnifyingGlassIcon, XMarkIcon } from "../icons.ts";
 import { FindBarShell, FindCount } from "../ui/layout.tsx";
 
 export type FindBarProps = { find: DocumentFind };
@@ -53,6 +54,8 @@ export function FindBar({ find }: FindBarProps) {
           label="Find in document"
           isLabelHidden
           size="sm"
+          hasClear
+          startIcon={<Icon icon={MagnifyingGlassIcon} size="sm" />}
           placeholder="Find"
           value={find.query}
           onChange={find.setQuery}
@@ -70,7 +73,7 @@ export function FindBar({ find }: FindBarProps) {
           variant="ghost"
           size="sm"
           isDisabled={find.total === 0}
-          icon={<ChevronUpIcon />}
+          icon={<Icon icon={ChevronUpIcon} size="sm" />}
           onClick={() => find.step(-1)}
         />
         <IconButton
@@ -79,7 +82,7 @@ export function FindBar({ find }: FindBarProps) {
           variant="ghost"
           size="sm"
           isDisabled={find.total === 0}
-          icon={<ChevronDownIcon />}
+          icon={<Icon icon={ChevronDownIcon} size="sm" />}
           onClick={() => find.step(1)}
         />
         <IconButton
@@ -87,7 +90,7 @@ export function FindBar({ find }: FindBarProps) {
           tooltip="Close find"
           variant="ghost"
           size="sm"
-          icon={<XMarkIcon />}
+          icon={<Icon icon={XMarkIcon} size="sm" />}
           onClick={find.close}
         />
       </HStack>

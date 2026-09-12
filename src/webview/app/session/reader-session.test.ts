@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import type { DocumentRef, Note, Suggestion } from "@mdreadr/domain";
+import type { DocumentRef, Note, PickFileInput, Suggestion } from "@mdreadr/domain";
 import { apiErrorMessage, type LoadNotesResult, type ReaderApi, unwrap } from "./reader-api.ts";
-import { loadNotesFlow, saveNotesFlow } from "./reader-flows.ts";
+import {
+  loadNotesFlow,
+  pickDocumentFlow,
+  saveDroppedDocumentFlow,
+  saveNotesFlow,
+} from "./reader-flows.ts";
 
 const sampleNote: Note = {
   id: "note-1",
@@ -220,5 +225,39 @@ describe("unwrap", () => {
 
   test("returns data unchanged when there is no error", () => {
     expect(unwrap({ data: { ok: true }, error: null })).toEqual({ ok: true });
+  });
+});
+
+describe("pickDocumentFlow", () => {
+  test("requests pick with mode 'open' and no restrictive filters", async () => {
+    let capturedInput: PickFileInput | undefined;
+    const helper = createInMemoryReaderApi();
+    helper.api.pickPath = async (input) => {
+      capturedInput = input;
+      return "/tmp/example.txt";
+    };
+
+    const picked = await pickDocumentFlow(helper.api);
+    expect(picked).toBe("/tmp/example.txt");
+    expect(capturedInput).toEqual({ mode: "open" });
+  });
+});
+
+describe("saveDroppedDocumentFlow", () => {
+  test("requests pick with mode 'save', defaultPath, and no restrictive filters", async () => {
+    let capturedInput: PickFileInput | undefined;
+    const helper = createInMemoryReaderApi();
+    helper.api.pickPath = async (input) => {
+      capturedInput = input;
+      return "/tmp/dropped.txt";
+    };
+
+    const outcome = await saveDroppedDocumentFlow(helper.api, {
+      name: "dropped.txt",
+      content: "hello",
+    });
+
+    expect(outcome).toEqual({ kind: "saved", path: "/tmp/dropped.txt" });
+    expect(capturedInput).toEqual({ mode: "save", defaultPath: "dropped.txt" });
   });
 });

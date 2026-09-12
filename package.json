@@ -65,6 +65,7 @@
   "devDependencies": {
     "@astryxdesign/cli": "^0.5.4",
     "@biomejs/biome": "^2.5.12",
+    "@iconify-json/vscode-icons": "^1.2.77",
     "@onrails/codemod": "^0.2.6",
     "@resvg/resvg-js": "^2.6.2",
     "@styled-cva/biome-plugin": "^0.3.0",

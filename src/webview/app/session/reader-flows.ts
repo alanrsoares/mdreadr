@@ -29,7 +29,7 @@ export async function loadNotesFlow(api: ReaderApi): Promise<LoadNotesOutcome> {
 
 /** Pick a Document (cancel → null). */
 export const pickDocumentFlow = async (api: ReaderApi): Promise<string | null> =>
-  api.pickPath({ mode: "open", filters: ["*.md"] });
+  api.pickPath({ mode: "open" });
 
 export type SaveDroppedDocumentInput = { name: string; content: string };
 export type SaveDroppedDocumentOutcome = { kind: "saved"; path: string } | { kind: "cancelled" };
@@ -39,7 +39,7 @@ export async function saveDroppedDocumentFlow(
   api: ReaderApi,
   input: SaveDroppedDocumentInput,
 ): Promise<SaveDroppedDocumentOutcome> {
-  const path = await api.pickPath({ mode: "save", defaultPath: input.name, filters: ["*.md"] });
+  const path = await api.pickPath({ mode: "save", defaultPath: input.name });
   if (!path) return { kind: "cancelled" };
 
   await api.createDocument(path, input.content);

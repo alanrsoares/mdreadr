@@ -1,8 +1,9 @@
 import { Icon } from "@astryxdesign/core/Icon";
 import type { KeyboardEvent, MouseEvent } from "react";
-import { DocumentTextIcon, XMarkIcon } from "../icons.ts";
+import { XMarkIcon } from "../icons.ts";
+import { fileIcon } from "./file-icons.ts";
 
-export type TabStripEntry = { id: string; label: string };
+export type TabStripEntry = { id: string; label: string; path?: string };
 
 type TabStripProps = {
   tabs: TabStripEntry[];
@@ -67,7 +68,7 @@ export function TabStrip({ tabs, activeId, dirtyIds, onActivate, onRequestClose 
             ) : null}
 
             <Icon
-              icon={DocumentTextIcon}
+              icon={fileIcon(tab.path ?? tab.label)}
               size="sm"
               className={`shrink-0 transition-colors ${
                 isActive
