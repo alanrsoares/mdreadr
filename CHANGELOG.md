@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0](https://github.com/alanrsoares/mdreadr/compare/v0.19.1...v0.20.0) (2026-09-12)
+
+
+### Features
+
+* syntax highlighting in the reader and the source editor ([#83](https://github.com/alanrsoares/mdreadr/issues/83)) ([6510230](https://github.com/alanrsoares/mdreadr/commit/6510230c14674102a3d0f2455579a73a76b538dd))
+
 ## [0.19.1](https://github.com/alanrsoares/mdreadr/compare/v0.19.0...v0.19.1) (2026-09-12)
 
 
