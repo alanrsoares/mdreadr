@@ -1,11 +1,23 @@
 import { useTheme } from "@astryxdesign/core/theme";
 import { markdown } from "@codemirror/lang-markdown";
+import type { LanguageSupport } from "@codemirror/language";
+import { languages } from "@codemirror/language-data";
 import { EditorView } from "@codemirror/view";
+import { isSome } from "@onrails/maybe";
+import { match } from "@onrails/pattern";
 import CodeMirror from "@uiw/react-codemirror";
-import { type CSSProperties, forwardRef, useImperativeHandle, useMemo, useRef } from "react";
+import {
+  type CSSProperties,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { grammarForPath, markdownSource, type SourceLanguage } from "./source-language.ts";
 
-/** What the editor highlights. Plain source is left unstyled rather than lit up as markdown it is not. */
-export type SourceLanguage = "markdown" | "plain";
+export type { SourceLanguage };
 
 /** Character offsets into the source, the same shape `inline-edit-ops` uses. */
 export type SourceSelection = { start: number; end: number };
@@ -55,7 +67,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(fu
     value,
     onChange,
     sizing,
-    language = "markdown",
+    language = markdownSource,
     typography,
     maxWidth,
     hasActiveLine = false,
@@ -130,12 +142,53 @@ export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(fu
     [isDark, sizing, maxWidth, hasActiveLine],
   );
 
+  // A file grammar is fetched on demand: CodeMirror ships every parser as its
+  // own chunk, so the editor opens immediately and gains colour a tick later
+  // rather than paying for 100 grammars it will not use.
+  const [fileSupport, setFileSupport] = useState<LanguageSupport | null>(null);
+  const languageKind = language.kind;
+  const filePath = language.kind === "file" ? language.path : null;
+
+  useEffect(() => {
+    if (filePath === null) {
+      setFileSupport(null);
+      return;
+    }
+
+    const grammar = grammarForPath(filePath);
+    if (!isSome(grammar)) {
+      setFileSupport(null);
+      return;
+    }
+
+    let isCurrent = true;
+    void grammar.value.load().then((support) => {
+      if (isCurrent) setFileSupport(support);
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [filePath]);
+
   const extensions = useMemo(
     () =>
-      language === "markdown"
-        ? [markdown(), EditorView.lineWrapping, editorTheme]
-        : [EditorView.lineWrapping, editorTheme],
-    [language, editorTheme],
+      match(languageKind)
+        // Fenced code inside the prose gets its own grammar too, loaded by the
+        // same on-demand table.
+        .with("markdown", () => [
+          markdown({ codeLanguages: languages }),
+          EditorView.lineWrapping,
+          editorTheme,
+        ])
+        .with("plain", () => [EditorView.lineWrapping, editorTheme])
+        .with("file", () =>
+          fileSupport === null
+            ? [EditorView.lineWrapping, editorTheme]
+            : [fileSupport, EditorView.lineWrapping, editorTheme],
+        )
+        .exhaustive(),
+    [languageKind, fileSupport, editorTheme],
   );
 
   return (
