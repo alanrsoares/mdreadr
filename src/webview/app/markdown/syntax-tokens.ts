@@ -6,6 +6,7 @@ import graphql from "refractor/graphql";
 import jsx from "refractor/jsx";
 import toml from "refractor/toml";
 import tsx from "refractor/tsx";
+import type { SyntaxSlot } from "../theme/syntax-slots.ts";
 
 // `refractor` (the common bundle) ships the ~36 grammars that cover almost
 // every fence in real docs. These five are missing from it but show up
@@ -13,21 +14,7 @@ import tsx from "refractor/tsx";
 // falls through to an unhighlighted block rather than guessing a grammar.
 for (const syntax of [jsx, tsx, toml, docker, graphql]) refractor.register(syntax);
 
-/** The 14-slot contract astryx's CodeBlock paints (minus `background`). */
-export type SyntaxSlot =
-  | "keyword"
-  | "string"
-  | "comment"
-  | "number"
-  | "function"
-  | "type"
-  | "variable"
-  | "operator"
-  | "constant"
-  | "tag"
-  | "attribute"
-  | "property"
-  | "punctuation";
+export type { SyntaxSlot };
 
 export type SyntaxToken = { type: SyntaxSlot; start: number; end: number };
 

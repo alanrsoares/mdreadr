@@ -1,6 +1,6 @@
 import { useTheme } from "@astryxdesign/core/theme";
 import { markdown } from "@codemirror/lang-markdown";
-import type { LanguageSupport } from "@codemirror/language";
+import { type LanguageSupport, syntaxHighlighting } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { EditorView } from "@codemirror/view";
 import { isSome } from "@onrails/maybe";
@@ -15,6 +15,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { astryxHighlightStyle } from "./astryx-highlight.ts";
 import { grammarForPath, markdownSource, type SourceLanguage } from "./source-language.ts";
 
 export type { SourceLanguage };
@@ -171,25 +172,20 @@ export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(fu
     };
   }, [filePath]);
 
-  const extensions = useMemo(
-    () =>
+  const extensions = useMemo(() => {
+    // `basicSetup` registers `defaultHighlightStyle` as a fallback, so this
+    // one wins wherever it has a rule and the default fills the gaps.
+    const base = [EditorView.lineWrapping, syntaxHighlighting(astryxHighlightStyle), editorTheme];
+    return (
       match(languageKind)
         // Fenced code inside the prose gets its own grammar too, loaded by the
         // same on-demand table.
-        .with("markdown", () => [
-          markdown({ codeLanguages: languages }),
-          EditorView.lineWrapping,
-          editorTheme,
-        ])
-        .with("plain", () => [EditorView.lineWrapping, editorTheme])
-        .with("file", () =>
-          fileSupport === null
-            ? [EditorView.lineWrapping, editorTheme]
-            : [fileSupport, EditorView.lineWrapping, editorTheme],
-        )
-        .exhaustive(),
-    [languageKind, fileSupport, editorTheme],
-  );
+        .with("markdown", () => [markdown({ codeLanguages: languages }), ...base])
+        .with("plain", () => base)
+        .with("file", () => (fileSupport === null ? base : [fileSupport, ...base]))
+        .exhaustive()
+    );
+  }, [languageKind, fileSupport, editorTheme]);
 
   return (
     <CodeMirror
@@ -214,7 +210,10 @@ export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(fu
         onCreateEditor?.(view);
       }}
       onChange={onChange}
-      theme={isDark ? "dark" : "light"}
+      // No CodeMirror palette: `oneDark` and the default light theme would
+      // paint over the astryx tokens above. Dark mode is carried by the
+      // `dark` flag on `editorTheme`.
+      theme="none"
     />
   );
 });
