@@ -248,10 +248,11 @@ export const pickNativePath = (
       }
 
       const filename = input.defaultPath ?? "notes.json";
+      const defaultFilters = filename.endsWith(".json") ? ["*.json"] : undefined;
 
       return isMac
         ? macFileSelection(buildMacSaveScript("Save file", filename))
-        : zenityFileSelection("Save file", toZenityFileFilters(input.filters ?? ["*.json"]), {
+        : zenityFileSelection("Save file", toZenityFileFilters(input.filters ?? defaultFilters), {
             save: true,
             filename,
           });

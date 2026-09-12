@@ -408,11 +408,12 @@ function ReaderPageContent() {
           actions={
             <VStack gap={3} hAlign="center">
               <Button
-                label="Open markdown…"
+                label="Open…"
                 variant="primary"
                 isLoading={tabs.isOpening}
                 onClick={tabs.pick}
               />
+
               <ReaderDropHint />
             </VStack>
           }

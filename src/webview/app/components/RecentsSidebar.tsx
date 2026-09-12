@@ -38,8 +38,8 @@ function RecentsSidebarOpenAction({
 
   return isCollapsed ? (
     <IconButton
-      label="Open markdown…"
-      tooltip="Open markdown…"
+      label="Open…"
+      tooltip="Open…"
       variant={variant}
       size="sm"
       icon={<Icon icon={DocumentTextIcon} size="sm" />}
@@ -47,12 +47,7 @@ function RecentsSidebarOpenAction({
       onClick={onPickDocument}
     />
   ) : (
-    <Button
-      label="Open markdown…"
-      variant={variant}
-      isLoading={isOpening}
-      onClick={onPickDocument}
-    />
+    <Button label="Open…" variant={variant} isLoading={isOpening} onClick={onPickDocument} />
   );
 }
 
