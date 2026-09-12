@@ -1,7 +1,6 @@
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
-import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
@@ -12,6 +11,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowPathIcon, CodeBracketIcon, CommandLineIcon, ShieldCheckIcon } from "../icons.ts";
+import { ReaderCodeBlock } from "../markdown/code-block.tsx";
 import { unwrap } from "../session/reader-api.ts";
 import { useMcpClients } from "../session/useMcpClients.ts";
 import { api } from "../treaty.ts";
@@ -159,7 +159,7 @@ export function McpSettingsDialog({ isOpen, onOpenChange }: McpSettingsDialogPro
                 <Icon icon={CommandLineIcon} size="sm" color="secondary" />
                 <Text type="label">Claude Code</Text>
               </HStack>
-              <CodeBlock
+              <ReaderCodeBlock
                 code={claudeCodeSnippet(connection.data.url, connection.data.token)}
                 language="bash"
                 hasLanguageLabel={false}
@@ -175,7 +175,7 @@ export function McpSettingsDialog({ isOpen, onOpenChange }: McpSettingsDialogPro
                 <Icon icon={CodeBracketIcon} size="sm" color="secondary" />
                 <Text type="label">Claude Desktop / Cursor / other JSON-config clients</Text>
               </HStack>
-              <CodeBlock
+              <ReaderCodeBlock
                 code={jsonConfigSnippet(connection.data.url, connection.data.token)}
                 language="json"
                 title="mcp.json"

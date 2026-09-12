@@ -1,14 +1,15 @@
 import type { EditorView } from "@codemirror/view";
 import { getEditorFontFamilyCss, useFontSettings } from "../theme/FontSettingsContext.tsx";
 import { ReaderEditor } from "../ui/reader.tsx";
-import { SourceEditor, type SourceLanguage } from "./SourceEditor.tsx";
+import { SourceEditor } from "./SourceEditor.tsx";
+import { markdownSource, type SourceLanguage } from "./source-language.ts";
 
 type DocumentEditorProps = {
   value: string;
   onChange: (text: string) => void;
   /** Handed the live EditorView so callers can drive scrolling (outline jumps). */
   onEditorReady?: (view: EditorView) => void;
-  /** `"plain"` for a Document that is not markdown, so nothing is styled as syntax it does not have. */
+  /** A `file` language highlights a Document that is not markdown by its path on disk. */
   language?: SourceLanguage;
 };
 
@@ -16,7 +17,7 @@ export const DocumentEditor = ({
   value,
   onChange,
   onEditorReady,
-  language = "markdown",
+  language = markdownSource,
 }: DocumentEditorProps) => {
   const { editorFontSize, editorFontFamily } = useFontSettings();
   const fontFamily = getEditorFontFamilyCss(editorFontFamily);

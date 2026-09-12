@@ -819,3 +819,12 @@ body,
   font-family: var(--font-family-body);
   line-height: normal;
 }
+
+/* Astryx's panel resize handle is a 16px grab strip centred on the panel edge,
+   so its outer half lands past the content box. The shell's content region
+   scrolls on both axes, so that half-strip buys a horizontal scrollbar the
+   document never asked for. Clip it: everything inside that needs to scroll
+   sideways — the code blocks, the source editor — owns its own scroller. */
+.astryx-layout-content {
+  overflow-x: clip;
+}

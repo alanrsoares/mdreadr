@@ -21,6 +21,7 @@ import { type DocumentViewMode, DocumentViewModeSwitch } from "./DocumentViewMod
 import { FontAdjustmentControl } from "./FontAdjustmentControl.tsx";
 import { ImageDocumentView } from "./ImageDocumentView.tsx";
 import { MarkdownView } from "./MarkdownView.tsx";
+import { fileSource, plainSource } from "./source-language.ts";
 
 export type { DocumentViewMode };
 
@@ -145,7 +146,7 @@ export const DocumentView = ({
                 value={editorValue}
                 onChange={onEditorChange}
                 onEditorReady={onEditorReady}
-                language="plain"
+                language={documentPath ? fileSource(documentPath) : plainSource}
               />
             </ReaderColumn>
           ))

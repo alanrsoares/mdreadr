@@ -1,4 +1,3 @@
-import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import type { MarkdownComponents } from "@astryxdesign/core/Markdown";
 import {
   type BlockAnchor,
@@ -17,6 +16,7 @@ import {
   ReaderParagraph,
   readerHeadingByLevel,
 } from "../ui/reader.tsx";
+import { ReaderCodeBlock } from "./code-block.tsx";
 import { ReaderImage, renderSpecialFence } from "./pipeline.tsx";
 import type { RenderContext } from "./render-context.ts";
 
@@ -132,7 +132,7 @@ function PinCodeBlock({ code, language, render, edit }: PinCodeBlockProps) {
         data-block-id={blockId}
         className={blockClasses(render.notedBlockIds, blockId)}
       >
-        <CodeBlock code={code} language={language} isCollapsible />
+        <ReaderCodeBlock code={code} language={language} isCollapsible />
       </ReaderCodeWrap>
     </EditableBlock>
   );
