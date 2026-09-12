@@ -268,15 +268,43 @@ install_linux() {
     tar -xzf "$TMP_DIR/setup.tar.gz" -C "$TMP_DIR"
     [ -f "$TMP_DIR/installer" ] || fail "Setup archive has no 'installer' binary"
     chmod +x "$TMP_DIR/installer"
+
+    # The Electrobun installer automatically launches the app upon extraction.
+    # On Linux/Wayland (especially with WebKitGTK and NVIDIA), WebKit fails
+    # GBM buffer creation without WEBKIT_DISABLE_DMABUF_RENDERER=1, resulting
+    # in an empty window. Export workarounds so the installer's launch inherits them.
+    export GDK_BACKEND="${GDK_BACKEND:-x11}"
+    export WEBKIT_DISABLE_DMABUF_RENDERER="${WEBKIT_DISABLE_DMABUF_RENDERER:-1}"
+
     say "» running the ${APP} installer (extracts to ~/.local/share, adds a desktop entry)…"
     (cd "$TMP_DIR" && ./installer)
 
-    # WebKitGTK on Wayland renders a blank window without these; patch the
-    # desktop entry so launching from an app menu/launcher works too.
-    DESKTOP_FILE="$HOME/.local/share/applications/${APP}.desktop"
-    if [ -f "$DESKTOP_FILE" ]; then
-      sed -i 's|Exec="|Exec=env GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 "|' "$DESKTOP_FILE"
+    # Wrap the extracted binary directly so ANY invocation (desktop entry,
+    # desktop shortcut, file manager, terminal) runs with the required environment.
+    APP_DIR="$HOME/.local/share/dev.mdreadr.app/$CHANNEL/app"
+    LAUNCHER="$APP_DIR/bin/launcher"
+    LAUNCHER_BIN="$APP_DIR/bin/launcher.bin"
+    if [ -f "$LAUNCHER" ]; then
+      if [ ! -f "$LAUNCHER_BIN" ]; then
+        mv "$LAUNCHER" "$LAUNCHER_BIN"
+      fi
+      cat << 'EOF' > "$LAUNCHER"
+#!/bin/sh
+export GDK_BACKEND="${GDK_BACKEND:-x11}"
+export WEBKIT_DISABLE_DMABUF_RENDERER="${WEBKIT_DISABLE_DMABUF_RENDERER:-1}"
+DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+exec "$DIR/launcher.bin" "$@"
+EOF
+      chmod +x "$LAUNCHER"
     fi
+
+    # WebKitGTK on Wayland renders a blank window without these; patch all
+    # desktop entries (applications menu + Desktop shortcut) as well.
+    for DESKTOP_FILE in "$HOME/.local/share/applications/${APP}.desktop" "$HOME/Desktop/${APP}.desktop"; do
+      if [ -f "$DESKTOP_FILE" ]; then
+        sed -i 's|Exec="|Exec=env GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 "|' "$DESKTOP_FILE"
+      fi
+    done
     mkdir -p "$BIN_DIR"
     printf '#!/bin/sh\nexport GDK_BACKEND=x11\nexport WEBKIT_DISABLE_DMABUF_RENDERER=1\nexec "%s/.local/share/dev.mdreadr.app/%s/app/bin/launcher" "$@"\n' \
       "$HOME" "$CHANNEL" >"$BIN_DIR/$APP"
@@ -311,7 +339,9 @@ install_linux() {
   tar -xf "$TMP_DIR/$APP.tar" -C "$OPT_DIR"
   LAUNCHER=$(find "$OPT_DIR" -type f -name "$APP" -perm -u+x | head -n 1)
   [ -n "$LAUNCHER" ] || fail "could not find the $APP launcher inside the bundle at $OPT_DIR"
-  ln -sf "$LAUNCHER" "$BIN_DIR/$APP"
+  printf '#!/bin/sh\nexport GDK_BACKEND="${GDK_BACKEND:-x11}"\nexport WEBKIT_DISABLE_DMABUF_RENDERER="${WEBKIT_DISABLE_DMABUF_RENDERER:-1}"\nexec "%s" "$@"\n' \
+    "$LAUNCHER" >"$BIN_DIR/$APP"
+  chmod +x "$BIN_DIR/$APP"
   say "✓ installed: $OPT_DIR (launcher: $BIN_DIR/$APP)"
   path_hint
 }
