@@ -47,11 +47,12 @@ Wait for `VITE … ready` before expecting UI. With `dev:hmr`, restart Electrobu
 ```bash
 bun run build
 mkdir -p /tmp/mdreadr-install
-tar -xzf artifacts/stable-linux-x64-mdreadr-Setup.tar.gz -C /tmp/mdreadr-install
+tar -xzf artifacts/*linux-x64*Setup.tar.gz -C /tmp/mdreadr-install
+export GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1
 /tmp/mdreadr-install/installer
 ```
 
-Installer extracts to `~/.local/share/` and adds a desktop shortcut.
+Installer extracts to `~/.local/share/` and immediately launches the app. Without `WEBKIT_DISABLE_DMABUF_RENDERER=1`, WebKit on Wayland/Linux fails GBM buffer creation and renders an empty window. Alternatively, run `bun run install:linux` which handles extraction, environment presets, and wrapper creation.
 
 **Do not** run `build/.../bin/launcher` directly — that is the inner bundle, not the self-extracting installer.
 
