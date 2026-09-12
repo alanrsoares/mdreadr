@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.1](https://github.com/alanrsoares/mdreadr/compare/v0.19.0...v0.19.1) (2026-09-12)
+
+
+### Bug Fixes
+
+* **shell:** refuse a download that never prepared ([#81](https://github.com/alanrsoares/mdreadr/issues/81)) ([d524624](https://github.com/alanrsoares/mdreadr/commit/d524624b3495a6538161aeb49ccdacac3d790a91))
+
 ## [0.19.0](https://github.com/alanrsoares/mdreadr/compare/v0.18.1...v0.19.0) (2026-09-11)
 
 
