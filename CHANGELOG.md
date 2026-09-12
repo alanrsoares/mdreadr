@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0](https://github.com/alanrsoares/mdreadr/compare/v0.20.0...v0.21.0) (2026-09-12)
+
+
+### Features
+
+* match the editor's palette to the reader's ([#85](https://github.com/alanrsoares/mdreadr/issues/85)) ([b2fcb73](https://github.com/alanrsoares/mdreadr/commit/b2fcb73e70b9189498aad8950f90b3c24780df85))
+
 ## [0.20.0](https://github.com/alanrsoares/mdreadr/compare/v0.19.1...v0.20.0) (2026-09-12)
 
 
