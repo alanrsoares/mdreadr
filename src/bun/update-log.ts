@@ -28,6 +28,20 @@ export const formatUpdateLogLine = (entry: UpdateLogEntry, at: Date): string => 
 export type UpdateLogError = { _tag: "UpdateLogIo"; message: string };
 
 /**
+ * Serializes file operations so concurrent fire-and-forget calls do not race
+ * their cap check, read, and write.
+ */
+let writeQueue: Promise<unknown> = Promise.resolve();
+
+async function performAppend(entry: UpdateLogEntry, at: Date): Promise<void> {
+  await ensureConfigDir();
+  const path = updateLogPath();
+  const file = Bun.file(path);
+  const existing = (await file.exists()) && file.size <= MAX_LOG_BYTES ? await file.text() : "";
+  await Bun.write(path, `${existing}${formatUpdateLogLine(entry, at)}`);
+}
+
+/**
  * Appends one line to the update log, starting the file over once it passes
  * its cap. Failing to log is never allowed to fail an update, so every caller
  * discards the Result — it exists so a test can assert the write.
@@ -37,13 +51,10 @@ export const appendUpdateLog = (
   at: Date = new Date(),
 ): ResultAsync<void, UpdateLogError> =>
   ResultAsync.fromPromise(
-    (async () => {
-      await ensureConfigDir();
-      const path = updateLogPath();
-      const file = Bun.file(path);
-      const existing = (await file.exists()) && file.size <= MAX_LOG_BYTES ? await file.text() : "";
-      await Bun.write(path, `${existing}${formatUpdateLogLine(entry, at)}`);
-    })(),
+    new Promise<void>((resolve, reject) => {
+      const task = () => performAppend(entry, at).then(resolve, reject);
+      writeQueue = writeQueue.then(task, task);
+    }),
     (error) => ({
       _tag: "UpdateLogIo" as const,
       message: error instanceof Error ? error.message : String(error),

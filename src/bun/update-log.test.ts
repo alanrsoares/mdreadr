@@ -37,4 +37,23 @@ describe("appendUpdateLog", () => {
         "2026-09-12T11:26:50.228Z no-update Already on latest version\n",
     );
   });
+
+  test("serializes concurrent writes so no entry is overwritten", async () => {
+    await Bun.write(updateLogPath(), "");
+    const count = 10;
+    const entries = Array.from({ length: count }, (_, i) => ({
+      status: `step-${i}`,
+      message: `message ${i}`,
+    }));
+
+    // Fire all appends concurrently without awaiting between them
+    await Promise.all(entries.map((entry) => appendUpdateLog(entry, at)));
+
+    const content = await Bun.file(updateLogPath()).text();
+    const lines = content.trim().split("\n");
+    expect(lines.length).toBe(count);
+    for (const [i, line] of lines.entries()) {
+      expect(line).toBe(`2026-09-12T11:26:50.228Z step-${i} message ${i}`);
+    }
+  });
 });
