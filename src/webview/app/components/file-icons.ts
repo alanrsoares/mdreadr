@@ -1,6 +1,7 @@
 import iconsJson from "@iconify-json/vscode-icons/icons.json";
 import type { ComponentType, SVGProps } from "react";
 import { createElement } from "react";
+import { pathFileName } from "./path-display.ts";
 
 export type FileIconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -87,9 +88,14 @@ export const ICONS_BY_NAME = {
   ".gitignore": createSvgIcon("file-type-git"),
 } satisfies Record<string, FileIconComponent>;
 
+const lookupIcon = (
+  registry: Record<string, FileIconComponent>,
+  key: string,
+): FileIconComponent | undefined => registry[key];
+
 /** The extension of a path's file name, lowercased, or "" when it has none. */
 export const fileExtension = (path: string): string => {
-  const name = path.split(/[/\\]/).at(-1) ?? "";
+  const name = pathFileName(path);
   const dot = name.lastIndexOf(".");
   // A leading dot is a dotfile's name, not an extension: `.gitignore` has none.
   return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
@@ -97,12 +103,10 @@ export const fileExtension = (path: string): string => {
 
 /** The icon for a file, falling back to the plain document for the unknown. */
 export const fileIcon = (path: string): FileIconComponent => {
-  const name = (path.split(/[/\\]/).at(-1) ?? "").toLowerCase();
-  const byName: FileIconComponent | undefined = (
-    ICONS_BY_NAME as Record<string, FileIconComponent>
-  )[name];
-  const byExt: FileIconComponent | undefined = (
-    ICONS_BY_EXTENSION as Record<string, FileIconComponent>
-  )[fileExtension(path)];
-  return byName ?? byExt ?? DEFAULT_FILE_ICON;
+  const name = pathFileName(path).toLowerCase();
+  return (
+    lookupIcon(ICONS_BY_NAME, name) ??
+    lookupIcon(ICONS_BY_EXTENSION, fileExtension(path)) ??
+    DEFAULT_FILE_ICON
+  );
 };
