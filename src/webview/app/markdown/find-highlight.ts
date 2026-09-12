@@ -113,6 +113,11 @@ export function paintMatches(
   matches: FindMatch[],
   currentIndex: number,
 ): PaintedFind {
+  if (matches.length === 0) {
+    clearHighlights();
+    return { currentRange: null };
+  }
+
   const api = highlightApi();
   const chunks = nodes.map((node) => ({ length: node.data.length }));
   const ranges: Range[] = [];

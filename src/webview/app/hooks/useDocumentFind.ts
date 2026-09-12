@@ -113,6 +113,12 @@ export function useDocumentFind({
     // painting from the background would draw this Document's matches over the
     // one in front. Reactivating repaints, which is why `isActive` is a dep.
     if (!isOpen || !isActive) return;
+
+    if (query === "" || matches.length === 0) {
+      clearHighlights();
+      return;
+    }
+
     const match = matches[index];
     if (match) anchorRef.current = match.start;
 
@@ -130,7 +136,7 @@ export function useDocumentFind({
     if (!root) return;
     const { currentRange } = paintMatches(collectTextNodes(root), matches, index);
     if (currentRange) revealRange(currentRange, root);
-  }, [isOpen, isActive, matches, index, mode, previewRef, rootRef, editorViewRef]);
+  }, [isOpen, isActive, query, matches, index, mode, previewRef, rootRef, editorViewRef]);
 
   // Painted ranges belong to this tab's DOM: leaving the tab, or the Document,
   // must not leave them on the next one.
