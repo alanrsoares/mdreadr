@@ -323,8 +323,14 @@ function ReaderPageContent() {
   }, [tabs]);
 
   const tabStripEntries = [
-    ...tabs.tabs.map((tab) => ({ id: tab.id, label: pathFileName(tab.document.path) })),
-    ...(unsavedDrop ? [{ id: UNSAVED_TAB_ID, label: unsavedDrop.name }] : []),
+    ...tabs.tabs.map((tab) => ({
+      id: tab.id,
+      label: pathFileName(tab.document.path),
+      path: tab.document.path,
+    })),
+    ...(unsavedDrop
+      ? [{ id: UNSAVED_TAB_ID, label: unsavedDrop.name, path: unsavedDrop.name }]
+      : []),
   ];
 
   // With nothing open the centred CTA is the only primary action, and the

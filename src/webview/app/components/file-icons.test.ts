@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { CodeBracketIcon, DocumentIcon, DocumentTextIcon, PhotoIcon } from "../icons.ts";
-import { fileExtension, fileIcon } from "./file-icons.ts";
+import {
+  DEFAULT_FILE_ICON,
+  fileExtension,
+  fileIcon,
+  ICONS_BY_EXTENSION,
+  ICONS_BY_NAME,
+} from "./file-icons.ts";
 
 describe("fileExtension", () => {
   test.each([
@@ -17,14 +22,17 @@ describe("fileExtension", () => {
 
 describe("fileIcon", () => {
   test.each([
-    ["/Users/reader/doc.md", DocumentTextIcon],
-    ["/Users/reader/notes.txt", DocumentTextIcon],
-    ["/Users/reader/shot.png", PhotoIcon],
-    ["/Users/reader/logo.svg", PhotoIcon],
-    ["/Users/reader/index.ts", CodeBracketIcon],
-    ["/Users/reader/config.yml", CodeBracketIcon],
-    ["/Users/reader/paper.pdf", DocumentIcon],
-    ["/Users/reader/LICENSE", DocumentIcon],
+    ["/Users/reader/doc.md", ICONS_BY_EXTENSION.md],
+    ["/Users/reader/notes.txt", ICONS_BY_EXTENSION.txt],
+    ["/Users/reader/shot.png", ICONS_BY_EXTENSION.png],
+    ["/Users/reader/logo.svg", ICONS_BY_EXTENSION.svg],
+    ["/Users/reader/index.ts", ICONS_BY_EXTENSION.ts],
+    ["/Users/reader/config.yml", ICONS_BY_EXTENSION.yml],
+    ["/Users/reader/paper.pdf", ICONS_BY_EXTENSION.pdf],
+    ["/Users/reader/LICENSE", ICONS_BY_NAME.license],
+    ["/Users/reader/.gitignore", ICONS_BY_NAME[".gitignore"]],
+    ["/Users/reader/unknown.xyz", DEFAULT_FILE_ICON],
+    ["/Users/reader/README", DEFAULT_FILE_ICON],
   ])("gives %p its own icon", (path, icon) => {
     expect(fileIcon(path)).toBe(icon);
   });
