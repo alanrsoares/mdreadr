@@ -1,6 +1,6 @@
-import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Markdown, type MarkdownComponents } from "@astryxdesign/core/Markdown";
 import type { ImageSrcResolver } from "./assets.ts";
+import { ReaderCodeBlock } from "./code-block.tsx";
 import { createReaderInlinePlugins, ReaderImage, renderSpecialFence } from "./pipeline.tsx";
 import { preprocessReaderMarkdown } from "./preprocess.ts";
 
@@ -32,7 +32,7 @@ const createNestedComponents = (
   code({ code, language }) {
     return (
       renderSpecialFence(language, code, { resolveImageSrc }, { skip: ["align"] }) ?? (
-        <CodeBlock code={code} language={language} isCollapsible />
+        <ReaderCodeBlock code={code} language={language} isCollapsible />
       )
     );
   },
@@ -47,7 +47,7 @@ export function AlignBlock({ code, resolveImageSrc }: AlignBlockProps) {
   const payload = decodeAlignPayload(code);
 
   return payload === null ? (
-    <CodeBlock code={code} language="text" />
+    <ReaderCodeBlock code={code} language="text" />
   ) : (
     <div className="reader-align-block" data-align={payload.align}>
       <Markdown
