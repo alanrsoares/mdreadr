@@ -16,13 +16,14 @@ import { AppLogo } from "../components/AppLogo.tsx";
 import { AppUpdateIndicator } from "../components/AppUpdateIndicator.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
 import { McpClientsIndicator } from "../components/McpClientsIndicator.tsx";
+import { McpIcon } from "../components/McpIcon.tsx";
 import { McpSettingsDialog } from "../components/McpSettingsDialog.tsx";
 import { formatDisplayPath, pathFileName, truncatePathMiddle } from "../components/path-display.ts";
 import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
 import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
 import { RecentsSidebarProvider, useRecentsSidebar } from "../components/RecentsSidebarContext.tsx";
 import { TabStrip } from "../components/TabStrip.tsx";
-import { Cog6ToothIcon, ViewColumnsIcon } from "../icons.ts";
+import { ViewColumnsIcon } from "../icons.ts";
 import { beginReaderTiming } from "../performance.ts";
 import { createTreatyReaderApi } from "../session/reader-api.ts";
 import { useDocumentTabs } from "../session/useReaderSession.ts";
@@ -359,7 +360,7 @@ function ReaderPageContent() {
                 label="MCP settings"
                 tooltip="MCP settings"
                 variant="ghost"
-                icon={<Icon icon={Cog6ToothIcon} size="sm" />}
+                icon={<Icon icon={McpIcon} size="sm" />}
                 onClick={() => setIsMcpSettingsOpen(true)}
               />
               <IconButton
