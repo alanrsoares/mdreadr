@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.1](https://github.com/alanrsoares/mdreadr/compare/v0.21.0...v0.21.1) (2026-09-12)
+
+
+### Bug Fixes
+
+* **shell:** wrap linux launcher and export env ([#87](https://github.com/alanrsoares/mdreadr/issues/87)) ([17aeac4](https://github.com/alanrsoares/mdreadr/commit/17aeac4853bcfec0bfc71cc055d56724fd26646f))
+
 ## [0.21.0](https://github.com/alanrsoares/mdreadr/compare/v0.20.0...v0.21.0) (2026-09-12)
 
 
