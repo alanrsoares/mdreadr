@@ -15,6 +15,7 @@ import { registerAppCommand } from "../appCommands.ts";
 import { AppLogo } from "../components/AppLogo.tsx";
 import { AppUpdateIndicator } from "../components/AppUpdateIndicator.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
+import { LinuxAppMenu } from "../components/LinuxAppMenu.tsx";
 import { McpClientsIndicator } from "../components/McpClientsIndicator.tsx";
 import { McpIcon } from "../components/McpIcon.tsx";
 import { McpSettingsDialog } from "../components/McpSettingsDialog.tsx";
@@ -353,6 +354,7 @@ function ReaderPageContent() {
           }
           endContent={
             <HStack gap={2} vAlign="center">
+              <LinuxAppMenu />
               <AppUpdateIndicator />
               <ColorSchemeToggle />
               <McpClientsIndicator />

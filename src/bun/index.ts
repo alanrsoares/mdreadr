@@ -145,6 +145,11 @@ async function getMainViewUrl(): Promise<string> {
 }
 
 function buildApplicationMenu(): void {
+  // Electrobun's ApplicationMenu has no GTK backend: setApplicationMenu logs
+  // "Application menus are not supported on Linux" and no-ops, so building
+  // one here would just be dead weight (and log spam on every rerender).
+  // Linux gets the same commands from LinuxAppMenu.tsx, a hamburger menu
+  // rendered in the webview's own chrome instead of the OS's.
   if (process.platform === "linux") {
     return;
   }
