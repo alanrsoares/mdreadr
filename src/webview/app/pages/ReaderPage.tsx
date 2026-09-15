@@ -24,7 +24,7 @@ import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
 import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
 import { RecentsSidebarProvider, useRecentsSidebar } from "../components/RecentsSidebarContext.tsx";
 import { TabStrip } from "../components/TabStrip.tsx";
-import { ViewColumnsIcon } from "../icons.ts";
+import { FolderOpenIcon, ViewColumnsIcon } from "../icons.ts";
 import { beginReaderTiming } from "../performance.ts";
 import { createTreatyReaderApi } from "../session/reader-api.ts";
 import { useDocumentTabs } from "../session/useReaderSession.ts";
@@ -383,14 +383,17 @@ function ReaderPageContent() {
                 icon={<Icon icon={ViewColumnsIcon} size="sm" />}
                 onClick={toggleNotesSidebar}
               />
-              {isEmpty ? null : (
-                <Button
-                  label="Open…"
-                  variant="secondary"
-                  isLoading={tabs.isOpening}
-                  onClick={tabs.pick}
-                />
-              )}
+              {/* The only persistent Open control now that the sidebar no
+                  longer carries one, so it stays put whether or not a document
+                  is open, and takes the accent to read as the page's action. */}
+              <IconButton
+                label="Open…"
+                tooltip="Open…"
+                variant="primary"
+                icon={<Icon icon={FolderOpenIcon} size="sm" />}
+                isLoading={tabs.isOpening}
+                onClick={tabs.pick}
+              />
             </HStack>
           }
         />
@@ -403,9 +406,6 @@ function ReaderPageContent() {
           homeDirectory={tabs.homeDirectory}
           onOpen={handleOpenPath}
           onForget={tabs.forgetRecent}
-          onPickDocument={tabs.pick}
-          isOpening={tabs.isOpening}
-          openActionVariant={isEmpty ? "secondary" : "primary"}
         />
       }
     >
