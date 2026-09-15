@@ -346,15 +346,22 @@ function ReaderPageContent() {
         <TopNav
           label="Reader"
           heading={
-            <ReaderDocumentTopNavHeading
-              documentPath={activeDocumentPath}
-              unsavedName={isUnsavedActive ? unsavedDrop?.name : undefined}
-              homeDirectory={tabs.homeDirectory}
-            />
+            // The Linux menu bar rides in the heading slot, not startContent:
+            // startContent collapses into the mobile drawer at narrow widths,
+            // and a File/Edit/View bar that disappears when the window shrinks
+            // is worse than no bar at all. Here it stays pinned left of the
+            // chrome, right after the app title, like a GTK header bar.
+            <HStack gap={2} vAlign="center">
+              <ReaderDocumentTopNavHeading
+                documentPath={activeDocumentPath}
+                unsavedName={isUnsavedActive ? unsavedDrop?.name : undefined}
+                homeDirectory={tabs.homeDirectory}
+              />
+              <LinuxAppMenu />
+            </HStack>
           }
           endContent={
             <HStack gap={2} vAlign="center">
-              <LinuxAppMenu />
               <AppUpdateIndicator />
               <ColorSchemeToggle />
               <McpClientsIndicator />

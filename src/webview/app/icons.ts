@@ -2,7 +2,6 @@ export {
   AdjustmentsHorizontalIcon,
   ArrowDownTrayIcon,
   ArrowPathIcon,
-  Bars3Icon,
   ChatBubbleBottomCenterTextIcon,
   CheckIcon,
   ChevronDownIcon,
