@@ -49,14 +49,7 @@ function ReaderDocumentTopNavHeading({
   const anchorRef = useRef<HTMLDivElement>(null);
 
   if (unsavedName) {
-    return (
-      <TopNavHeading
-        logo={<AppLogo />}
-        superheading="mdreadr"
-        heading={unsavedName}
-        subheading="Unsaved"
-      />
-    );
+    return <TopNavHeading logo={<AppLogo />} heading={unsavedName} subheading="Unsaved" />;
   }
 
   if (!documentPath) {
@@ -72,7 +65,6 @@ function ReaderDocumentTopNavHeading({
       <div ref={anchorRef}>
         <TopNavHeading
           logo={<AppLogo />}
-          superheading="mdreadr"
           heading={pathFileName(documentPath)}
           subheading={subheading}
         />
