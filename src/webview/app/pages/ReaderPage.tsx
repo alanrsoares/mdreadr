@@ -35,6 +35,11 @@ const readerApi = createTreatyReaderApi();
 
 const UNSAVED_TAB_ID = "__unsaved__";
 
+/** The mark sits beside a two-line block (name over path), so it reads as a
+ *  peer of that stack rather than of the first line: the default 28px leaves it
+ *  floating small against 44px of text. Single-line headings keep the default. */
+const STACKED_LOGO_SIZE = 36;
+
 type ReaderDocumentTopNavHeadingProps = {
   documentPath?: string;
   unsavedName?: string;
@@ -49,7 +54,13 @@ function ReaderDocumentTopNavHeading({
   const anchorRef = useRef<HTMLDivElement>(null);
 
   if (unsavedName) {
-    return <TopNavHeading logo={<AppLogo />} heading={unsavedName} subheading="Unsaved" />;
+    return (
+      <TopNavHeading
+        logo={<AppLogo size={STACKED_LOGO_SIZE} />}
+        heading={unsavedName}
+        subheading="Unsaved"
+      />
+    );
   }
 
   if (!documentPath) {
@@ -64,7 +75,7 @@ function ReaderDocumentTopNavHeading({
     <>
       <div ref={anchorRef}>
         <TopNavHeading
-          logo={<AppLogo />}
+          logo={<AppLogo size={STACKED_LOGO_SIZE} />}
           heading={pathFileName(documentPath)}
           subheading={subheading}
         />
