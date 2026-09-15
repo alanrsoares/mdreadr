@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.2](https://github.com/alanrsoares/mdreadr/compare/v0.21.1...v0.21.2) (2026-09-15)
+
+
+### Bug Fixes
+
+* **webview:** add menu bar fallback for Linux ([#89](https://github.com/alanrsoares/mdreadr/issues/89)) ([322547e](https://github.com/alanrsoares/mdreadr/commit/322547ec486128c15dee15902202228e67a43b21))
+
 ## [0.21.1](https://github.com/alanrsoares/mdreadr/compare/v0.21.0...v0.21.1) (2026-09-12)
 
 
