@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.3](https://github.com/alanrsoares/mdreadr/compare/v0.21.2...v0.21.3) (2026-09-15)
+
+
+### Bug Fixes
+
+* **webview:** render Linux menu as inline menu bar ([#91](https://github.com/alanrsoares/mdreadr/issues/91)) ([d2d0771](https://github.com/alanrsoares/mdreadr/commit/d2d0771e3f23ad428690b82c7c6794ed50b2cfef))
+
 ## [0.21.2](https://github.com/alanrsoares/mdreadr/compare/v0.21.1...v0.21.2) (2026-09-15)
 
 
