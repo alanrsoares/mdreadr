@@ -1,6 +1,6 @@
 import { DropdownMenu, type DropdownMenuOption } from "@astryxdesign/core/DropdownMenu";
 import { HStack } from "@astryxdesign/core/HStack";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { runAppCommand } from "../appCommands.ts";
 import { isLinuxPlatform, shortcutLabel } from "../platform.ts";
 
@@ -21,6 +21,12 @@ import { isLinuxPlatform, shortcutLabel } from "../platform.ts";
  * `appCommands.ts` for state the bun process cannot hold, `__MDREADR_EDIT__`
  * for undo/redo — so the two platforms expose the same actions even though
  * only one gets OS chrome for them.
+ *
+ * The accelerators are the menu's job too. macOS gets them from the native
+ * menu item; on Linux nothing binds them unless this does, which is why the
+ * shortcut is declared on the entry itself rather than printed as a hint next
+ * to a binding kept somewhere else — a label and a key that can drift apart
+ * is how Ctrl+E, Ctrl+1 and Ctrl+2 came to be advertised but dead.
  */
 
 const runEdit = (method: "undo" | "redo"): void => {
@@ -31,69 +37,123 @@ const runEdit = (method: "undo" | "redo"): void => {
   ).__MDREADR_EDIT__?.[method]();
 };
 
+/** `key` matches `KeyboardEvent.key`, lowercased. Cmd/Ctrl is implied: every
+ *  entry in this menu has it, as the whole menu mirrors `CmdOrCtrl+…` items. */
+type Shortcut = { key: string; shift?: boolean };
+
+type MenuEntry = { type: "divider" } | { label: string; shortcut: Shortcut; run: () => void };
+
 type MenuBarMenu = {
   title: string;
-  items: DropdownMenuOption[];
+  entries: MenuEntry[];
 };
 
 const menus: MenuBarMenu[] = [
   {
     title: "File",
-    items: [
+    entries: [
       {
         label: "Open…",
-        endContent: shortcutLabel("O"),
-        onClick: () => runAppCommand("open-document"),
+        shortcut: { key: "o" },
+        run: () => runAppCommand("open-document"),
       },
       { type: "divider" },
       {
         label: "Save",
-        endContent: shortcutLabel("S"),
-        onClick: () => runAppCommand("save-document"),
+        shortcut: { key: "s" },
+        run: () => runAppCommand("save-document"),
       },
       { type: "divider" },
       {
         label: "Close Tab",
-        endContent: shortcutLabel("W"),
-        onClick: () => runAppCommand("close-tab"),
+        shortcut: { key: "w" },
+        run: () => runAppCommand("close-tab"),
       },
     ],
   },
   {
     title: "Edit",
-    items: [
-      { label: "Undo", endContent: shortcutLabel("Z"), onClick: () => runEdit("undo") },
-      { label: "Redo", endContent: shortcutLabel("⇧Z"), onClick: () => runEdit("redo") },
+    entries: [
+      { label: "Undo", shortcut: { key: "z" }, run: () => runEdit("undo") },
+      { label: "Redo", shortcut: { key: "z", shift: true }, run: () => runEdit("redo") },
       { type: "divider" },
       {
         label: "Find…",
-        endContent: shortcutLabel("F"),
-        onClick: () => runAppCommand("find-in-document"),
+        shortcut: { key: "f" },
+        run: () => runAppCommand("find-in-document"),
       },
     ],
   },
   {
     title: "View",
-    items: [
+    entries: [
       {
         label: "Toggle Preview / Edit",
-        endContent: shortcutLabel("E"),
-        onClick: () => runAppCommand("toggle-view-mode"),
+        shortcut: { key: "e" },
+        run: () => runAppCommand("toggle-view-mode"),
       },
       { type: "divider" },
       {
         label: "Toggle Navigation",
-        endContent: shortcutLabel("1"),
-        onClick: () => runAppCommand("toggle-navigation-sidebar"),
+        shortcut: { key: "1" },
+        run: () => runAppCommand("toggle-navigation-sidebar"),
       },
       {
         label: "Toggle Notes",
-        endContent: shortcutLabel("2"),
-        onClick: () => runAppCommand("toggle-notes-sidebar"),
+        shortcut: { key: "2" },
+        run: () => runAppCommand("toggle-notes-sidebar"),
       },
     ],
   },
 ];
+
+const toDropdownItems = (menu: MenuBarMenu): DropdownMenuOption[] =>
+  menu.entries.map((entry) =>
+    "type" in entry
+      ? entry
+      : {
+          label: entry.label,
+          endContent: shortcutLabel(entry.shortcut.key.toUpperCase(), {
+            shift: entry.shortcut.shift,
+          }),
+          onClick: entry.run,
+        },
+  );
+
+const commands = menus.flatMap((menu) =>
+  menu.entries.filter(
+    (entry): entry is Extract<MenuEntry, { label: string }> => !("type" in entry),
+  ),
+);
+
+/**
+ * Binds every menu accelerator, because on Linux no OS menu does.
+ *
+ * Capture phase and `stopImmediatePropagation` make this the only handler for
+ * these chords: ReaderPage and ReaderTab bind Cmd/Ctrl+O, W, S and F on their
+ * own window listeners for macOS, where the native menu swallows the key
+ * before the webview sees it. Without stopping here, those would run the same
+ * command a second time on Linux — two file pickers for one Ctrl+O.
+ */
+function useMenuShortcuts(): void {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      const key = event.key.toLowerCase();
+      const command = commands.find(
+        ({ shortcut }) => shortcut.key === key && (shortcut.shift ?? false) === event.shiftKey,
+      );
+      if (!command) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      command.run();
+    };
+
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, []);
+}
 
 function MenuBar() {
   // One open title at a time, held here rather than per-menu, because a menu
@@ -101,6 +161,8 @@ function MenuBar() {
   // neighbouring title switches to it without a second click, the way native
   // menu bars track the pointer.
   const [openTitle, setOpenTitle] = useState<string | null>(null);
+
+  useMenuShortcuts();
 
   return (
     <HStack gap={0} vAlign="center">
@@ -119,7 +181,7 @@ function MenuBar() {
             // Shortcut hints sit in `endContent`, so a trigger-width menu would
             // wrap every row; size to the widest row instead.
             menuWidth="max-content"
-            items={menu.items}
+            items={toDropdownItems(menu)}
             isMenuOpen={openTitle === menu.title}
             onOpenChange={(isOpen) => setOpenTitle(isOpen ? menu.title : null)}
           />

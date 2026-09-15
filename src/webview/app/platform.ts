@@ -10,6 +10,13 @@ export const isApplePlatform = (): boolean =>
 export const isLinuxPlatform = (): boolean =>
   LINUX_PLATFORM.test(navigator.userAgent) || LINUX_PLATFORM.test(navigator.platform);
 
-/** `⌘B` / `Ctrl+B` — the separator differs by platform convention too. */
-export const shortcutLabel = (key: string): string =>
-  isApplePlatform() ? `⌘${key}` : `Ctrl+${key}`;
+type ShortcutModifiers = {
+  shift?: boolean;
+};
+
+/** `⌘B` / `Ctrl+B` — the separator differs by platform convention too, and so
+ *  does how a second modifier reads: `⌘⇧Z` against `Ctrl+Shift+Z`. */
+export const shortcutLabel = (key: string, modifiers?: ShortcutModifiers): string => {
+  const shift = modifiers?.shift ?? false;
+  return isApplePlatform() ? `⌘${shift ? "⇧" : ""}${key}` : `Ctrl+${shift ? "Shift+" : ""}${key}`;
+};
