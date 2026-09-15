@@ -1,6 +1,7 @@
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { Button } from "@astryxdesign/core/Button";
+import { Divider } from "@astryxdesign/core/Divider";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
@@ -16,8 +17,7 @@ import { AppLogo } from "../components/AppLogo.tsx";
 import { AppUpdateIndicator } from "../components/AppUpdateIndicator.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
 import { LinuxAppMenu } from "../components/LinuxAppMenu.tsx";
-import { McpClientsIndicator } from "../components/McpClientsIndicator.tsx";
-import { McpIcon } from "../components/McpIcon.tsx";
+import { McpSettingsButton } from "../components/McpSettingsButton.tsx";
 import { McpSettingsDialog } from "../components/McpSettingsDialog.tsx";
 import { formatDisplayPath, pathFileName, truncatePathMiddle } from "../components/path-display.ts";
 import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
@@ -366,23 +366,22 @@ function ReaderPageContent() {
           endContent={
             <HStack gap={2} vAlign="center">
               <AppUpdateIndicator />
-              <ColorSchemeToggle />
-              <McpClientsIndicator />
-              <IconButton
-                label="MCP settings"
-                tooltip="MCP settings"
-                variant="ghost"
-                icon={<Icon icon={McpIcon} size="sm" />}
-                onClick={() => setIsMcpSettingsOpen(true)}
-              />
-              <IconButton
-                label={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
-                tooltip={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
-                variant={notesSidebar.isCollapsed ? "ghost" : "secondary"}
-                isDisabled={isEmpty}
-                icon={<Icon icon={ViewColumnsIcon} size="sm" />}
-                onClick={toggleNotesSidebar}
-              />
+              {/* Toggles read as one run of equal-weight icon buttons, tight
+                  enough to group; the divider then separates state-of-the-view
+                  controls from the one action, which is the only accent here. */}
+              <HStack gap={1} vAlign="center">
+                <ColorSchemeToggle />
+                <McpSettingsButton onClick={() => setIsMcpSettingsOpen(true)} />
+                <IconButton
+                  label={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
+                  tooltip={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
+                  variant={notesSidebar.isCollapsed ? "ghost" : "secondary"}
+                  isDisabled={isEmpty}
+                  icon={<Icon icon={ViewColumnsIcon} size="sm" />}
+                  onClick={toggleNotesSidebar}
+                />
+              </HStack>
+              <Divider orientation="vertical" style={{ height: 20 }} />
               {/* The only persistent Open control now that the sidebar no
                   longer carries one, so it stays put whether or not a document
                   is open, and takes the accent to read as the page's action. */}
