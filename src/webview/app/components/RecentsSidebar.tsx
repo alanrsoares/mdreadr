@@ -1,8 +1,5 @@
 import { Badge } from "@astryxdesign/core/Badge";
-import { Button } from "@astryxdesign/core/Button";
 import { HStack } from "@astryxdesign/core/HStack";
-import { Icon } from "@astryxdesign/core/Icon";
-import { IconButton } from "@astryxdesign/core/IconButton";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import {
   SideNav,
@@ -20,36 +17,6 @@ import { RecentItemActions, RecentItemRow } from "../ui/layout.tsx";
 import { fileIcon } from "./file-icons.ts";
 import { formatDisplayPath, formatRecentMenuLabels, pathFileName } from "./path-display.ts";
 import { useRecentsSidebar } from "./RecentsSidebarContext.tsx";
-
-type OpenActionVariant = "primary" | "secondary";
-
-type RecentsSidebarOpenActionProps = {
-  onPickDocument: () => void;
-  isOpening: boolean;
-  variant: OpenActionVariant;
-};
-
-function RecentsSidebarOpenAction({
-  onPickDocument,
-  isOpening,
-  variant,
-}: RecentsSidebarOpenActionProps) {
-  const { isCollapsed } = useSideNavCollapse();
-
-  return isCollapsed ? (
-    <IconButton
-      label="Open…"
-      tooltip="Open…"
-      variant={variant}
-      size="sm"
-      icon={<Icon icon={DocumentTextIcon} size="sm" />}
-      isLoading={isOpening}
-      onClick={onPickDocument}
-    />
-  ) : (
-    <Button label="Open…" variant={variant} isLoading={isOpening} onClick={onPickDocument} />
-  );
-}
 
 type RecentSideNavItemProps = {
   path: string;
@@ -138,13 +105,6 @@ type RecentsSidebarProps = {
   homeDirectory?: string;
   onOpen: (path: string) => void;
   onForget: (path: string) => void;
-  onPickDocument: () => void;
-  isOpening?: boolean;
-  /**
-   * Demoted to secondary while the app is empty, so the centred CTA in
-   * ReaderPage is the only primary action on screen.
-   */
-  openActionVariant?: OpenActionVariant;
 };
 
 export function RecentsSidebar({
@@ -154,9 +114,6 @@ export function RecentsSidebar({
   homeDirectory,
   onOpen,
   onForget,
-  onPickDocument,
-  isOpening = false,
-  openActionVariant = "primary",
 }: RecentsSidebarProps) {
   const { isCollapsed, setCollapsed } = useRecentsSidebar();
 
@@ -179,13 +136,6 @@ export function RecentsSidebar({
         minWidth: 200,
         maxWidth: 360,
       }}
-      topContent={
-        <RecentsSidebarOpenAction
-          onPickDocument={onPickDocument}
-          isOpening={isOpening}
-          variant={openActionVariant}
-        />
-      }
       footerIcons={<RecentsSidebarFooter />}
     >
       <SideNavSection title="Recents">

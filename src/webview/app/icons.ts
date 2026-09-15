@@ -13,6 +13,7 @@ export {
   ExclamationTriangleIcon,
   EyeIcon,
   FolderIcon,
+  FolderOpenIcon,
   HashtagIcon,
   KeyIcon,
   LinkIcon,
