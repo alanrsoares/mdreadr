@@ -2,7 +2,7 @@ import { DropdownMenu, type DropdownMenuOption } from "@astryxdesign/core/Dropdo
 import { Icon } from "@astryxdesign/core/Icon";
 import { runAppCommand } from "../appCommands.ts";
 import { Bars3Icon } from "../icons.ts";
-import { isApplePlatform, shortcutLabel } from "../platform.ts";
+import { isLinuxPlatform, shortcutLabel } from "../platform.ts";
 
 /**
  * Stand-in for the native application menu on Linux.
@@ -88,9 +88,10 @@ const items: DropdownMenuOption[] = [
   },
 ];
 
-/** Nothing to stand in for on macOS, where the native menu bar already does this. */
+/** Nothing to stand in for anywhere but Linux — macOS gets the native menu bar,
+ *  and a future Windows build would get its own native chrome too. */
 export function LinuxAppMenu() {
-  if (isApplePlatform()) return null;
+  if (!isLinuxPlatform()) return null;
 
   return (
     <DropdownMenu
