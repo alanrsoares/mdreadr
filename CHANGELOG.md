@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.4](https://github.com/alanrsoares/mdreadr/compare/v0.21.3...v0.21.4) (2026-09-16)
+
+
+### Bug Fixes
+
+* **webview:** bind Linux menu shortcuts and rebalance top nav ([#93](https://github.com/alanrsoares/mdreadr/issues/93)) ([d304ab4](https://github.com/alanrsoares/mdreadr/commit/d304ab43d703f17e6f495c48ead7ec5159b8c6de))
+
 ## [0.21.3](https://github.com/alanrsoares/mdreadr/compare/v0.21.2...v0.21.3) (2026-09-15)
 
 
