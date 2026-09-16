@@ -1,6 +1,7 @@
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { Button } from "@astryxdesign/core/Button";
+import { Divider } from "@astryxdesign/core/Divider";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
@@ -16,15 +17,14 @@ import { AppLogo } from "../components/AppLogo.tsx";
 import { AppUpdateIndicator } from "../components/AppUpdateIndicator.tsx";
 import { ColorSchemeToggle } from "../components/ColorSchemeToggle.tsx";
 import { LinuxAppMenu } from "../components/LinuxAppMenu.tsx";
-import { McpClientsIndicator } from "../components/McpClientsIndicator.tsx";
-import { McpIcon } from "../components/McpIcon.tsx";
+import { McpSettingsButton } from "../components/McpSettingsButton.tsx";
 import { McpSettingsDialog } from "../components/McpSettingsDialog.tsx";
 import { formatDisplayPath, pathFileName, truncatePathMiddle } from "../components/path-display.ts";
 import { ReaderDropHint } from "../components/ReaderDropHint.tsx";
 import { RecentsSidebar } from "../components/RecentsSidebar.tsx";
 import { RecentsSidebarProvider, useRecentsSidebar } from "../components/RecentsSidebarContext.tsx";
 import { TabStrip } from "../components/TabStrip.tsx";
-import { ViewColumnsIcon } from "../icons.ts";
+import { FolderOpenIcon, ViewColumnsIcon } from "../icons.ts";
 import { beginReaderTiming } from "../performance.ts";
 import { createTreatyReaderApi } from "../session/reader-api.ts";
 import { useDocumentTabs } from "../session/useReaderSession.ts";
@@ -34,6 +34,11 @@ import { UnsavedReaderTab } from "./UnsavedReaderTab.tsx";
 const readerApi = createTreatyReaderApi();
 
 const UNSAVED_TAB_ID = "__unsaved__";
+
+/** The mark sits beside a two-line block (name over path), so it reads as a
+ *  peer of that stack rather than of the first line: the default 28px leaves it
+ *  floating small against 44px of text. Single-line headings keep the default. */
+const STACKED_LOGO_SIZE = 36;
 
 type ReaderDocumentTopNavHeadingProps = {
   documentPath?: string;
@@ -51,8 +56,7 @@ function ReaderDocumentTopNavHeading({
   if (unsavedName) {
     return (
       <TopNavHeading
-        logo={<AppLogo />}
-        superheading="mdreadr"
+        logo={<AppLogo size={STACKED_LOGO_SIZE} />}
         heading={unsavedName}
         subheading="Unsaved"
       />
@@ -71,8 +75,7 @@ function ReaderDocumentTopNavHeading({
     <>
       <div ref={anchorRef}>
         <TopNavHeading
-          logo={<AppLogo />}
-          superheading="mdreadr"
+          logo={<AppLogo size={STACKED_LOGO_SIZE} />}
           heading={pathFileName(documentPath)}
           subheading={subheading}
         />
@@ -363,31 +366,33 @@ function ReaderPageContent() {
           endContent={
             <HStack gap={2} vAlign="center">
               <AppUpdateIndicator />
-              <ColorSchemeToggle />
-              <McpClientsIndicator />
-              <IconButton
-                label="MCP settings"
-                tooltip="MCP settings"
-                variant="ghost"
-                icon={<Icon icon={McpIcon} size="sm" />}
-                onClick={() => setIsMcpSettingsOpen(true)}
-              />
-              <IconButton
-                label={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
-                tooltip={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
-                variant={notesSidebar.isCollapsed ? "ghost" : "secondary"}
-                isDisabled={isEmpty}
-                icon={<Icon icon={ViewColumnsIcon} size="sm" />}
-                onClick={toggleNotesSidebar}
-              />
-              {isEmpty ? null : (
-                <Button
-                  label="Open…"
-                  variant="secondary"
-                  isLoading={tabs.isOpening}
-                  onClick={tabs.pick}
+              {/* Toggles read as one run of equal-weight icon buttons, tight
+                  enough to group; the divider then separates state-of-the-view
+                  controls from the one action, which is the only accent here. */}
+              <HStack gap={1} vAlign="center">
+                <ColorSchemeToggle />
+                <McpSettingsButton onClick={() => setIsMcpSettingsOpen(true)} />
+                <IconButton
+                  label={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
+                  tooltip={notesSidebar.isCollapsed ? "Show notes sidebar" : "Hide notes sidebar"}
+                  variant={notesSidebar.isCollapsed ? "ghost" : "secondary"}
+                  isDisabled={isEmpty}
+                  icon={<Icon icon={ViewColumnsIcon} size="sm" />}
+                  onClick={toggleNotesSidebar}
                 />
-              )}
+              </HStack>
+              <Divider orientation="vertical" style={{ height: 20 }} />
+              {/* The only persistent Open control now that the sidebar no
+                  longer carries one, so it stays put whether or not a document
+                  is open, and takes the accent to read as the page's action. */}
+              <IconButton
+                label="Open…"
+                tooltip="Open…"
+                variant="primary"
+                icon={<Icon icon={FolderOpenIcon} size="sm" />}
+                isLoading={tabs.isOpening}
+                onClick={tabs.pick}
+              />
             </HStack>
           }
         />
@@ -400,9 +405,6 @@ function ReaderPageContent() {
           homeDirectory={tabs.homeDirectory}
           onOpen={handleOpenPath}
           onForget={tabs.forgetRecent}
-          onPickDocument={tabs.pick}
-          isOpening={tabs.isOpening}
-          openActionVariant={isEmpty ? "secondary" : "primary"}
         />
       }
     >
