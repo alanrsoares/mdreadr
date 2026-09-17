@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { parseMarkdown } from "@astryxdesign/core/Markdown/utils";
 import type { BlockAnchor } from "../schemas/index.ts";
-import { listDocumentBlocks } from "./anchors.ts";
+import { inlineToText, type ListNode, listDocumentBlocks } from "./anchors.ts";
 import {
   applySubBlockEdit,
   collectSubBlocks,
@@ -351,8 +352,9 @@ describe("splitAroundSubBlock: lists", () => {
     expect(slices(splitAroundSubBlock(nested, { kind: "list-item", path: [0, 0] }))).toEqual({
       before: "- alpha",
       source: "  - alpha one",
-      // The parent reopens empty so the sibling left behind still nests.
-      after: "-\n  - alpha two\n- beta",
+      // The parent reopens empty so the sibling left behind still nests. The
+      // marker keeps its trailing space: a bare dash parses as a paragraph.
+      after: "- \n  - alpha two\n- beta",
     });
   });
 
@@ -361,7 +363,7 @@ describe("splitAroundSubBlock: lists", () => {
     expect(slices(splitAroundSubBlock(nested, { kind: "list-item", path: [0, 0, 0] }))).toEqual({
       before: "- alpha\n  - alpha one",
       source: "    - deep a",
-      after: "-\n  -\n    - deep b",
+      after: "- \n  - \n    - deep b",
     });
   });
 
@@ -486,6 +488,85 @@ describe("mapTailTarget", () => {
         path: [7],
       }),
     ).toBeUndefined();
+  });
+});
+
+describe("a split tail renders at the depth its source claims", () => {
+  /**
+   * The path a reading surface would hand back for the item reading `words`.
+   *
+   * `subBlockTargetFromNode` counts `li` elements in the rendered DOM, and that
+   * DOM is built from this parse — so walking the parse is the DOM's own
+   * numbering, minus a browser. The bug this guards: a tail whose reopened
+   * ancestors parse as anything but list items renders its survivors one level
+   * shallower than the tail's source says they are, and every gesture in it
+   * resolves to a path `mapTailTarget` has never heard of.
+   */
+  const renderedPath = (source: string, words: string): number[] | undefined => {
+    const blocks = parseMarkdown(source, { autolink: "gfm" });
+    const lists = blocks.filter((block): block is ListNode => block.type === "list");
+    // A tail that kept its nesting is one list. Two means the reopened markers
+    // broke it apart, and no path off it can be trusted.
+    if (lists.length !== 1) return undefined;
+
+    const walk = (items: ListNode["items"], prefix: number[]): number[] | undefined => {
+      for (const [index, item] of items.entries()) {
+        const path = [...prefix, index];
+        const text = item.children
+          .map((child) => (child.type === "paragraph" ? inlineToText(child.children) : ""))
+          .join(" ")
+          .trim();
+        if (text === words) return path;
+
+        for (const child of item.children) {
+          if (child.type !== "list") continue;
+          const hit = walk(child.items, path);
+          if (hit) return hit;
+        }
+      }
+      return undefined;
+    };
+
+    return walk(lists[0]?.items ?? [], []);
+  };
+
+  test("a sibling left in a nested tail is reachable at the path it renders at", () => {
+    const source = ["- alpha", "  - alpha one", "  - alpha two", "- beta"].join("\n");
+    const split = splitAroundSubBlock(source, { kind: "list-item", path: [0, 0] });
+    const tail = split?.after;
+    if (!tail) throw new Error("no tail to render");
+
+    const path = renderedPath(tail.source, "alpha two");
+    expect(path).toEqual([0, 0]);
+    expect(mapTailTarget(tail, { kind: "list-item", path: path ?? [] })).toEqual({
+      kind: "list-item",
+      path: [0, 1],
+    });
+  });
+
+  test("the item after the reopened subtree keeps its own place", () => {
+    const source = ["- alpha", "  - alpha one", "  - alpha two", "- beta"].join("\n");
+    const tail = splitAroundSubBlock(source, { kind: "list-item", path: [0, 0] })?.after;
+    if (!tail) throw new Error("no tail to render");
+
+    expect(renderedPath(tail.source, "beta")).toEqual([1]);
+    expect(mapTailTarget(tail, { kind: "list-item", path: [1] })).toEqual({
+      kind: "list-item",
+      path: [1],
+    });
+  });
+
+  test("a tail two ancestors deep still nests both of them", () => {
+    const source = ["- alpha", "  - alpha one", "    - deep a", "    - deep b"].join("\n");
+    const tail = splitAroundSubBlock(source, { kind: "list-item", path: [0, 0, 0] })?.after;
+    if (!tail) throw new Error("no tail to render");
+
+    const path = renderedPath(tail.source, "deep b");
+    expect(path).toEqual([0, 0, 0]);
+    expect(mapTailTarget(tail, { kind: "list-item", path: path ?? [] })).toEqual({
+      kind: "list-item",
+      path: [0, 0, 1],
+    });
   });
 });
 
