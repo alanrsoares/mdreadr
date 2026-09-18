@@ -1,6 +1,6 @@
 {
   "name": "mdreadr",
-  "version": "0.21.4",
+  "version": "0.21.5",
   "module": "src/bun/index.ts",
   "type": "module",
   "private": true,
