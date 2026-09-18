@@ -103,9 +103,18 @@ const indentOf = (line: string): number => LIST_MARKER.exec(line)?.[1]?.length ?
  * The opening marker of a list item's line — its indentation and bullet, with
  * the item's own text dropped. An empty item at the same depth, which is what
  * a split list's tail needs to keep nesting at the depth the author wrote.
+ *
+ * The trailing space is load-bearing, not slack the trim missed: the renderer's
+ * parser reads a bare `-` on its own line as a paragraph of one dash, which
+ * breaks the tail into sibling lists — every item in it then renders one level
+ * shallower than the source says it is, and a gesture on it resolves to a path
+ * the tail's coordinate map has never heard of. With the space it is an empty
+ * item, the nesting survives the round trip, and no stray dash is drawn.
  */
-export const listItemMarkerPrefix = (line: string): string | undefined =>
-  LIST_MARKER.exec(line)?.[0].replace(/\s+$/, "");
+export const listItemMarkerPrefix = (line: string): string | undefined => {
+  const marker = LIST_MARKER.exec(line)?.[0].replace(/\s+$/, "");
+  return marker === undefined ? undefined : `${marker} `;
+};
 
 /**
  * The lines that open a list item, fenced code skipped: `- not an item` inside
