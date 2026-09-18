@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.5](https://github.com/alanrsoares/mdreadr/compare/v0.21.4...v0.21.5) (2026-09-18)
+
+
+### Bug Fixes
+
+* **domain:** reopen tail ancestors as parseable empty items ([#95](https://github.com/alanrsoares/mdreadr/issues/95)) ([d79888e](https://github.com/alanrsoares/mdreadr/commit/d79888ec560a8adde9c62c93278b3842259c0e95)), closes [#65](https://github.com/alanrsoares/mdreadr/issues/65)
+
 ## [0.21.4](https://github.com/alanrsoares/mdreadr/compare/v0.21.3...v0.21.4) (2026-09-16)
 
 
