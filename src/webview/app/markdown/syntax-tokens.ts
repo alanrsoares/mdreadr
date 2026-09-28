@@ -97,13 +97,12 @@ const grammarByAlias: Record<string, string> = {
 const MAX_HIGHLIGHTED_CHARS = 100_000;
 
 /** The grammar to highlight `language` with, if we have one registered. */
-export function resolveGrammar(language: string | undefined): Maybe<string> {
-  return flatMap(fromNullable(language), (value) => {
+export const resolveGrammar = (language: string | undefined): Maybe<string> =>
+  flatMap(fromNullable(language), (value) => {
     const requested = value.trim().toLowerCase();
     const grammar = grammarByAlias[requested] ?? requested;
     return fromNullable(refractor.registered(grammar) ? grammar : null);
   });
-}
 
 /** Depth-first walk; text is attributed to the innermost token that wraps it. */
 function collectTokens(

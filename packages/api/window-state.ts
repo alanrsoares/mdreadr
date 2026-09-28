@@ -28,14 +28,12 @@ export type WindowStateError = { _tag: "WindowStateIo"; message: string };
  * launch, or a `-32000` minimised frame from a Windows session, would otherwise
  * put the window somewhere the reader cannot reach it.
  */
-export function sanitizeWindowFrame(frame: WindowFrame): WindowFrame {
-  return {
-    x: Math.max(0, Math.round(frame.x)),
-    y: Math.max(0, Math.round(frame.y)),
-    width: Math.max(MIN_WIDTH, Math.round(frame.width)),
-    height: Math.max(MIN_HEIGHT, Math.round(frame.height)),
-  };
-}
+export const sanitizeWindowFrame = (frame: WindowFrame): WindowFrame => ({
+  x: Math.max(0, Math.round(frame.x)),
+  y: Math.max(0, Math.round(frame.y)),
+  width: Math.max(MIN_WIDTH, Math.round(frame.width)),
+  height: Math.max(MIN_HEIGHT, Math.round(frame.height)),
+});
 
 /** The frame to open at. Anything unreadable is the default, never an error the shell has to handle. */
 export const loadWindowFrame = (): ResultAsync<WindowFrame, never> =>

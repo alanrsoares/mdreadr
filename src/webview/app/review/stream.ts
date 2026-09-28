@@ -120,8 +120,9 @@ const searchableText = (item: ReviewItem): string =>
  */
 export const searchReviewStream = (items: ReviewItem[], query: string): ReviewItem[] => {
   const needle = query.trim().toLowerCase();
-  if (needle === "") return items;
-  return items.filter((item) => searchableText(item).toLowerCase().includes(needle));
+  return needle === ""
+    ? items
+    : items.filter((item) => searchableText(item).toLowerCase().includes(needle));
 };
 
 export const countReviewStream = (items: ReviewItem[]): ReviewCounts => {

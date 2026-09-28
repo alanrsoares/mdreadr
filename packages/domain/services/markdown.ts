@@ -53,12 +53,12 @@ export function stripFrontmatter(content: string): string {
   const closing = lines.findIndex(
     (line, index) => index > 0 && /^(---|\.\.\.)[ \t\r]*$/.test(line),
   );
-  if (closing === -1) return content;
-
-  return lines
-    .slice(closing + 1)
-    .join("\n")
-    .replace(/^\s*\n/, "");
+  return closing === -1
+    ? content
+    : lines
+        .slice(closing + 1)
+        .join("\n")
+        .replace(/^\s*\n/, "");
 }
 
 /** Prose-only word count and the reading time it implies. */
@@ -147,9 +147,7 @@ const hasExtension = (path: string, extensions: string[]): boolean => {
 };
 
 /** True for paths the reader can render as prose. */
-export function isMarkdownPath(path: string): boolean {
-  return hasExtension(path, MARKDOWN_EXTENSIONS);
-}
+export const isMarkdownPath = (path: string): boolean => hasExtension(path, MARKDOWN_EXTENSIONS);
 
 export function documentKindForPath(path: string): DocumentKind {
   if (isMarkdownPath(path)) return "markdown";

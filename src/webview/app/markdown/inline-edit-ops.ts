@@ -105,18 +105,16 @@ export function wrapSelection(
       value.slice(range.start - beforeLen, range.start) === before &&
       value.slice(range.end, range.end + afterLen) === after;
 
-    if (isWrapped) {
-      return {
-        text:
-          value.slice(0, range.start - beforeLen) + selected + value.slice(range.end + afterLen),
-        selection: { start: range.start - beforeLen, end: range.end - beforeLen },
-      };
-    }
-
-    return {
-      text: value.slice(0, range.start) + before + selected + after + value.slice(range.end),
-      selection: { start: range.start + beforeLen, end: range.end + beforeLen },
-    };
+    return isWrapped
+      ? {
+          text:
+            value.slice(0, range.start - beforeLen) + selected + value.slice(range.end + afterLen),
+          selection: { start: range.start - beforeLen, end: range.end - beforeLen },
+        }
+      : {
+          text: value.slice(0, range.start) + before + selected + after + value.slice(range.end),
+          selection: { start: range.start + beforeLen, end: range.end + beforeLen },
+        };
   }
 
   return {

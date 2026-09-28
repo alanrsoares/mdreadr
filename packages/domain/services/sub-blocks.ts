@@ -193,8 +193,8 @@ function listItemTree(source: string): ItemNode[] {
 }
 
 /** Flattens the tree in document order, parents before their children. */
-function flattenItems(nodes: ItemNode[], source: string, prefix: number[]): SubBlockSpan[] {
-  return nodes.flatMap((node, index) => {
+const flattenItems = (nodes: ItemNode[], source: string, prefix: number[]): SubBlockSpan[] =>
+  nodes.flatMap((node, index) => {
     const path = [...prefix, index];
     return [
       {
@@ -205,11 +205,9 @@ function flattenItems(nodes: ItemNode[], source: string, prefix: number[]): SubB
       ...flattenItems(node.children, source, path),
     ];
   });
-}
 
-function listItemSpans(source: string): SubBlockSpan[] {
-  return flattenItems(listItemTree(source), source, []);
-}
+const listItemSpans = (source: string): SubBlockSpan[] =>
+  flattenItems(listItemTree(source), source, []);
 
 /** Walks the tree by path, `undefined` when the path no longer leads anywhere. */
 function itemAtPath(nodes: ItemNode[], path: number[]): ItemNode | undefined {
@@ -241,15 +239,14 @@ function tableRowSpans(source: string): SubBlockSpan[] {
  * relative to that source. Empty for a block kind that has no sub-blocks, and
  * for a list or table whose source does not actually parse as one.
  */
-export function collectSubBlocks(
+export const collectSubBlocks = (
   blockSource: string,
   kind: SubBlockTarget["kind"],
-): SubBlockSpan[] {
-  return match(kind)
+): SubBlockSpan[] =>
+  match(kind)
     .with("list-item", () => listItemSpans(blockSource))
     .with("table-row", () => tableRowSpans(blockSource))
     .exhaustive();
-}
 
 /**
  * The document range of one sub-block, or `undefined` when the parent block or
@@ -270,12 +267,12 @@ export function findSubBlockRange(
     .with({ kind: "list-item" }, ({ path }) => itemAtPath(listItemTree(blockSource), path)?.range)
     .with({ kind: "table-row" }, ({ row }) => tableRowSpans(blockSource)[row]?.range)
     .exhaustive();
-  if (!range) return undefined;
-
-  return {
-    start: block.start + range.start,
-    end: block.start + range.end,
-  };
+  return !range
+    ? undefined
+    : {
+        start: block.start + range.start,
+        end: block.start + range.end,
+      };
 }
 
 /** The raw markdown of one sub-block, exactly as it sits in the document. */
@@ -302,8 +299,9 @@ export function applySubBlockEdit(
   options?: ResolveBlockTextOptions,
 ): string | undefined {
   const range = findSubBlockRange(content, anchor, target, options);
-  if (!range) return undefined;
-  return `${content.slice(0, range.start)}${newMarkdown}${content.slice(range.end)}`;
+  return !range
+    ? undefined
+    : `${content.slice(0, range.start)}${newMarkdown}${content.slice(range.end)}`;
 }
 
 /**
@@ -363,24 +361,22 @@ const blankHeader = (delimiter: string): string => delimiter.replace(/[-:]+/g, "
  * Row 0 of the tail is that repeated head, which stands for the block's own
  * header; every body row after it sits `editedRow` further down the block.
  */
-function tableTail(source: string, editedRow: number): SubBlockTail {
-  return {
-    source,
-    targets: tableRowSpans(source).flatMap(({ target }) =>
-      target.kind === "table-row"
-        ? [
-            {
-              local: target,
-              parent: {
-                kind: "table-row" as const,
-                row: target.row === 0 ? 0 : editedRow + target.row,
-              },
+const tableTail = (source: string, editedRow: number): SubBlockTail => ({
+  source,
+  targets: tableRowSpans(source).flatMap(({ target }) =>
+    target.kind === "table-row"
+      ? [
+          {
+            local: target,
+            parent: {
+              kind: "table-row" as const,
+              row: target.row === 0 ? 0 : editedRow + target.row,
             },
-          ]
-        : [],
-    ),
-  };
-}
+          },
+        ]
+      : [],
+  ),
+});
 
 function splitTable(blockSource: string, row: number): SubBlockSplit | undefined {
   const lines = blockSource.split("\n").filter((line) => line.trim() !== "");
@@ -417,8 +413,8 @@ function splitTable(blockSource: string, row: number): SubBlockSplit | undefined
 
 /** The empty markers of an item's ancestors, outermost first, so a tail slice
  *  of a nested list nests at the depth the author wrote. */
-function ancestorMarkers(blockSource: string, spans: SubBlockSpan[], path: number[]): string[] {
-  return path.slice(0, -1).flatMap((_, depth) => {
+const ancestorMarkers = (blockSource: string, spans: SubBlockSpan[], path: number[]): string[] =>
+  path.slice(0, -1).flatMap((_, depth) => {
     const ancestorPath = path.slice(0, depth + 1);
     const ancestor = spans.find(
       (entry) => entry.target.kind === "list-item" && samePath(entry.target.path, ancestorPath),
@@ -428,7 +424,6 @@ function ancestorMarkers(blockSource: string, spans: SubBlockSpan[], path: numbe
     const marker = listItemMarkerPrefix(line);
     return marker === undefined ? [] : [marker];
   });
-}
 
 /**
  * The tail of a split list. Every item in it is a slice of the block's own
@@ -436,24 +431,22 @@ function ancestorMarkers(blockSource: string, spans: SubBlockSpan[], path: numbe
  * offset in the tail, minus the reopened ancestors that have no source behind
  * them, plus where the tail was cut from.
  */
-function listTail(
+const listTail = (
   spans: SubBlockSpan[],
   source: string,
   cutFrom: number,
   reopenedLength: number,
-): SubBlockTail {
-  return {
-    source,
-    targets: collectSubBlocks(source, "list-item").flatMap((local) => {
-      // A reopened ancestor marker is not the author's text and stands for no
-      // item of the block.
-      if (local.range.start < reopenedLength) return [];
-      const start = cutFrom + local.range.start - reopenedLength;
-      const parent = spans.find((entry) => entry.range.start === start);
-      return parent ? [{ local: local.target, parent: parent.target }] : [];
-    }),
-  };
-}
+): SubBlockTail => ({
+  source,
+  targets: collectSubBlocks(source, "list-item").flatMap((local) => {
+    // A reopened ancestor marker is not the author's text and stands for no
+    // item of the block.
+    if (local.range.start < reopenedLength) return [];
+    const start = cutFrom + local.range.start - reopenedLength;
+    const parent = spans.find((entry) => entry.range.start === start);
+    return parent ? [{ local: local.target, parent: parent.target }] : [];
+  }),
+});
 
 /**
  * Splits a list or table's source into the part before the edited sub-block,
@@ -553,8 +546,9 @@ const comparable = (text: string): string =>
  */
 const sameWords = (a: string, b: string): boolean => {
   const [left, right] = [comparable(a), comparable(b)];
-  if (left.length === 0 || right.length === 0) return true;
-  return left.startsWith(right) || right.startsWith(left);
+  return left.length === 0 || right.length === 0
+    ? true
+    : left.startsWith(right) || right.startsWith(left);
 };
 
 /**

@@ -20,12 +20,10 @@ function parse(fixture: string): { value: string; selection: { start: number; en
 }
 
 /** Renders an edit back into the `|` / `[...]` notation for readable assertions. */
-function render({ text, selection }: ReturnType<typeof wrapSelection>): string {
-  if (selection.start === selection.end) {
-    return `${text.slice(0, selection.start)}|${text.slice(selection.start)}`;
-  }
-  return `${text.slice(0, selection.start)}[${text.slice(selection.start, selection.end)}]${text.slice(selection.end)}`;
-}
+const render = ({ text, selection }: ReturnType<typeof wrapSelection>): string =>
+  selection.start === selection.end
+    ? `${text.slice(0, selection.start)}|${text.slice(selection.start)}`
+    : `${text.slice(0, selection.start)}[${text.slice(selection.start, selection.end)}]${text.slice(selection.end)}`;
 
 const bold = (fixture: string) => {
   const { value, selection } = parse(fixture);

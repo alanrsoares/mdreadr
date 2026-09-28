@@ -57,35 +57,35 @@ function computeBlockIds(prepared: string): BlockIds {
   const tableIds: string[] = [];
 
   for (const block of pinnable) {
-    if (block.kind === "paragraph") {
-      const hash = hashBlockContent(block.text);
-      const occurrence = paragraphCounts.get(hash) ?? 0;
-      paragraphCounts.set(hash, occurrence + 1);
-      paragraphIds.push(blockIdForParagraph(block.text, occurrence));
-      continue;
-    }
-
-    if (block.kind === "code") {
-      const key = hashBlockContent(`${block.language ?? ""}\n${block.text}`);
-      const occurrence = codeCounts.get(key) ?? 0;
-      codeCounts.set(key, occurrence + 1);
-      codeIds.push(blockIdForCode(block.text, block.language, occurrence));
-      continue;
-    }
-
-    if (block.kind === "list") {
-      const hash = hashBlockContent(block.text);
-      const occurrence = listCounts.get(hash) ?? 0;
-      listCounts.set(hash, occurrence + 1);
-      listIds.push(blockIdForList(block.text, occurrence));
-      continue;
-    }
-
-    if (block.kind === "table") {
-      const hash = hashBlockContent(block.text);
-      const occurrence = tableCounts.get(hash) ?? 0;
-      tableCounts.set(hash, occurrence + 1);
-      tableIds.push(blockIdForTable(block.text, occurrence));
+    switch (block.kind) {
+      case "paragraph": {
+        const hash = hashBlockContent(block.text);
+        const occurrence = paragraphCounts.get(hash) ?? 0;
+        paragraphCounts.set(hash, occurrence + 1);
+        paragraphIds.push(blockIdForParagraph(block.text, occurrence));
+        continue;
+      }
+      case "code": {
+        const key = hashBlockContent(`${block.language ?? ""}\n${block.text}`);
+        const occurrence = codeCounts.get(key) ?? 0;
+        codeCounts.set(key, occurrence + 1);
+        codeIds.push(blockIdForCode(block.text, block.language, occurrence));
+        continue;
+      }
+      case "list": {
+        const hash = hashBlockContent(block.text);
+        const occurrence = listCounts.get(hash) ?? 0;
+        listCounts.set(hash, occurrence + 1);
+        listIds.push(blockIdForList(block.text, occurrence));
+        continue;
+      }
+      case "table": {
+        const hash = hashBlockContent(block.text);
+        const occurrence = tableCounts.get(hash) ?? 0;
+        tableCounts.set(hash, occurrence + 1);
+        tableIds.push(blockIdForTable(block.text, occurrence));
+        break;
+      }
     }
   }
 
@@ -341,9 +341,8 @@ export function scrollToAnchor(blockId: string): boolean {
  * GitHub-style slugs (`#hard-bans`) while the reader's own heading ids carry a
  * `heading-` prefix (`blockIdForHeading`), so both spellings are tried.
  */
-export function scrollToHeadingSlug(slug: string): boolean {
-  return scrollToAnchor(`heading-${slug}`) || scrollToAnchor(slug);
-}
+export const scrollToHeadingSlug = (slug: string): boolean =>
+  scrollToAnchor(`heading-${slug}`) || scrollToAnchor(slug);
 
 export function anchorDisplayLabel(anchor: BlockAnchor): string {
   if (anchor.label?.trim()) return anchor.label.trim();

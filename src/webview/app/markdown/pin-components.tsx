@@ -93,11 +93,9 @@ function PinParagraph({ children, render, edit }: PinParagraphProps) {
   const anchor = render.plan.nextParagraph(text);
   const blockId = anchor.blockId;
 
-  if (isBlockOpen(edit.open, blockId)) {
-    return <BlockSourceEditor anchor={anchor} fallback={text} render={render} edit={edit} />;
-  }
-
-  return (
+  return isBlockOpen(edit.open, blockId) ? (
+    <BlockSourceEditor anchor={anchor} fallback={text} render={render} edit={edit} />
+  ) : (
     <EditableBlock anchor={anchor} edit={edit} content={render.content} onPin={render.onPinBlock}>
       <ReaderParagraph
         data-block-id={blockId}

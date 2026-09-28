@@ -76,8 +76,7 @@ export function EditableBlock({
     if (!guess) return null;
 
     const target = mapSubTarget ? mapSubTarget(guess.target) : guess.target;
-    if (!target || !source) return null;
-    return confirmSubBlockTarget(source, target, guess.words) ?? null;
+    return !target || !source ? null : (confirmSubBlockTarget(source, target, guess.words) ?? null);
   };
 
   const editFrom = (event: MouseEvent): void => {

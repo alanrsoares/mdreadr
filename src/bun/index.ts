@@ -220,21 +220,23 @@ function buildApplicationMenu(): void {
 
   ApplicationMenu.on("application-menu-clicked", (event) => {
     const action = (event as { data?: { action?: string } })?.data?.action;
-    if (action === "install-cli") {
-      installCliCommand();
-    }
-    if (action === "check-for-updates") {
-      void checkForUpdatesCommand();
-    }
-    if (action === "download-update") {
-      downloadUpdate().catch((e) => {
-        console.error("Failed to download update:", e);
-      });
-    }
-    if (action === "apply-update") {
-      applyUpdate().catch((e) => {
-        console.error("Failed to apply update:", e);
-      });
+    switch (action) {
+      case "install-cli":
+        installCliCommand();
+        break;
+      case "check-for-updates":
+        void checkForUpdatesCommand();
+        break;
+      case "download-update":
+        downloadUpdate().catch((e) => {
+          console.error("Failed to download update:", e);
+        });
+        break;
+      case "apply-update":
+        applyUpdate().catch((e) => {
+          console.error("Failed to apply update:", e);
+        });
+        break;
     }
     // Everything the reader owns rather than the shell: which Tab is in front,
     // whether a sidebar is collapsed, whether the Draft is dirty. The bun

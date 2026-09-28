@@ -32,58 +32,62 @@ export function AppUpdateIndicator() {
     );
   }
 
-  if (state.status === "downloading") {
-    const percent = state.progressPercent ?? 0;
-    return (
-      <div ref={containerRef}>
-        <Button size="sm" variant="ghost" isDisabled isLoading label={`Downloading ${percent}%`} />
-        <Tooltip
-          content={`Downloading update: ${percent}% complete`}
-          anchorRef={containerRef}
-          placement="below"
-        />
-      </div>
-    );
-  }
-
-  if (state.status === "ready") {
-    return (
-      <div ref={containerRef}>
-        <Button
-          size="sm"
-          variant="primary"
-          isLoading={isApplying}
-          icon={<Icon icon={ArrowPathIcon} size="xsm" />}
-          label="Restart to Update"
-          onClick={() => applyUpdate()}
-        />
-        <Tooltip
-          content="Update is downloaded and ready. Restart to apply."
-          anchorRef={containerRef}
-          placement="below"
-        />
-      </div>
-    );
-  }
-
-  if (state.status === "error") {
-    return (
-      <div ref={containerRef}>
-        <Button
-          size="sm"
-          variant="destructive"
-          isLoading={isDownloading}
-          icon={<Icon icon={ExclamationTriangleIcon} size="xsm" />}
-          label="Update Failed — Retry"
-          onClick={() => downloadUpdate()}
-        />
-        <Tooltip
-          content={state.error || "Update failed. Click to retry download."}
-          anchorRef={containerRef}
-          placement="below"
-        />
-      </div>
-    );
+  switch (state.status) {
+    case "downloading": {
+      const percent = state.progressPercent ?? 0;
+      return (
+        <div ref={containerRef}>
+          <Button
+            size="sm"
+            variant="ghost"
+            isDisabled
+            isLoading
+            label={`Downloading ${percent}%`}
+          />
+          <Tooltip
+            content={`Downloading update: ${percent}% complete`}
+            anchorRef={containerRef}
+            placement="below"
+          />
+        </div>
+      );
+    }
+    case "ready":
+      return (
+        <div ref={containerRef}>
+          <Button
+            size="sm"
+            variant="primary"
+            isLoading={isApplying}
+            icon={<Icon icon={ArrowPathIcon} size="xsm" />}
+            label="Restart to Update"
+            onClick={() => applyUpdate()}
+          />
+          <Tooltip
+            content="Update is downloaded and ready. Restart to apply."
+            anchorRef={containerRef}
+            placement="below"
+          />
+        </div>
+      );
+    case "error":
+      return (
+        <div ref={containerRef}>
+          <Button
+            size="sm"
+            variant="destructive"
+            isLoading={isDownloading}
+            icon={<Icon icon={ExclamationTriangleIcon} size="xsm" />}
+            label="Update Failed — Retry"
+            onClick={() => downloadUpdate()}
+          />
+          <Tooltip
+            content={state.error || "Update failed. Click to retry download."}
+            anchorRef={containerRef}
+            placement="below"
+          />
+        </div>
+      );
   }
 
   return null;

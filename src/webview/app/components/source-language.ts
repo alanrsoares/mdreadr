@@ -33,9 +33,7 @@ const grammarByExtension: Record<string, string> = {
 };
 
 /** Last path segment, for both posix and windows separators. */
-export function filenameOf(path: string): string {
-  return path.split(/[\\/]/).at(-1) ?? path;
-}
+export const filenameOf = (path: string): string => path.split(/[\\/]/).at(-1) ?? path;
 
 /**
  * The grammar for a path, if CodeMirror ships one. A description carries only

@@ -58,8 +58,8 @@ export const inlineToText = (nodes: InlineNode[]): string =>
 export type ListNode = Extract<BlockNode, { type: "list" }>;
 export type TableNode = Extract<BlockNode, { type: "table" }>;
 
-export function listToText(block: ListNode): string {
-  return block.items
+export const listToText = (block: ListNode): string =>
+  block.items
     .map((item) =>
       item.children
         .map((child) => (child.type === "paragraph" ? inlineToText(child.children) : ""))
@@ -67,7 +67,6 @@ export function listToText(block: ListNode): string {
         .trim(),
     )
     .join("\n");
-}
 
 export function tableToText(block: TableNode): string {
   const headers = block.headers.map((h) => inlineToText(h.children)).join(" | ");
@@ -218,48 +217,48 @@ export function resolveBlockText(
   const tableCounts = new Map<string, number>();
 
   for (const block of pinnable) {
-    if (block.kind === "paragraph") {
-      const hash = hashBlockContent(block.text);
-      const occurrence = paragraphCounts.get(hash) ?? 0;
-      paragraphCounts.set(hash, occurrence + 1);
-      if (
-        anchor.kind === "paragraph" &&
-        blockIdForParagraph(block.text, occurrence) === anchor.blockId
-      ) {
-        return block.text;
+    switch (block.kind) {
+      case "paragraph": {
+        const hash = hashBlockContent(block.text);
+        const occurrence = paragraphCounts.get(hash) ?? 0;
+        paragraphCounts.set(hash, occurrence + 1);
+        if (
+          anchor.kind === "paragraph" &&
+          blockIdForParagraph(block.text, occurrence) === anchor.blockId
+        ) {
+          return block.text;
+        }
+        continue;
       }
-      continue;
-    }
-
-    if (block.kind === "code") {
-      const key = hashBlockContent(`${block.language ?? ""}\n${block.text}`);
-      const occurrence = codeCounts.get(key) ?? 0;
-      codeCounts.set(key, occurrence + 1);
-      if (
-        anchor.kind === "code" &&
-        blockIdForCode(block.text, block.language, occurrence) === anchor.blockId
-      ) {
-        return block.text;
+      case "code": {
+        const key = hashBlockContent(`${block.language ?? ""}\n${block.text}`);
+        const occurrence = codeCounts.get(key) ?? 0;
+        codeCounts.set(key, occurrence + 1);
+        if (
+          anchor.kind === "code" &&
+          blockIdForCode(block.text, block.language, occurrence) === anchor.blockId
+        ) {
+          return block.text;
+        }
+        continue;
       }
-      continue;
-    }
-
-    if (block.kind === "list") {
-      const hash = hashBlockContent(block.text);
-      const occurrence = listCounts.get(hash) ?? 0;
-      listCounts.set(hash, occurrence + 1);
-      if (anchor.kind === "list" && blockIdForList(block.text, occurrence) === anchor.blockId) {
-        return block.text;
+      case "list": {
+        const hash = hashBlockContent(block.text);
+        const occurrence = listCounts.get(hash) ?? 0;
+        listCounts.set(hash, occurrence + 1);
+        if (anchor.kind === "list" && blockIdForList(block.text, occurrence) === anchor.blockId) {
+          return block.text;
+        }
+        continue;
       }
-      continue;
-    }
-
-    if (block.kind === "table") {
-      const hash = hashBlockContent(block.text);
-      const occurrence = tableCounts.get(hash) ?? 0;
-      tableCounts.set(hash, occurrence + 1);
-      if (anchor.kind === "table" && blockIdForTable(block.text, occurrence) === anchor.blockId) {
-        return block.text;
+      case "table": {
+        const hash = hashBlockContent(block.text);
+        const occurrence = tableCounts.get(hash) ?? 0;
+        tableCounts.set(hash, occurrence + 1);
+        if (anchor.kind === "table" && blockIdForTable(block.text, occurrence) === anchor.blockId) {
+          return block.text;
+        }
+        break;
       }
     }
   }
@@ -312,48 +311,48 @@ export function findBlockRange(
   const tableCounts = new Map<string, number>();
 
   for (const block of pinnable) {
-    if (block.kind === "paragraph") {
-      const hash = hashBlockContent(block.text);
-      const occurrence = paragraphCounts.get(hash) ?? 0;
-      paragraphCounts.set(hash, occurrence + 1);
-      if (
-        anchor.kind === "paragraph" &&
-        blockIdForParagraph(block.text, occurrence) === anchor.blockId
-      ) {
-        return block.range;
+    switch (block.kind) {
+      case "paragraph": {
+        const hash = hashBlockContent(block.text);
+        const occurrence = paragraphCounts.get(hash) ?? 0;
+        paragraphCounts.set(hash, occurrence + 1);
+        if (
+          anchor.kind === "paragraph" &&
+          blockIdForParagraph(block.text, occurrence) === anchor.blockId
+        ) {
+          return block.range;
+        }
+        continue;
       }
-      continue;
-    }
-
-    if (block.kind === "code") {
-      const key = hashBlockContent(`${block.language ?? ""}\n${block.text}`);
-      const occurrence = codeCounts.get(key) ?? 0;
-      codeCounts.set(key, occurrence + 1);
-      if (
-        anchor.kind === "code" &&
-        blockIdForCode(block.text, block.language, occurrence) === anchor.blockId
-      ) {
-        return block.range;
+      case "code": {
+        const key = hashBlockContent(`${block.language ?? ""}\n${block.text}`);
+        const occurrence = codeCounts.get(key) ?? 0;
+        codeCounts.set(key, occurrence + 1);
+        if (
+          anchor.kind === "code" &&
+          blockIdForCode(block.text, block.language, occurrence) === anchor.blockId
+        ) {
+          return block.range;
+        }
+        continue;
       }
-      continue;
-    }
-
-    if (block.kind === "list") {
-      const hash = hashBlockContent(block.text);
-      const occurrence = listCounts.get(hash) ?? 0;
-      listCounts.set(hash, occurrence + 1);
-      if (anchor.kind === "list" && blockIdForList(block.text, occurrence) === anchor.blockId) {
-        return block.range;
+      case "list": {
+        const hash = hashBlockContent(block.text);
+        const occurrence = listCounts.get(hash) ?? 0;
+        listCounts.set(hash, occurrence + 1);
+        if (anchor.kind === "list" && blockIdForList(block.text, occurrence) === anchor.blockId) {
+          return block.range;
+        }
+        continue;
       }
-      continue;
-    }
-
-    if (block.kind === "table") {
-      const hash = hashBlockContent(block.text);
-      const occurrence = tableCounts.get(hash) ?? 0;
-      tableCounts.set(hash, occurrence + 1);
-      if (anchor.kind === "table" && blockIdForTable(block.text, occurrence) === anchor.blockId) {
-        return block.range;
+      case "table": {
+        const hash = hashBlockContent(block.text);
+        const occurrence = tableCounts.get(hash) ?? 0;
+        tableCounts.set(hash, occurrence + 1);
+        if (anchor.kind === "table" && blockIdForTable(block.text, occurrence) === anchor.blockId) {
+          return block.range;
+        }
+        break;
       }
     }
   }
@@ -370,8 +369,7 @@ export function resolveBlockRawMarkdown(
   options?: ResolveBlockTextOptions,
 ): string | undefined {
   const range = findBlockRange(content, anchor, options);
-  if (!range) return undefined;
-  return content.slice(range.start, range.end);
+  return !range ? undefined : content.slice(range.start, range.end);
 }
 
 /**
@@ -384,8 +382,9 @@ export function applyBlockEdit(
   options?: ResolveBlockTextOptions,
 ): string | undefined {
   const range = findBlockRange(content, anchor, options);
-  if (!range) return undefined;
-  return `${content.slice(0, range.start)}${newBlockMarkdown}${content.slice(range.end)}`;
+  return !range
+    ? undefined
+    : `${content.slice(0, range.start)}${newBlockMarkdown}${content.slice(range.end)}`;
 }
 
 /** One anchorable block in the open document, ready to hand to propose_edit. */

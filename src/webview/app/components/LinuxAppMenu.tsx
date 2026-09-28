@@ -193,8 +193,4 @@ function MenuBar() {
 
 /** Nothing to stand in for anywhere but Linux — macOS gets the native menu bar,
  *  and a future Windows build would get its own native chrome too. */
-export function LinuxAppMenu() {
-  if (!isLinuxPlatform()) return null;
-
-  return <MenuBar />;
-}
+export const LinuxAppMenu = () => (!isLinuxPlatform() ? null : <MenuBar />);

@@ -32,7 +32,7 @@ describe("resolveGrammar", () => {
 
 describe("syntaxTokenizer", () => {
   test("highlights languages the bare CodeBlock cannot", () => {
-    const code = `fn main() {\n    let x = 42;\n}`;
+    const code = "fn main() {\n    let x = 42;\n}";
     const tokens = syntaxTokenizer(code, "rust");
 
     expect(typeOfSlice(code, tokens, "fn")).toBe("keyword");
@@ -41,7 +41,7 @@ describe("syntaxTokenizer", () => {
   });
 
   test("returns ranges that are ordered, non-overlapping and in bounds", () => {
-    const code = `SELECT name FROM users -- a comment\nWHERE id = 7;`;
+    const code = "SELECT name FROM users -- a comment\nWHERE id = 7;";
     const tokens = syntaxTokenizer(code, "sql");
 
     expect(tokens.length).toBeGreaterThan(0);

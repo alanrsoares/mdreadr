@@ -54,9 +54,7 @@ function updateState(next: Partial<AppUpdateState>) {
   onMenuUpdateListener?.(getUpdateMenuItemConfig());
 }
 
-export function getUpdateStatus(): AppUpdateState {
-  return currentState;
-}
+export const getUpdateStatus = (): AppUpdateState => currentState;
 
 function resignBundleIfNeeded(): void {
   if (process.platform !== "darwin") return;

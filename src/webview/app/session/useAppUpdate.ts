@@ -10,10 +10,7 @@ export function useAppUpdate(api: ReaderApi) {
     queryFn: () => api.getUpdateStatus(),
     refetchInterval: (q) => {
       const status = q.state.data?.status;
-      if (status === "checking" || status === "downloading") {
-        return 1000;
-      }
-      return 60000;
+      return status === "checking" || status === "downloading" ? 1000 : 60000;
     },
   });
 

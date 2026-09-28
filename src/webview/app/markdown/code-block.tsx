@@ -9,6 +9,6 @@ import { syntaxTokenizer } from "./syntax-tokens.ts";
  * `highlightMode` is left on `auto` on purpose: the Highlight API path is
  * skipped on WebKit, which is exactly the engine the app's webview runs.
  */
-export function ReaderCodeBlock(props: CodeBlockProps) {
-  return <CodeBlock {...props} tokenizer={syntaxTokenizer} />;
-}
+export const ReaderCodeBlock = (props: CodeBlockProps) => (
+  <CodeBlock {...props} tokenizer={syntaxTokenizer} />
+);
