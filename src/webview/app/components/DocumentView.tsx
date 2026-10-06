@@ -16,6 +16,7 @@ import {
   ReaderDocumentChrome,
   ReaderSheet,
 } from "../ui/layout.tsx";
+import { WriteEditor } from "../write/WriteEditor.tsx";
 import { DocumentEditor } from "./DocumentEditor.tsx";
 import { type DocumentViewMode, DocumentViewModeSwitch } from "./DocumentViewModeSwitch.tsx";
 import { FontAdjustmentControl } from "./FontAdjustmentControl.tsx";
@@ -44,6 +45,8 @@ type DocumentViewProps = {
   findBar?: ReactNode;
   /** The rendered Document, when a caller needs to read it (find, navigation). */
   previewRef?: RefObject<HTMLDivElement | null>;
+  /** The column holding the Write surface, when a caller needs to read it. */
+  writeRef?: RefObject<HTMLDivElement | null>;
   /** False for a mounted-but-hidden tab; gates the window-level Cmd+± shortcut. */
   isActive?: boolean;
 };
@@ -63,6 +66,7 @@ export const DocumentView = ({
   chromeEnd,
   findBar,
   previewRef: previewRefFromProps,
+  writeRef,
   isActive = true,
 }: DocumentViewProps) => {
   const { readerFontSize, readerFontFamily, readerLineHeight, editorFontSize, editorFontFamily } =
@@ -151,25 +155,39 @@ export const DocumentView = ({
             </ReaderColumn>
           ))
           .with("markdown", () =>
-            mode === "preview" ? (
-              <ReaderColumn ref={previewRef} style={readerStyles}>
-                <MarkdownView
-                  content={content}
-                  documentPath={documentPath}
-                  notes={notes}
-                  onPinBlock={onPinBlock}
-                  onOpenDocument={onOpenDocument}
-                />
-              </ReaderColumn>
-            ) : (
-              <ReaderColumn style={readerStyles}>
-                <DocumentEditor
-                  value={editorValue}
-                  onChange={onEditorChange}
-                  onEditorReady={onEditorReady}
-                />
-              </ReaderColumn>
-            ),
+            match(mode)
+              .with("preview", () => (
+                <ReaderColumn ref={previewRef} style={readerStyles}>
+                  <MarkdownView
+                    content={content}
+                    documentPath={documentPath}
+                    notes={notes}
+                    onPinBlock={onPinBlock}
+                    onOpenDocument={onOpenDocument}
+                  />
+                </ReaderColumn>
+              ))
+              // No pins here: Notes anchor to the Preview's blocks, so they stay
+              // in Preview and the Review panel.
+              .with("write", () => (
+                <ReaderColumn ref={writeRef} style={readerStyles}>
+                  <WriteEditor
+                    value={editorValue}
+                    documentPath={documentPath}
+                    onChange={onEditorChange}
+                  />
+                </ReaderColumn>
+              ))
+              .with("edit", () => (
+                <ReaderColumn style={readerStyles}>
+                  <DocumentEditor
+                    value={editorValue}
+                    onChange={onEditorChange}
+                    onEditorReady={onEditorReady}
+                  />
+                </ReaderColumn>
+              ))
+              .exhaustive(),
           )
           .exhaustive()}
       </ReaderDocumentBody>
