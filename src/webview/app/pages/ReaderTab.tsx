@@ -41,6 +41,7 @@ import { ApplyInlineEditProvider } from "../session/inline-edit-context.tsx";
 import { takeFragment } from "../session/pending-fragment.ts";
 import type { ReaderApi } from "../session/reader-api.ts";
 import { useReaderSession } from "../session/useReaderSession.ts";
+import { writeHeadingIndex } from "../write/outline.ts";
 import { ReaderTabShell } from "./ReaderTabShell.tsx";
 import { readerPageContainer } from "./reader-page-container.ts";
 
@@ -300,13 +301,16 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
   }, []);
 
   // Write renders headings without the reader's anchor ids, so an outline entry
-  // is found by its position among the headings.
+  // is found by its position among the headings, minus `#` lines inside fences.
   const onSelectHeadingInWrite = useCallback(
     (entry: TocEntry) => {
       const headings = writeRef.current?.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6");
-      headings?.[toc.indexOf(entry)]?.scrollIntoView({ block: "start", behavior: "smooth" });
+      headings?.[writeHeadingIndex(editorValue, toc, entry)]?.scrollIntoView({
+        block: "start",
+        behavior: "smooth",
+      });
     },
-    [toc],
+    [toc, editorValue],
   );
 
   const onScrollToAnchor = useCallback(

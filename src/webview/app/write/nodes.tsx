@@ -14,7 +14,7 @@ import {
   type Spread,
 } from "lexical";
 import { createContext, type ReactNode, useContext } from "react";
-import type { ImageSrcResolver } from "../markdown/assets.ts";
+import { DANGEROUS_URL_PATTERN, type ImageSrcResolver } from "../markdown/assets.ts";
 
 /**
  * Rewrites Document-relative image sources for display only. The node keeps the
@@ -31,6 +31,8 @@ type WriteImageProps = { src: string; alt: string; title: string | null };
 
 function WriteImage({ src, alt, title }: WriteImageProps) {
   const resolve = useContext(ImageSrcContext);
+  // Same policy as Preview: a script-bearing source shows its alt text instead.
+  if (DANGEROUS_URL_PATTERN.test(src.trim())) return <span>{alt}</span>;
   return <img src={resolve(src)} alt={alt} title={title ?? undefined} draggable={false} />;
 }
 
