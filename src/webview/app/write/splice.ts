@@ -31,6 +31,7 @@ const INDENTED = /^(?: {2,}|\t)/;
 type BlockKind = "paragraph" | "list" | "quote" | "table" | "single";
 type OpenBlock = { kind: BlockKind; first: number; last: number };
 
+/** Whether a line is empty or whitespace only. */
 const isBlank = (line: string): boolean => line.trim() === "";
 
 /** Length of a leading `---` front matter block, which Write mode never edits. */
@@ -39,6 +40,7 @@ export const frontmatterLength = (markdown: string): number =>
 
 type Line = { text: string; start: number };
 
+/** Splits markdown into lines, each with its character offset, counting from `from`. */
 function toLines(markdown: string, from: number): Line[] {
   const lines: Line[] = [];
   let start = from;
@@ -158,6 +160,7 @@ export function splitSourceBlocks(markdown: string): SourceBlock[] {
 
 type Edit = { start: number; end: number; insert: string };
 
+/** Applies non-overlapping edits to `text` without shifting earlier offsets. */
 const applyEdits = (text: string, edits: readonly Edit[]): string =>
   [...edits]
     .sort((a, b) => b.start - a.start)

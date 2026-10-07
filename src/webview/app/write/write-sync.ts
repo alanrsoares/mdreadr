@@ -10,6 +10,7 @@ export type WriteSync = {
   readonly exported: string;
 };
 
+/** Starts tracking: the Draft text paired with what the editor exported for it. */
 export const startWriteSync = (markdown: string, exported: string): WriteSync => ({
   markdown,
   exported,
@@ -21,6 +22,7 @@ export type WriteEdit = {
   changed: boolean;
 };
 
+/** Splices an editor export into the Draft, touching only the blocks that changed. */
 export function applyWriteEdit(sync: WriteSync, exported: string): WriteEdit {
   const markdown = spliceMarkdown(sync.markdown, sync.exported, exported);
   return { sync: { markdown, exported }, changed: markdown !== sync.markdown };

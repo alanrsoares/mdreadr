@@ -64,6 +64,7 @@ function $createRow(cells: readonly string[], header: boolean): TableRowNode {
   return row;
 }
 
+/** Makes cell text safe inside a pipe-table row. */
 const escapeCell = (text: string): string => text.replace(/\n/g, " ").replace(/\|/g, "\\|").trim();
 
 /** GFM pipe tables: a header row, a divider row, then body rows. */

@@ -29,6 +29,7 @@ type SerializedImageNode = Spread<
 
 type WriteImageProps = { src: string; alt: string; title: string | null };
 
+/** Renders an image through the Document-relative resolver, or its alt text when unsafe. */
 function WriteImage({ src, alt, title }: WriteImageProps) {
   const resolve = useContext(ImageSrcContext);
   // Same policy as Preview: a script-bearing source shows its alt text instead.

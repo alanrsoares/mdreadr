@@ -81,6 +81,7 @@ type ExternalDraftProps = {
   pendingRef: RefObject<PendingEmits>;
 };
 
+/** Loads Draft changes made outside Write into the editor as one undoable update. */
 function ExternalDraftPlugin({ value, syncRef, pendingRef }: ExternalDraftProps) {
   const [editor] = useLexicalComposerContext();
 

@@ -33,6 +33,7 @@ export function codeParts(code: string, language: string | undefined): CodePart[
   });
 }
 
+/** The highlightable piece a code child contributes, or undefined for anything else. */
 const partOf = (node: LexicalNode): CodePart | undefined => {
   if ($isCodeHighlightNode(node)) {
     return { kind: "text", text: node.getTextContent(), slot: node.getHighlightType() ?? null };
@@ -42,6 +43,7 @@ const partOf = (node: LexicalNode): CodePart | undefined => {
   return undefined;
 };
 
+/** Whether two code pieces are identical, so an unchanged line is not rewritten. */
 const samePart = (a: CodePart | undefined, b: CodePart | undefined): boolean =>
   a !== undefined &&
   b !== undefined &&
