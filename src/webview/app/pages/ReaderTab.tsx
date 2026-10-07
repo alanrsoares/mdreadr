@@ -41,6 +41,7 @@ import { ApplyInlineEditProvider } from "../session/inline-edit-context.tsx";
 import { takeFragment } from "../session/pending-fragment.ts";
 import type { ReaderApi } from "../session/reader-api.ts";
 import { useReaderSession } from "../session/useReaderSession.ts";
+import { writeHeadingIndex } from "../write/outline.ts";
 import { ReaderTabShell } from "./ReaderTabShell.tsx";
 import { readerPageContainer } from "./reader-page-container.ts";
 
@@ -84,6 +85,7 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
   const { pendingAnchor, documentViewMode, isDragOver } = useStoreValues(store);
   const readerMainRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const writeRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
 
   const drop = useFileDrop({
@@ -164,6 +166,7 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
     isActive,
     mode: documentViewMode,
     previewRef,
+    writeRef,
     rootRef: readerMainRef,
     editorViewRef,
     editorValue,
@@ -192,7 +195,7 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
       }),
       registerAppCommand("find-in-document", find.open),
       registerAppCommand("toggle-view-mode", () => {
-        store.actions.documentViewModeChanged(documentViewMode === "edit" ? "preview" : "edit");
+        store.actions.documentViewModeChanged(documentViewMode === "preview" ? "edit" : "preview");
       }),
     ];
     return () => {
@@ -270,13 +273,16 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
     content: editorValue,
     rootRef: readerMainRef,
     editorViewRef,
+    writeRootRef: writeRef,
     onChange: store.actions.documentViewModeChanged,
   });
   // Only markdown has headings: `# ` in a shell script or a Python file is a
   // comment, and an outline built from those is noise.
+  // Write shows the Draft too, so its outline follows the Draft.
+  const isDraftView = isEditing || (kind === "markdown" && documentViewMode === "write");
   const toc = useMemo(
-    () => (kind === "markdown" ? extractHeadings(isEditing ? editorValue : content) : []),
-    [kind, isEditing, editorValue, content],
+    () => (kind === "markdown" ? extractHeadings(isDraftView ? editorValue : content) : []),
+    [kind, isDraftView, editorValue, content],
   );
 
   // The DOM scroll spy inside TocSidebar has no heading elements to watch in
@@ -293,6 +299,19 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
     scrollEditorToSettled(view, root, line.from);
     view.focus();
   }, []);
+
+  // Write renders headings without the reader's anchor ids, so an outline entry
+  // is found by its position among the headings, minus `#` lines inside fences.
+  const onSelectHeadingInWrite = useCallback(
+    (entry: TocEntry) => {
+      const headings = writeRef.current?.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6");
+      headings?.[writeHeadingIndex(editorValue, toc, entry)]?.scrollIntoView({
+        block: "start",
+        behavior: "smooth",
+      });
+    },
+    [toc, editorValue],
+  );
 
   const onScrollToAnchor = useCallback(
     (blockId: string) => {
@@ -386,7 +405,13 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
           entries={toc}
           scrollRootRef={readerMainRef}
           documentKey={documentPath}
-          onSelect={isEditing ? onSelectHeadingInEditor : undefined}
+          onSelect={
+            isEditing
+              ? onSelectHeadingInEditor
+              : documentViewMode === "write"
+                ? onSelectHeadingInWrite
+                : undefined
+          }
           activeId={editorActiveHeadingId}
         />
       }
@@ -436,9 +461,10 @@ const ReaderTabInner = forwardRef<ReaderTabHandle, ReaderTabProps>(function Read
           onEditorChange={onEditorChange}
           onEditorReady={onEditorReady}
           previewRef={previewRef}
+          writeRef={writeRef}
           findBar={find.isOpen ? <FindBar find={find} /> : undefined}
           chromeEnd={
-            isEditing || dirty ? (
+            isEditing || documentViewMode === "write" || dirty ? (
               <Button
                 label="Save"
                 variant="primary"

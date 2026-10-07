@@ -29,6 +29,8 @@ export type UseDocumentFindInput = {
   mode: DocumentViewMode;
   /** The rendered Document, searched in Preview. */
   previewRef: RefObject<HTMLElement | null>;
+  /** The Write surface, searched like the rendered Document: it is rendered text too. */
+  writeRef: RefObject<HTMLElement | null>;
   /** The scroll container, for placing a source match at the fold. */
   rootRef: RefObject<HTMLElement | null>;
   editorViewRef: RefObject<EditorView | null>;
@@ -39,8 +41,8 @@ export type UseDocumentFindInput = {
 /**
  * Find within the open Document.
  *
- * One session across both modes: the same term, the same counter, and a match
- * index that survives the Preview/Edit toggle, because a reviewer who searched
+ * One session across the modes: the same term, the same counter, and a match
+ * index that survives the Preview/Write/Edit toggle, because a reviewer who searched
  * in Preview and switched to Edit to fix what they found is still looking for
  * the same thing. What differs is only where the text comes from and how a
  * match is shown: painted ranges over the prose, a real selection in the source.
@@ -49,10 +51,14 @@ export function useDocumentFind({
   isActive,
   mode,
   previewRef,
+  writeRef,
   rootRef,
   editorViewRef,
   editorValue,
 }: UseDocumentFindInput): DocumentFind {
+  // Preview and Write both paint matches over rendered text; they differ only in
+  // which element holds it.
+  const surfaceRef = mode === "write" ? writeRef : previewRef;
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQueryState] = useState("");
   const [matches, setMatches] = useState<FindMatch[]>([]);
@@ -97,14 +103,14 @@ export function useDocumentFind({
     const haystack =
       mode === "edit"
         ? editorValue
-        : collectTextNodes(previewRef.current ?? document.createElement("div"))
+        : collectTextNodes(surfaceRef.current ?? document.createElement("div"))
             .map((node) => node.data)
             .join("");
 
     const found = findMatches(haystack, query);
     setMatches(found);
     setIndex(matchNearestTo(found, anchorRef.current));
-  }, [isOpen, query, mode, editorValue, previewRef]);
+  }, [isOpen, query, mode, editorValue, surfaceRef]);
 
   // Show the match the reader is on: painted over the prose, selected in the
   // source. Separate from finding them, so stepping does not re-scan the text.
@@ -132,11 +138,11 @@ export function useDocumentFind({
       return;
     }
 
-    const root = previewRef.current;
+    const root = surfaceRef.current;
     if (!root) return;
     const { currentRange } = paintMatches(collectTextNodes(root), matches, index);
     if (currentRange) revealRange(currentRange, root);
-  }, [isOpen, isActive, query, matches, index, mode, previewRef, rootRef, editorViewRef]);
+  }, [isOpen, isActive, query, matches, index, mode, surfaceRef, rootRef, editorViewRef]);
 
   // Painted ranges belong to this tab's DOM: leaving the tab, or the Document,
   // must not leave them on the next one.
