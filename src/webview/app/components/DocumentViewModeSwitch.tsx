@@ -2,15 +2,15 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import type { DocumentKind } from "@mdreadr/domain";
-import { EyeIcon, PencilSquareIcon } from "../icons.ts";
+import { CodeBracketIcon, EyeIcon, PencilSquareIcon } from "../icons.ts";
 
-export type DocumentViewMode = "preview" | "edit";
+export type DocumentViewMode = "preview" | "write" | "edit";
 
 type DocumentViewModeSwitchProps = {
   value: DocumentViewMode;
   onChange: (mode: DocumentViewMode) => void;
   /**
-   * Only markdown has both modes. The switch still renders for the others —
+   * Only markdown has all three modes. The switch still renders for the others —
    * with the mode they cannot reach disabled — so the chrome does not move
    * when a Tab opens a file of a different kind.
    */
@@ -23,10 +23,11 @@ export function DocumentViewModeSwitch({
   kind = "markdown",
 }: DocumentViewModeSwitchProps) {
   const canPreview = kind !== "source";
+  const canWrite = kind === "markdown";
   const canEdit = kind !== "image";
 
   const selectMode = (next: string) => {
-    if (next === "preview" || next === "edit") {
+    if (next === "preview" || next === "write" || next === "edit") {
       onChange(next);
     }
   };
@@ -48,13 +49,22 @@ export function DocumentViewModeSwitch({
           icon={<Icon icon={EyeIcon} size="sm" />}
         />
       </Tooltip>
+      <Tooltip content={canWrite ? "Write" : "No write mode: this file is not markdown"}>
+        <SegmentedControlItem
+          value="write"
+          label="Write"
+          isLabelHidden
+          isDisabled={!canWrite}
+          icon={<Icon icon={PencilSquareIcon} size="sm" />}
+        />
+      </Tooltip>
       <Tooltip content={canEdit ? "Edit source" : "No source to edit: this file is an image"}>
         <SegmentedControlItem
           value="edit"
           label="Edit"
           isLabelHidden
           isDisabled={!canEdit}
-          icon={<Icon icon={PencilSquareIcon} size="sm" />}
+          icon={<Icon icon={CodeBracketIcon} size="sm" />}
         />
       </Tooltip>
     </SegmentedControl>
