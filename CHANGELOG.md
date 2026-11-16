@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.0](https://github.com/alanrsoares/mdreadr/compare/v0.21.5...v0.22.0) (2026-11-15)
+
+
+### Features
+
+* **webview:** add Write mode on Lexical ([#97](https://github.com/alanrsoares/mdreadr/issues/97)) ([842a064](https://github.com/alanrsoares/mdreadr/commit/842a064abbd706486402d187ed47c57cfa273ba9))
+
 ## [0.21.5](https://github.com/alanrsoares/mdreadr/compare/v0.21.4...v0.21.5) (2026-09-18)
 
 
